@@ -11,6 +11,10 @@ and the debug keyboard that the game's console reads.
 
 #include "platform.h"
 #include "sdl_platform.h"
+extern void halo_input_focus_lost(void);
+#ifdef HALO_MACOS
+extern void halo_input_gamepads_changed(void);
+#endif
 #include "gl.h"
 #include "port_config.h"
 #include "p2p.h"
@@ -30,7 +34,7 @@ static struct platform_input_state input_state;
 /* keys pressed since the last read, so a press and release between two
 reads still counts as a press (input injected on Android, or a slow frame) */
 static unsigned char keys_pressed[SDL_SCANCODE_COUNT];
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) || defined(HALO_MACOS)
 /* the menus' pointer (platform_ui_pointer_set_active), under input_lock */
 static struct platform_ui_pointer ui_pointer;
 static float ui_pointer_wheel;
@@ -57,7 +61,7 @@ BOOL platform_sdl_initialize(void)
 	if (p2p_hand_off_invite())
 		exit(EXIT_SUCCESS);
 	SDL_SetHint(SDL_HINT_APP_NAME, "Halo");
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 	/* landscape only; the back key arrives as a key event (xinput_sdl.c)
 	instead of closing the activity */
 	SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
@@ -298,14 +302,16 @@ int halo_interpolation_enabled(void)
 	return enabled;
 }
 
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) || defined(HALO_MACOS)
 /* whether the window opens fullscreen (display.fullscreen), never when it
 is hidden */
 static BOOL platform_fullscreen_setting(void)
 {
 	return !config_boolean("debug.hidden_window") && config_boolean("display.fullscreen");
 }
+#endif
 
+#ifndef HALO_ANDROID
 /* whether the game is, or is to be, fullscreen, and if so the size in
 pixels of the display it fills (d3d8_gl.c draws at that resolution) */
 BOOL platform_screen_mode(long *width, long *height)
@@ -326,7 +332,37 @@ BOOL platform_screen_mode(long *width, long *height)
 	*height = (long)(mode->h * mode->pixel_density + 0.5f);
 	return TRUE;
 }
+#endif
+#ifdef HALO_MACOS
+BOOL platform_render_resolution(long *width, long *height)
+{
+	const char *resolution = config_string("display.resolution");
+	if (!strcmp(resolution, "native")) return FALSE;
+	if (!strcmp(resolution, "1920x1080")) { *width = 1920; *height = 1080; }
+	else if (!strcmp(resolution, "640x480")) { *width = 640; *height = 480; }
+	else { *width = 1280; *height = 720; }
+	return TRUE;
+}
 
+static void platform_cycle_render_resolution(void)
+{
+ const char *current = config_string("display.resolution");
+ const char *next = !strcmp(current, "640x480") ? "1280x720" :
+  !strcmp(current, "1280x720") ? "1920x1080" : "640x480";
+ int points_w = 0, points_h = 0, pixels_w = 0, pixels_h = 0;
+ long width = !strcmp(next, "640x480") ? 640 : !strcmp(next, "1280x720") ? 1280 : 1920;
+ long height = !strcmp(next, "640x480") ? 480 : !strcmp(next, "1280x720") ? 720 : 1080;
+ SDL_GetWindowSize(platform_window, &points_w, &points_h);
+ SDL_GetWindowSizeInPixels(platform_window, &pixels_w, &pixels_h);
+ double density = points_w > 0 && pixels_w > 0 ? (double)pixels_w / points_w : 1.0;
+ if (density < 1.0) density = 1.0;
+ if (!SDL_SetWindowSize(platform_window, (int)(width / density + 0.5), (int)(height / density + 0.5)))
+  platform_log("display mode: cannot resize window: %s", SDL_GetError());
+ if (!config_write_string("display.resolution", next))
+  platform_log("display mode: cannot persist %s", next);
+ /* halo_screen_commit reuses the normal back/depth-buffer resize path next frame. */
+ platform_log("display mode: %s (F10)", next);
+}
 #endif
 BOOL platform_video_initialize(unsigned long width, unsigned long height)
 {
@@ -339,11 +375,26 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		return FALSE;
 	if (scale < 1)
 		scale = 1;
+#ifdef HALO_MACOS
+	{
+		long render_width, render_height;
+		if (platform_render_resolution(&render_width, &render_height))
+		{
+			width = (unsigned long)render_width;
+			height = (unsigned long)render_height;
+			scale = 1;
+		}
+	}
+#endif
 
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+#elif defined(HALO_MACOS)
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
 #else
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
@@ -352,8 +403,14 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
+#ifdef HALO_MACOS
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS,
+		SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG |
+		(config_boolean("debug.gl_debug") ? SDL_GL_CONTEXT_DEBUG_FLAG : 0));
+#else
 	if (config_boolean("debug.gl_debug"))
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+#endif
 #if !defined(HALO_ANDROID) && !defined(_WIN32)
 	/* Mesa's GL thread: the renderer makes thousands of GL calls a frame
 	and never waits for their results, so handing them to a thread of
@@ -362,7 +419,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	setenv("mesa_glthread", "true", 0);
 #endif
 
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 	platform_window = SDL_CreateWindow("Halo", (int)(width * scale), (int)(height * scale),
 		SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN);
 #else
@@ -381,7 +438,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		return FALSE;
 	}
 	platform_gl_context = SDL_GL_CreateContext(platform_window);
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 	/* ES 3.2 where the driver has it, otherwise the renderer makes do with
 	3.0 plus extensions */
 	if (!platform_gl_context)
@@ -402,7 +459,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	(void)version;
 	platform_event_thread = SDL_GetCurrentThreadID();
 	platform_log("OpenGL %s on %s", (const char *)glGetString(GL_VERSION), (const char *)glGetString(GL_RENDERER));
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) || defined(HALO_MACOS)
 	platform_mouse_capture(TRUE);
 #endif
 	return TRUE;
@@ -589,7 +646,7 @@ static void platform_invite_clipboard(BOOL look)
 		SDL_SetClipboardText(invite);
 		snprintf(seen, sizeof(seen), "%s", invite);
 		platform_log("Internet play: the invite link is on the clipboard");
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 		SDL_ShowAndroidToast("Hosting: the invite link is on the clipboard", 1, -1, 0, 0);
 #endif
 	}
@@ -602,7 +659,7 @@ static void platform_invite_clipboard(BOOL look)
 			snprintf(seen, sizeof(seen), "%s", text);
 			if (p2p_join_invite(text))
 			{
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 				SDL_ShowAndroidToast("Joining the invite on the clipboard", 1, -1, 0, 0);
 #endif
 			}
@@ -683,6 +740,13 @@ void platform_pump_events(void)
 		double seconds = config_real("debug.exit_after");
 
 		exit_ticks = seconds > 0.0 ? SDL_GetTicks() + (Uint64)(seconds * 1000.0) : 0;
+		if (getenv("HALO_TRACE_SCREEN_MODE"))
+		{
+			union { double value; uint64_t bits; } raw_seconds = { .value = seconds };
+			fprintf(stderr, "[exit-after-trace] seconds=%.17g bits=0x%016llx now=%llu deadline=%llu\n",
+				raw_seconds.value, (unsigned long long)raw_seconds.bits,
+				(unsigned long long)SDL_GetTicks(), (unsigned long long)exit_ticks);
+		}
 	}
 	if (exit_ticks && SDL_GetTicks() >= exit_ticks)
 	{
@@ -704,7 +768,39 @@ void platform_pump_events(void)
 			exit(EXIT_SUCCESS);
 		case SDL_EVENT_KEY_DOWN:
 		case SDL_EVENT_KEY_UP:
-			if (event.key.scancode < SDL_SCANCODE_COUNT)
+#ifdef HALO_MACOS
+			if (event.key.down && event.key.scancode == SDL_SCANCODE_Q && (event.key.mod & SDL_KMOD_GUI)) {
+				pthread_mutex_unlock(&input_lock); platform_log("Command-Q"); exit(EXIT_SUCCESS);
+			}
+			/* Leave Command-Tab and macOS screenshot chords to the system.
+			   Screenshot overlays need a free pointer even if focus stays here. */
+			if (event.key.mod & SDL_KMOD_GUI)
+			{
+				input_state.mouse_released = TRUE;
+				platform_mouse_capture(FALSE);
+				memset(input_state.keys, 0, sizeof(input_state.keys));
+				memset(input_state.mouse_buttons, 0, sizeof(input_state.mouse_buttons));
+				memset(keys_pressed, 0, sizeof(keys_pressed));
+				keystroke_head = keystroke_count = 0;
+				input_state.mouse_dx = input_state.mouse_dy = input_state.mouse_wheel = 0;
+				halo_input_focus_lost();
+				break;
+			}
+			/* Consume both edges/repeats so F10 never enters gameplay or text input. */
+			if (event.key.scancode == SDL_SCANCODE_F10)
+			{
+				if (event.key.down && !event.key.repeat &&
+					!(event.key.mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_SHIFT | SDL_KMOD_GUI)))
+					platform_cycle_render_resolution();
+				break;
+			}
+			if (event.key.down && event.key.scancode == SDL_SCANCODE_ESCAPE)
+			{
+				input_state.mouse_released = TRUE;
+				platform_mouse_capture(FALSE);
+			}
+#endif
+			if (event.key.scancode >= 0 && event.key.scancode < SDL_SCANCODE_COUNT)
 			{
 				input_state.keys[event.key.scancode] = event.key.down;
 				if (event.key.down)
@@ -717,7 +813,7 @@ void platform_pump_events(void)
 				input_state.mouse_released = !input_state.mouse_released;
 				platform_mouse_capture(!input_state.mouse_released && !input_state.ui_pointer);
 			}
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) || defined(HALO_MACOS)
 			/* F11 switches between fullscreen and the window (SDL keeps the
 			window's size and place while fullscreen) */
 			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F11)
@@ -728,7 +824,7 @@ void platform_pump_events(void)
 #endif
 			break;
 		case SDL_EVENT_MOUSE_MOTION:
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) || defined(HALO_MACOS)
 			/* in the menus the mouse moves the pointer, not the view */
 			if (input_state.ui_pointer)
 			{
@@ -743,7 +839,17 @@ void platform_pump_events(void)
 			break;
 		case SDL_EVENT_MOUSE_BUTTON_DOWN:
 		case SDL_EVENT_MOUSE_BUTTON_UP:
-#ifndef HALO_ANDROID
+#ifdef HALO_MACOS
+			if (input_state.focused && input_state.mouse_released && !input_state.ui_pointer &&
+				event.button.down && event.button.button == SDL_BUTTON_LEFT)
+			{
+				input_state.mouse_released = FALSE;
+				input_state.mouse_dx = input_state.mouse_dy = 0;
+				platform_mouse_capture(TRUE);
+				break; /* the recapture click must not fire the weapon */
+			}
+#endif
+#if !defined(HALO_ANDROID) || defined(HALO_MACOS)
 			/* clicks in the menus go to the pointer; a button held down
 			when the menu closes stays up until pressed again, so the click
 			that resumes the game does not also fire */
@@ -766,7 +872,7 @@ void platform_pump_events(void)
 				input_state.mouse_buttons[event.button.button] = event.button.down;
 			break;
 		case SDL_EVENT_MOUSE_WHEEL:
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) || defined(HALO_MACOS)
 			if (input_state.ui_pointer)
 			{
 				/* whole notches: smooth-scrolling wheels send fractions */
@@ -790,18 +896,35 @@ void platform_pump_events(void)
 			memset(input_state.keys, 0, sizeof(input_state.keys));
 			memset(input_state.mouse_buttons, 0, sizeof(input_state.mouse_buttons));
 			input_state.focused = FALSE;
+   memset(keys_pressed, 0, sizeof(keys_pressed));
+   keystroke_head = keystroke_count = 0;
+   input_state.mouse_dx = input_state.mouse_dy = input_state.mouse_wheel = 0;
+   halo_input_focus_lost();
+#if !defined(HALO_ANDROID) || defined(HALO_MACOS)
+   platform_mouse_capture(FALSE);
+   ui_pointer.left_clicks = ui_pointer.right_clicks = ui_pointer.wheel_steps = 0;
+   ui_pointer_wheel = 0.0f;
+#endif
 			break;
 		case SDL_EVENT_WINDOW_FOCUS_GAINED:
 			input_state.focused = TRUE;
 			look_at_clipboard = TRUE;
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) || defined(HALO_MACOS)
 			if (!input_state.mouse_released && !input_state.ui_pointer)
 				platform_mouse_capture(TRUE);
 #endif
 			break;
 		case SDL_EVENT_GAMEPAD_ADDED:
 			SDL_OpenGamepad(event.gdevice.which);
+#ifdef HALO_MACOS
+			halo_input_gamepads_changed();
+#endif
 			break;
+#ifdef HALO_MACOS
+		case SDL_EVENT_GAMEPAD_REMOVED:
+			halo_input_gamepads_changed();
+			break;
+#endif
 		default:
 			break;
 		}
@@ -811,7 +934,7 @@ void platform_pump_events(void)
 	platform_invite_clipboard(look_at_clipboard);
 }
 
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) || defined(HALO_MACOS)
 /* ---------- the menus' pointer */
 
 /* While a menu is up the mouse is released, its pointer shows (centered when

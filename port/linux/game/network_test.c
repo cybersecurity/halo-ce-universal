@@ -28,6 +28,7 @@ Called from the main loop every frame (main.c).
 */
 
 #include "cseries.h"
+#include "bink/bink_playback.h"
 #include "main/main.h"
 #include "interface/player_ui.h"
 #include "interface/ui_widget.h"
@@ -437,6 +438,14 @@ static void network_test_pickup(
 	}
 }
 
+/* main_menu_scenario_loaded can already be true while the intro owns the
+ * texture-cache scratch pool. Host setup precaches its map using that same
+ * pool, so wait for normal movie disposal before starting the menu timer. */
+static boolean network_test_frontend_ready(boolean main_menu_loaded)
+{
+ return main_menu_loaded && !bink_playback_active();
+}
+
 void network_test_update(
 	boolean main_menu_loaded,
 	real seconds)
@@ -545,7 +554,7 @@ void network_test_update(
 		}
 	}
 
-	if (!main_menu_loaded)
+	if (!network_test_frontend_ready(main_menu_loaded))
 		return;
 	network_test.menu_seconds += seconds;
 	/* (the main menu settling first) */

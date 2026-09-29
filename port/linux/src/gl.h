@@ -16,7 +16,7 @@ Windows it is __stdcall too, and SDL would include windows.h without it) */
 #ifndef _WIN32
 #undef APIENTRY
 #endif
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 #include <GLES3/gl32.h>
 #include <GLES2/gl2ext.h>
 #define GLAPIENTRY GL_APIENTRY
@@ -25,7 +25,7 @@ Windows it is __stdcall too, and SDL would include windows.h without it) */
 #endif
 #pragma pop_macro("APIENTRY")
 
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 /* OpenGL ES 3.2 (port/android/README.md); tools/android_gl_stubs.py reads
 this list to generate the guest's entry points */
 /* ANDROID_GL_FUNCTIONS_BEGIN */
@@ -131,13 +131,25 @@ this list to generate the guest's entry points */
 	X(glGetQueryObjectuiv)
 /* ANDROID_GL_FUNCTIONS_END */
 #else
+#ifdef HALO_MACOS
+#define HALO_GL_COPY_IMAGE(X)
+#define HALO_GL_CLIP_CONTROL(X)
+#define HALO_GL_BUFFER_STORAGE(X)
+#define HALO_GL_DEBUG_CALLBACK(X)
+#else
+#define HALO_GL_COPY_IMAGE(X) X(glCopyImageSubData)
+#define HALO_GL_CLIP_CONTROL(X) X(glClipControl)
+#define HALO_GL_BUFFER_STORAGE(X) X(glBufferStorage)
+#define HALO_GL_DEBUG_CALLBACK(X) X(glDebugMessageCallback)
+#endif
 #define GL_FUNCTIONS(X) \
 	X(glGetString) \
 	X(glGetIntegerv) \
 	X(glGetTexImage) \
-	X(glCopyImageSubData) \
+	HALO_GL_COPY_IMAGE(X) \
 	X(glGenerateMipmap) \
 	X(glGetError) \
+	X(glIsEnabled) \
 	X(glEnable) \
 	X(glDisable) \
 	X(glViewport) \
@@ -165,7 +177,7 @@ this list to generate the guest's entry points */
 	X(glReadPixels) \
 	X(glFinish) \
 	X(glFlush) \
-	X(glClipControl) \
+	HALO_GL_CLIP_CONTROL(X) \
 	X(glGenTextures) \
 	X(glDeleteTextures) \
 	X(glBindTexture) \
@@ -191,12 +203,14 @@ this list to generate the guest's entry points */
 	X(glCheckFramebufferStatus) \
 	X(glBlitFramebuffer) \
 	X(glDrawBuffers) \
+	X(glReadBuffer) \
 	X(glGenBuffers) \
 	X(glDeleteBuffers) \
 	X(glBindBuffer) \
 	X(glBufferData) \
 	X(glBufferSubData) \
-	X(glBufferStorage) \
+	X(glBindBufferRange) \
+	HALO_GL_BUFFER_STORAGE(X) \
 	X(glMapBufferRange) \
 	X(glBindBufferBase) \
 	X(glGenVertexArrays) \
@@ -234,7 +248,7 @@ this list to generate the guest's entry points */
 	X(glBeginQuery) \
 	X(glEndQuery) \
 	X(glGetQueryObjectuiv) \
-	X(glDebugMessageCallback)
+	HALO_GL_DEBUG_CALLBACK(X)
 #endif
 
 #define GL_DECLARE_FUNCTION(name) extern __typeof__(&name) halo_##name;
@@ -244,10 +258,12 @@ GL_FUNCTIONS(GL_DECLARE_FUNCTION)
 /* call sites use the ordinary names; gl_functions.c, which defines the
 pointers, sees the declarations without these aliases */
 #ifndef GL_FUNCTIONS_DEFINE
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 #define glGetString halo_glGetString
 #define glGetIntegerv halo_glGetIntegerv
+#ifndef HALO_MACOS
 #define glCopyImageSubData halo_glCopyImageSubData
+#endif
 #define glGenerateMipmap halo_glGenerateMipmap
 #define glGetError halo_glGetError
 #define glEnable halo_glEnable
@@ -348,7 +364,11 @@ pointers, sees the declarations without these aliases */
 #define glGetString halo_glGetString
 #define glGetIntegerv halo_glGetIntegerv
 #define glGetTexImage halo_glGetTexImage
+#define glIsEnabled halo_glIsEnabled
+#define glReadBuffer halo_glReadBuffer
+#ifndef HALO_MACOS
 #define glCopyImageSubData halo_glCopyImageSubData
+#endif
 #define glGenerateMipmap halo_glGenerateMipmap
 #define glGetError halo_glGetError
 #define glEnable halo_glEnable

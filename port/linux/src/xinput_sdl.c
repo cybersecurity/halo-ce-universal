@@ -35,9 +35,11 @@ drive the controller.
 #include "platform.h"
 #include "sdl_platform.h"
 #include "port_config.h"
+#include "input_bindings.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -86,7 +88,7 @@ static float mouse_sensitivity(void)
 	if (sensitivity < 0.0f)
 	{
 		sensitivity = (float)config_real("input.mouse_sensitivity");
-		if (sensitivity <= 0.0f)
+		if (!isfinite(sensitivity) || sensitivity <= 0.0f)
 			sensitivity = 1.0f;
 	}
 	return sensitivity;
@@ -132,7 +134,7 @@ static void mouse_poll(const struct platform_input_state *input)
 		mouse_pending_x = 0.0f;
 		mouse_pending_y = 0.0f;
 	}
-	if (!input->mouse_released)
+	if (input->focused && !input->mouse_released)
 	{
 		mouse_pending_x += input->mouse_dx;
 		mouse_pending_y += input->mouse_dy;
@@ -150,17 +152,92 @@ static BYTE analog(BOOL down)
 	return down ? 0xff : 0x00;
 }
 
+enum { B_FORWARD, B_BACKWARD, B_LEFT, B_RIGHT, B_JUMP, B_MELEE, B_ACTION,
+ B_WEAPON, B_FLASHLIGHT, B_GRENADE_TYPE, B_GRENADE, B_FIRE, B_CROUCH, B_ZOOM, B_COUNT };
+static struct input_binding bindings[B_COUNT];
+static void load_bindings(void)
+{
+ static int loaded;
+ static const char *names[B_COUNT] = {"forward","backward","left","right","jump","melee","action",
+  "change_weapon","flashlight","change_grenade","grenade","fire","crouch","zoom"};
+ static const char *defaults[B_COUNT] = {"W","S","A","D","Space","F,Mouse4","E,R",
+  "Tab,Wheel","Q","X",
+#ifdef HALO_MACOS
+  "G","Mouse1","LeftCtrl,C","Z,Mouse2,Mouse3"
+#else
+  "G,Mouse2","Mouse1","LeftCtrl,C","Z,Mouse3"
+#endif
+ };
+ int i;
+ if(loaded) return;
+ for(i=0;i<B_COUNT;i++) {
+  char name[64]; const char *value;
+  snprintf(name,sizeof(name),"input.%s",names[i]); value=config_string(name);
+  if(!input_binding_parse(value,&bindings[i])) {
+   platform_log("invalid binding %s; using %s",name,defaults[i]);
+   input_binding_parse(defaults[i],&bindings[i]);
+  }
+ }
+ loaded=1;
+}
+static int physical_gamepad_present;
+static SDL_GamepadType physical_gamepad_type;
+#ifdef HALO_MACOS
+/* HUD enum values are original Xbox icon IDs. Labels follow the configured
+ * keyboard binding and leave controller artwork intact for a physical pad. */
+const wchar_t *halo_macos_control_prompt(short icon)
+{
+ static wchar_t labels[18][40];
+ static const char *names[18] = {"jump","melee","action","change_weapon","change_grenade","flashlight",
+  "grenade","fire",NULL,NULL,NULL,NULL,NULL,NULL,"crouch","zoom",NULL,NULL};
+ static const char *fixed[18] = {NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,"Up","Down","Left","Right","Esc","F1",NULL,NULL,"WASD","Mouse"};
+ const char *text; char name[64], movement[40]; unsigned int i;
+ static const char *fallback[18] = {"Space","F","E","Tab","X","Q","G","Mouse1",NULL,NULL,NULL,NULL,NULL,NULL,"LeftCtrl","Z",NULL,NULL};
+ struct input_binding check;
+ if(icon<0 || icon>=18) return NULL;
+ if(physical_gamepad_present) {
+  static const wchar_t *sony[18]={L"Cross",L"Circle",L"Square",L"Triangle",L"R1",L"L1",L"L2",L"R2",
+   L"D-pad Up",L"D-pad Down",L"D-pad Left",L"D-pad Right",L"Options",L"Share",L"L3",L"R3",L"Left Stick",L"Right Stick"};
+  if(physical_gamepad_type==SDL_GAMEPAD_TYPE_PS3 || physical_gamepad_type==SDL_GAMEPAD_TYPE_PS4 || physical_gamepad_type==SDL_GAMEPAD_TYPE_PS5) return sony[icon];
+  return NULL;
+ }
+ if(names[icon]) { snprintf(name,sizeof(name),"input.%s",names[icon]); text=config_string(name); }
+ else text=fixed[icon];
+ if(names[icon] && !input_binding_parse(text,&check)) text=fallback[icon];
+ if(icon==16) {
+  const char *f=config_string("input.forward"), *b=config_string("input.backward");
+  const char *l=config_string("input.left"), *r=config_string("input.right");
+  if(strcmp(f,"W") || strcmp(b,"S") || strcmp(l,"A") || strcmp(r,"D")) {
+   snprintf(movement,sizeof(movement),"%s/%s/%s/%s",f,b,l,r); text=movement;
+  }
+ }
+ if(!text || !*text) text="Unbound";
+ for(i=0;i<39 && text[i] && text[i]!=',';i++) labels[icon][i]=(wchar_t)(unsigned char)text[i];
+ labels[icon][i]=0;
+ return labels[icon];
+}
+#endif
+void halo_input_focus_lost(void)
+{
+ pthread_mutex_lock(&mouse_lock);
+ mouse_pending_x=mouse_pending_y=mouse_wheel_accumulated=0.0f;
+ mouse_polls_unconsumed=0; wheel_moved_ms=wheel_press_until_ms=0; wheel_scrolling=FALSE;
+ pthread_mutex_unlock(&mouse_lock);
+}
+
 static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GAMEPAD *pad)
 {
 	const unsigned char *k = input->keys;
 	BOOL mouse = !input->mouse_released;
 	const unsigned char *m = input->mouse_buttons;
 	int x = 0, y = 0;
+	load_bindings();
+#define DOWN(b) input_binding_down(&bindings[b], k, m, mouse)
 
-	if (k[SDL_SCANCODE_D]) x++;
-	if (k[SDL_SCANCODE_A]) x--;
-	if (k[SDL_SCANCODE_W]) y++;
-	if (k[SDL_SCANCODE_S]) y--;
+	if (DOWN(B_RIGHT)) x++;
+	if (DOWN(B_LEFT)) x--;
+	if (DOWN(B_FORWARD)) y++;
+	if (DOWN(B_BACKWARD)) y--;
 	if (x || y)
 	{
 		/* full deflection, diagonals on the unit circle */
@@ -176,23 +253,23 @@ static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GA
 	if (k[SDL_SCANCODE_RIGHT]) pad->wButtons |= XINPUT_GAMEPAD_DPAD_RIGHT;
 	if (k[SDL_SCANCODE_ESCAPE]) pad->wButtons |= XINPUT_GAMEPAD_START;
 	if (k[SDL_SCANCODE_F1]) pad->wButtons |= XINPUT_GAMEPAD_BACK;
-	if (k[SDL_SCANCODE_LCTRL] || k[SDL_SCANCODE_C]) pad->wButtons |= XINPUT_GAMEPAD_LEFT_THUMB;
-	if (k[SDL_SCANCODE_Z] || (mouse && m[SDL_BUTTON_MIDDLE])) pad->wButtons |= XINPUT_GAMEPAD_RIGHT_THUMB;
+	if (DOWN(B_CROUCH)) pad->wButtons |= XINPUT_GAMEPAD_LEFT_THUMB;
+	if (DOWN(B_ZOOM)) pad->wButtons |= XINPUT_GAMEPAD_RIGHT_THUMB;
 
-	pad->bAnalogButtons[XINPUT_GAMEPAD_A] |= analog(k[SDL_SCANCODE_SPACE] || k[SDL_SCANCODE_RETURN] ||
+	pad->bAnalogButtons[XINPUT_GAMEPAD_A] |= analog(DOWN(B_JUMP) || k[SDL_SCANCODE_RETURN] ||
 		k[SDL_SCANCODE_KP_ENTER]);
-	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(k[SDL_SCANCODE_F] || k[SDL_SCANCODE_BACKSPACE] ||
-		(mouse && m[SDL_BUTTON_X1]));
+	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(DOWN(B_MELEE) || k[SDL_SCANCODE_BACKSPACE]);
 #ifdef HALO_ANDROID
 	/* the system back key (gesture or button) backs out of menus */
 	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(k[SDL_SCANCODE_AC_BACK]);
 #endif
-	pad->bAnalogButtons[XINPUT_GAMEPAD_X] |= analog(k[SDL_SCANCODE_E] || k[SDL_SCANCODE_R]);
-	pad->bAnalogButtons[XINPUT_GAMEPAD_Y] |= analog(k[SDL_SCANCODE_TAB] || SDL_GetTicks() < wheel_press_until_ms);
-	pad->bAnalogButtons[XINPUT_GAMEPAD_WHITE] |= analog(k[SDL_SCANCODE_Q]);
-	pad->bAnalogButtons[XINPUT_GAMEPAD_BLACK] |= analog(k[SDL_SCANCODE_X]);
-	pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] |= analog(k[SDL_SCANCODE_G] || (mouse && m[SDL_BUTTON_RIGHT]));
-	pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] |= analog(mouse && m[SDL_BUTTON_LEFT]);
+	pad->bAnalogButtons[XINPUT_GAMEPAD_X] |= analog(DOWN(B_ACTION));
+	pad->bAnalogButtons[XINPUT_GAMEPAD_Y] |= analog(DOWN(B_WEAPON) || (bindings[B_WEAPON].wheel && SDL_GetTicks() < wheel_press_until_ms));
+	pad->bAnalogButtons[XINPUT_GAMEPAD_WHITE] |= analog(DOWN(B_FLASHLIGHT));
+	pad->bAnalogButtons[XINPUT_GAMEPAD_BLACK] |= analog(DOWN(B_GRENADE_TYPE));
+	pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] |= analog(DOWN(B_GRENADE));
+	pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] |= analog(DOWN(B_FIRE));
+#undef DOWN
 }
 
 /* A scroll of the wheel switches weapons once: it holds Y for WHEEL_PRESS_MS
@@ -226,6 +303,7 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 {
 	static int checked;
 	static int seed = -1;
+	static int movement_only;
 	double t;
 
 	if (!checked)
@@ -233,14 +311,21 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 		const char *setting = config_string("debug.test_input");
 
 		checked = 1;
-		if (!strncmp(setting, "bot:", 4))
+		if (!strncmp(setting, "move:", 5))
+		{
+			seed = atoi(setting + 5);
+			movement_only = 1;
+		}
+		else if (!strncmp(setting, "bot:", 4))
 			seed = atoi(setting + 4);
 		else if (!strcmp(setting, "bot"))
 			seed = 0;
 	}
 	if (seed < 0)
 		return;
-	if (test_input_holding_action)
+	if (movement_only)
+		memset(pad, 0, sizeof(*pad));
+	if (test_input_holding_action && !movement_only)
 	{
 		/* (standing still, the button held from a second on) */
 		if (SDL_GetTicks() - test_input_holding_action_since >= 1000)
@@ -251,6 +336,8 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 	pad->sThumbLY = (SHORT)(sin(t * 0.9) * 32000.0);
 	pad->sThumbLX = (SHORT)(cos(t * 0.6 + seed) * 20000.0);
 	pad->sThumbRX = (SHORT)(sin(t * 0.4) * 14000.0);
+	if (movement_only)
+		return;
 	if (fmod(t, 3.0) < 0.3)
 		pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 255;
 	if (fmod(t, 5.0) < 0.1)
@@ -283,18 +370,70 @@ static void wheel_update(void)
 /* ---------- SDL gamepads */
 
 /* the SDL gamepads in connection order, at most one per port */
+#ifdef HALO_MACOS
+/* Four fixed player slots. Enumerate/allocate an SDL list only initially or
+ * after hot-plug. A token lookup also recovers a missed removal notification. */
+static pthread_mutex_t gamepad_cache_lock = PTHREAD_MUTEX_INITIALIZER;
+static SDL_JoystickID assigned_gamepads[PORT_COUNT];
+static SDL_Gamepad *cached_gamepads[PORT_COUNT];
+static int cached_gamepad_count;
+static BOOL gamepad_cache_dirty = TRUE;
+void halo_input_gamepads_changed(void)
+{
+ pthread_mutex_lock(&gamepad_cache_lock);
+ gamepad_cache_dirty = TRUE;
+ pthread_mutex_unlock(&gamepad_cache_lock);
+}
+#endif
+
 static int sdl_gamepads(SDL_Gamepad *gamepads[PORT_COUNT])
 {
 	SDL_JoystickID *ids;
 	int count = 0, index, found = 0;
 
+#ifdef HALO_MACOS
+ pthread_mutex_lock(&gamepad_cache_lock);
+ for(index=0;index<PORT_COUNT;index++)
+  if(assigned_gamepads[index] && SDL_GetGamepadFromID(assigned_gamepads[index]) != cached_gamepads[index])
+   gamepad_cache_dirty=TRUE;
+ if(!gamepad_cache_dirty) {
+  memcpy(gamepads,cached_gamepads,sizeof(cached_gamepads));
+  found=cached_gamepad_count;
+  pthread_mutex_unlock(&gamepad_cache_lock);
+  return found;
+ }
+#endif
 	memset(gamepads, 0, sizeof(SDL_Gamepad *) * PORT_COUNT);
 	ids = SDL_GetGamepads(&count);
-	if (!ids)
-		return 0;
-#ifdef HALO_ANDROID
-	{
-		/* Android can list input devices with a few gamepad buttons (the
+	if (!ids) {
+#ifdef HALO_MACOS
+  pthread_mutex_unlock(&gamepad_cache_lock);
+#endif
+  return 0;
+ }
+#ifdef HALO_MACOS
+ {
+  int port;
+  /* Preserve occupied slots when another controller disconnects. */
+  for(port=0;port<PORT_COUNT;port++) {
+   BOOL present=FALSE;
+   for(index=0;index<count;index++) if(ids[index]==assigned_gamepads[port]) present=TRUE;
+   if(!present) assigned_gamepads[port]=0;
+  }
+  for(index=0;index<count;index++) {
+   BOOL present=FALSE;
+   for(port=0;port<PORT_COUNT;port++) if(assigned_gamepads[port]==ids[index]) present=TRUE;
+   if(!present) for(port=0;port<PORT_COUNT;port++) if(!assigned_gamepads[port]) { assigned_gamepads[port]=ids[index];break; }
+  }
+  for(port=0;port<PORT_COUNT;port++) if(assigned_gamepads[port]) {
+   gamepads[port]=SDL_GetGamepadFromID(assigned_gamepads[port]);
+   if(!gamepads[port]) gamepads[port]=SDL_OpenGamepad(assigned_gamepads[port]);
+   if(gamepads[port]) found=port+1;
+  }
+ }
+#elif defined(HALO_ANDROID)
+ {
+  /* Android can list input devices with a few gamepad buttons (the
 		emulator's keyboard, some phones' key devices) as generic gamepads:
 		recognised controllers take the first ports */
 		int pass;
@@ -326,12 +465,17 @@ static int sdl_gamepads(SDL_Gamepad *gamepads[PORT_COUNT])
 	}
 #endif
 	SDL_free(ids);
+#ifdef HALO_MACOS
+ memcpy(cached_gamepads,gamepads,sizeof(cached_gamepads));
+ cached_gamepad_count=found;gamepad_cache_dirty=FALSE;
+ pthread_mutex_unlock(&gamepad_cache_lock);
+#endif
 	return found;
 }
 
 static SHORT stick(Sint16 value, BOOL flip)
 {
-	int result = flip ? -(int)value - 1 : value;
+	int result = flip ? -(int)value : value;
 
 	if (result < -32768) result = -32768;
 	if (result > 32767) result = 32767;
@@ -380,6 +524,8 @@ static void sdl_gamepad_state(SDL_Gamepad *gamepad, XINPUT_GAMEPAD *pad)
 
 	left_trigger = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) * 255 / 32767;
 	right_trigger = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) * 255 / 32767;
+	left_trigger = left_trigger < 0 ? 0 : left_trigger > 255 ? 255 : left_trigger;
+	right_trigger = right_trigger < 0 ? 0 : right_trigger > 255 ? 255 : right_trigger;
 	if (left_trigger > pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER])
 		pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = (BYTE)left_trigger;
 	if (right_trigger > pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER])
@@ -414,7 +560,7 @@ static DWORD connected_gamepads(void)
 
 	/* the first pad shares port 0 with the keyboard */
 	for (port = 1; port < count; port++)
-		mask |= 1UL << port;
+		if (gamepads[port]) mask |= 1UL << port;
 	return mask;
 }
 
@@ -496,19 +642,22 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 	{
 		struct platform_input_state input;
 
+		physical_gamepad_present = gamepads[0] != NULL;
+		physical_gamepad_type = physical_gamepad_present ? SDL_GetGamepadType(gamepads[0]) : SDL_GAMEPAD_TYPE_UNKNOWN;
 		platform_input_read(&input, TRUE);
 		mouse_poll(&input);
 		wheel_update();
-		if (!console_is_active())
+		if (input.focused && !console_is_active())
 			keyboard_gamepad(&input, &state->Gamepad);
-		if (count > 0)
+		if (gamepads[0])
 			sdl_gamepad_state(gamepads[0], &state->Gamepad);
 		test_input_gamepad(&state->Gamepad);
 	}
-	else if (port < count)
+	else if (port < count && gamepads[port])
 	{
 		sdl_gamepad_state(gamepads[port], &state->Gamepad);
 	}
+ else return ERROR_DEVICE_NOT_CONNECTED;
 
 	if (memcmp(&state->Gamepad, &controllers[port].previous, sizeof(state->Gamepad)))
 	{
@@ -521,24 +670,18 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 
 DWORD WINAPI XInputSetState(HANDLE device, PXINPUT_FEEDBACK feedback)
 {
-	int port = controller_port(device);
-	SDL_Gamepad *gamepads[PORT_COUNT];
-	int count;
-
-	if (!feedback)
-		return ERROR_INVALID_PARAMETER;
-	feedback->Header.dwStatus = ERROR_SUCCESS;
-	if (port < 0)
-		return ERROR_DEVICE_NOT_CONNECTED;
-	count = sdl_gamepads(gamepads);
-	if (port < count)
-	{
-		/* the game refreshes the motors every frame; rumble a little longer
-		than that so they do not stutter */
-		SDL_RumbleGamepad(gamepads[port], feedback->Rumble.wLeftMotorSpeed,
-			feedback->Rumble.wRightMotorSpeed, 100);
-	}
-	return ERROR_SUCCESS;
+ int port=controller_port(device); SDL_Gamepad *gamepads[PORT_COUNT]; int count;
+ DWORD status=ERROR_DEVICE_NOT_CONNECTED;
+ if(!feedback) return ERROR_INVALID_PARAMETER;
+ if(port>=0) {
+  count=sdl_gamepads(gamepads);
+  if(port<count && gamepads[port])
+   status=SDL_RumbleGamepad(gamepads[port],feedback->Rumble.wLeftMotorSpeed,feedback->Rumble.wRightMotorSpeed,100)?ERROR_SUCCESS:50; /* ERROR_NOT_SUPPORTED */
+  else if(port==0) status=50; /* Keyboard/mouse has no motors. */
+ }
+ feedback->Header.dwStatus=status;
+ if(feedback->Header.hEvent) SetEvent(feedback->Header.hEvent);
+ return status;
 }
 
 DWORD WINAPI XInputDebugInitKeyboardQueue(PXINPUT_DEBUG_KEYQUEUE_PARAMETERS parameters)

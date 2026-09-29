@@ -115,6 +115,37 @@ bool SDL_SetWindowRelativeMouseMode(SDL_Window *window, bool enabled)
 	return host_sdl_set_relative_mouse((unsigned int)window, enabled) != 0;
 }
 
+#ifdef HALO_MACOS
+bool SDL_GetWindowSize(SDL_Window *window, int *width, int *height)
+{
+	int w = 0, h = 0;
+	int result = host_sdl_window_size((unsigned int)window, &w, &h);
+	if (width) *width = w;
+	if (height) *height = h;
+	return result != 0;
+}
+
+SDL_WindowFlags SDL_GetWindowFlags(SDL_Window *window)
+{
+	return (SDL_WindowFlags)host_sdl_window_flags((unsigned int)window);
+}
+
+bool SDL_SetWindowSize(SDL_Window *window, int width, int height)
+{
+	return host_sdl_set_window_size((unsigned int)window, width, height) != 0;
+}
+
+bool SDL_SetWindowFullscreen(SDL_Window *window, bool fullscreen)
+{
+	return host_sdl_set_window_fullscreen((unsigned int)window, fullscreen) != 0;
+}
+
+void SDL_WarpMouseInWindow(SDL_Window *window, float x, float y)
+{
+	(void)host_sdl_warp_mouse((unsigned int)window, x, y);
+}
+#endif
+
 bool SDL_GL_SetAttribute(SDL_GLAttr attribute, int value)
 {
 	return host_sdl_gl_set_attribute((int)attribute, value) != 0;

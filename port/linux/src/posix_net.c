@@ -18,7 +18,9 @@ with the host ABI.
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#ifndef __APPLE__
 #include <sys/random.h>
+#endif
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -27,6 +29,16 @@ with the host ABI.
 #include <unistd.h>
 
 #include "posix.h"
+
+#ifdef __APPLE__
+/* Darwin sockets are close-on-exec only after fcntl; SOCK_CLOEXEC is absent. */
+#ifndef SOCK_CLOEXEC
+#define SOCK_CLOEXEC 0
+#endif
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
+#endif
 
 /* Winsock error codes (winsockx.h) */
 #define WSAEINTR 10004
@@ -124,7 +136,16 @@ int posix_socket_last_error(void)
 
 int posix_socket(int family, int type, int protocol)
 {
-	return succeed(socket(family, type | SOCK_CLOEXEC, protocol));
+	int descriptor = socket(family, type | SOCK_CLOEXEC, protocol);
+#ifdef __APPLE__
+	if (descriptor >= 0)
+	{
+		int enabled = 1;
+		(void)fcntl(descriptor, F_SETFD, FD_CLOEXEC);
+		(void)setsockopt(descriptor, SOL_SOCKET, SO_NOSIGPIPE, &enabled, sizeof(enabled));
+	}
+#endif
+	return succeed(descriptor);
 }
 
 int posix_socket_close(int socket)
@@ -163,7 +184,18 @@ int posix_socket_listen(int socket, int backlog)
 int posix_socket_accept(int socket, void *address, int *address_length)
 {
 	socklen_t length = address_length ? (socklen_t)*address_length : 0;
-	int result = accept4(socket, address, address_length ? &length : NULL, SOCK_CLOEXEC);
+	int result;
+#ifdef __APPLE__
+	result = accept(socket, address, address_length ? &length : NULL);
+	if (result >= 0)
+	{
+		int enabled = 1;
+		(void)fcntl(result, F_SETFD, FD_CLOEXEC);
+		(void)setsockopt(result, SOL_SOCKET, SO_NOSIGPIPE, &enabled, sizeof(enabled));
+	}
+#else
+	result = accept4(socket, address, address_length ? &length : NULL, SOCK_CLOEXEC);
+#endif
 
 	if (address_length)
 		*address_length = (int)length;
@@ -412,6 +444,9 @@ posix_ulong posix_local_ipv4_address(void)
 
 void posix_random_bytes(void *buffer, posix_ulong size)
 {
+#ifdef __APPLE__
+	arc4random_buf(buffer, size);
+#else
 	unsigned char *cursor = buffer;
 
 	while (size)
@@ -427,6 +462,7 @@ void posix_random_bytes(void *buffer, posix_ulong size)
 		cursor += count;
 		size -= (posix_ulong)count;
 	}
+#endif
 }
 
 posix_ulong posix_resolve_ipv4(const char *host)
@@ -449,7 +485,7 @@ posix_ulong posix_resolve_ipv4(const char *host)
 
 int posix_command_line_argument(int index, char *buffer, posix_ulong size)
 {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(HALO_MACOS)
 	(void)index;
 	(void)buffer;
 	(void)size;
@@ -484,7 +520,7 @@ posix_ulong posix_process_id(void)
 	return (posix_ulong)getpid();
 }
 
-#ifndef __ANDROID__
+#if !defined(__ANDROID__) && !defined(HALO_MACOS)
 /* runs a program with its arguments and waits for it; its exit status, or -1 */
 static int run_program(char *const arguments[])
 {
@@ -502,7 +538,7 @@ static int run_program(char *const arguments[])
 
 int posix_register_url_scheme(const char *scheme, const char *description)
 {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(HALO_MACOS)
 	(void)scheme;
 	(void)description;
 	return 0;
@@ -566,7 +602,7 @@ int posix_register_url_scheme(const char *scheme, const char *description)
 
 int posix_discord_connect(void)
 {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(HALO_MACOS)
 	return -1;
 #else
 	/* where Discord (and its Flatpak and Snap packages) put discord-ipc-N */

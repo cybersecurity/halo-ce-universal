@@ -25,6 +25,9 @@ Conventions carried over from the Xbox:
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
 #include "port_config.h"
+#ifdef HALO_MACOS
+#include "../../macos/gl41_compat.h"
+#endif
 
 #include <math.h>
 #include <stdio.h>
@@ -35,7 +38,7 @@ Conventions carried over from the Xbox:
 void d3d8_surface_initialize(D3DSurface *surface, D3DFORMAT format, unsigned long width, unsigned long height);
 void d3d8_surface_resize(D3DSurface *surface, D3DFORMAT format, unsigned long width, unsigned long height);
 
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 /* OpenGL ES 3 (port/android/README.md): the desktop formats, enumerants
 and entry points used below that ES lacks */
 #define GL_BGRA GL_RGBA
@@ -51,7 +54,10 @@ and entry points used below that ES lacks */
 #define GL_CLAMP_TO_BORDER 0x812d
 #endif
 
-/* what the context supports (gl_initialize) */
+#endif
+
+#if defined(HALO_ANDROID) || defined(HALO_MACOS)
+/* Capabilities are initialized from the actual current GL context. */
 struct xgpu_capabilities xgpu_capabilities;
 #endif
 
@@ -84,7 +90,19 @@ static long ui_offset;
 
 static void screen_mode_choose(long *width, float scale[2])
 {
-#ifdef HALO_ANDROID
+#ifdef HALO_MACOS
+	long render_width, render_height;
+	if (platform_render_resolution(&render_width, &render_height))
+	{
+		/* Widen the camera's logical viewport; keep the original vertical
+		   FOV and centered 640-column UI. Targets use explicit pixel sizes. */
+		*width = ((SCREEN_HEIGHT * render_width + render_height / 2) / render_height + 1) & ~1L;
+		scale[0] = (float)render_width / (float)*width;
+		scale[1] = (float)render_height / (float)SCREEN_HEIGHT;
+		return;
+	}
+#endif
+	#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 	/* display.screen_width, or 0 for the display's shape, which the app
 	passes (port/android/host/host_main.c) */
 	const char *display = getenv("HALO_DISPLAY_WIDTH");
@@ -108,6 +126,14 @@ static void screen_mode_choose(long *width, float scale[2])
 		long wanted = (SCREEN_HEIGHT * display_width + display_height / 2) / display_height;
 
 		*width = wanted < 640 ? 640 : wanted > SCREEN_MAXIMUM_WIDTH ? SCREEN_MAXIMUM_WIDTH : wanted & ~1L;
+		/* Keep logical coordinates and aspect fixed while choosing a smaller
+		fullscreen render target. The existing display blit fills the desktop. */
+		long render_width = config_integer("display.render_width");
+		if (render_width >= 640 && render_width < display_width)
+		{
+			display_height = (display_height * render_width + display_width / 2) / display_width;
+			display_width = render_width;
+		}
 		scale[0] = (float)display_width / (float)*width;
 		scale[1] = (float)display_height / (float)SCREEN_HEIGHT;
 		/* a display narrower or wider than the game can be: the picture
@@ -720,7 +746,7 @@ static GLuint compile_shader(GLenum type, const char *source, const char *what)
 	return shader;
 }
 
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) && !defined(HALO_MACOS)
 static void GLAPIENTRY gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum severity,
 	GLsizei length, const GLchar *message, const void *user)
 {
@@ -750,6 +776,16 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	struct render_target_entry *entry;
 	unsigned long width, height;
 	BOOL depth;
+	static unsigned trace_allocations;
+	unsigned trace_index = 0;
+	if (getenv("HALO_TRACE_RT_ALLOC") && trace_allocations < 32)
+	{
+		trace_index = ++trace_allocations;
+		fprintf(stderr, "[rt-alloc] #%u input surface=%p common=0x%08x data=0x%08x format=0x%08x size=0x%08x\n",
+			trace_index, (const void *)surface, surface ? (unsigned)surface->Common : 0,
+			surface ? (unsigned)surface->Data : 0, surface ? (unsigned)surface->Format : 0,
+			surface ? (unsigned)surface->Size : 0);
+	}
 
 	if (!surface || !surface->Data)
 		return NULL;
@@ -780,6 +816,14 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	entry->target.scale[1] = scale[1];
 	entry->target.gl_width = (unsigned long)(width * scale[0] + 0.5f);
 	entry->target.gl_height = (unsigned long)(height * scale[1] + 0.5f);
+	if (trace_index)
+	{
+		union { float f; unsigned bits; } scale_x = { .f = scale[0] }, scale_y = { .f = scale[1] };
+		fprintf(stderr, "[rt-alloc] #%u decoded=%lux%lu depth=%d scale={0x%08x/%.9g,0x%08x/%.9g} gl=%lux%lu data=0x%08lx format=0x%08x size=0x%08x\n",
+			trace_index, width, height, (int)depth, scale_x.bits, scale_x.f, scale_y.bits, scale_y.f,
+			entry->target.gl_width, entry->target.gl_height, (unsigned long)surface->Data,
+			(unsigned)surface->Format, (unsigned)surface->Size);
+	}
 	glGenTextures(1, &entry->target.texture);
 	glBindTexture(GL_TEXTURE_2D, entry->target.texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
@@ -789,6 +833,10 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	else
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)entry->target.gl_width, (GLsizei)entry->target.gl_height,
 			0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+	if (trace_index)
+		fprintf(stderr, "[rt-alloc] #%u uploaded texture=%u size=%lux%lu depth=%d gl-error=0x%04x\n",
+			trace_index, entry->target.texture, entry->target.gl_width, entry->target.gl_height,
+			(int)depth, (unsigned)glGetError());
 	xgpu_gl_state_invalidate();
 	entry->next = render_targets;
 	render_targets = entry;
@@ -876,7 +924,7 @@ static void gl_initialize(void)
 
 	glGetIntegerv(GL_MAJOR_VERSION, &major);
 	glGetIntegerv(GL_MINOR_VERSION, &minor);
-#ifdef HALO_ANDROID
+	#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 	{
 		BOOL es32 = major > 3 || (major == 3 && minor >= 2);
 
@@ -903,6 +951,21 @@ static void gl_initialize(void)
 			(int)major, (int)minor, xgpu_capabilities.copy_image, xgpu_capabilities.border_clamp,
 			xgpu_capabilities.anisotropy, xgpu_capabilities.s3tc, xgpu_capabilities.atomic_counters);
 	}
+#elif defined(HALO_MACOS)
+	/* OpenGL 4.1 has neither clip control nor core KHR_debug. The vertex
+	shader performs the clip-origin/depth conversion for this context. */
+	static char glsl_version[4];
+	xgpu_capabilities.copy_image = FALSE;
+	/* GL_CLAMP_TO_BORDER is core long before the required 4.1 context. */
+	xgpu_capabilities.border_clamp = TRUE;
+	xgpu_capabilities.anisotropy = host_gl_has_extension("GL_EXT_texture_filter_anisotropic");
+	xgpu_capabilities.s3tc = host_gl_has_extension("GL_EXT_texture_compression_s3tc");
+	xgpu_capabilities.base_vertex = major > 3 || (major == 3 && minor >= 2);
+	/* Fragment atomic counters entered desktop GL in 4.2, after Apple's 4.1 cap. */
+	xgpu_capabilities.atomic_counters = FALSE;
+	snprintf(glsl_version, sizeof(glsl_version), "%d", (int)major * 100 + (int)minor * 10);
+	xgpu_capabilities.shading_language = glsl_version;
+	glEnable(GL_PROGRAM_POINT_SIZE);
 #else
 	if (config_boolean("debug.gl_debug"))
 	{
@@ -942,7 +1005,7 @@ static void gl_initialize(void)
 #endif
 	glGenSamplers(D3DTSS_MAXSTAGES, device.samplers);
 	glGenQueries(VISIBILITY_TEST_SLOTS, device.queries);
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) && !defined(HALO_MACOS)
 	glGenBuffers(1, &device.visibility_results_buffer);
 	glBindBuffer(GL_QUERY_BUFFER, device.visibility_results_buffer);
 	glBufferStorage(GL_QUERY_BUFFER, VISIBILITY_TEST_SLOTS * sizeof(GLuint), NULL,
@@ -1129,7 +1192,7 @@ HRESULT WINAPI Direct3D_CreateDevice(UINT adapter, D3DDEVTYPE device_type, void 
 
 /* ---------- the menus' pointer */
 
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
 {
 	(void)menus_active;
@@ -1204,7 +1267,7 @@ long halo_screen_commit(void)
 		screen_width = width;
 		screen_scale[0] = scale[0];
 		screen_scale[1] = scale[1];
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) || defined(HALO_MACOS)
 		if (device.created)
 		{
 			device.presentation.BackBufferWidth = (UINT)width;
@@ -1394,7 +1457,7 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 	device.queries[0] = device.queries[index];
 	device.queries[index] = scratch;
 	device.query_pending[index] = TRUE;
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) && !defined(HALO_MACOS)
 	if (device.visibility_results)
 	{
 		/* the GPU writes the count into the slot once it is known */
@@ -1442,7 +1505,7 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 		return S_OK;
 	}
 #endif
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) && !defined(HALO_MACOS)
 	if (device.visibility_results)
 	{
 		/* the latest count the GPU has written: from this test, or while
@@ -2066,7 +2129,7 @@ struct mip_composite
 
 static struct mip_composite *mip_composites;
 
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 static GLuint framebuffer_get(GLuint color, GLuint depth);
 
 /* glCopyImageSubData for ES 3.0/3.1 contexts without the extension */
@@ -2084,6 +2147,35 @@ static void copy_level_by_blit(GLuint source, GLuint destination, GLint level, G
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	/* the blit bypasses the cached state, so the next draw must re-apply it */
 	xgpu_gl_state_invalidate();
+}
+#elif defined(HALO_MACOS)
+/* OpenGL 4.1 has no core glCopyImageSubData. Copy through private FBOs and
+restore independent READ/DRAW bindings plus scissor after each mip copy. */
+static struct halo_gl41_copy_state macos_copy_state;
+
+static void macos_draw_buffer(GLenum buffer)
+{
+	glDrawBuffers(1, &buffer);
+}
+
+static int copy_level_by_blit(GLuint source, GLuint destination, GLint level, GLsizei width, GLsizei height)
+{
+	const struct halo_gl41_copy_api api = {
+		halo_glGetIntegerv,
+		halo_glIsEnabled,
+		halo_glEnable,
+		halo_glDisable,
+		halo_glGenFramebuffers,
+		halo_glBindFramebuffer,
+		halo_glFramebufferTexture2D,
+		halo_glReadBuffer,
+		macos_draw_buffer,
+		halo_glCheckFramebufferStatus,
+		halo_glBlitFramebuffer,
+	};
+
+	return halo_gl41_copy_image_2d(&api, &macos_copy_state, source, 0,
+		destination, level, width, height);
 }
 #endif
 
@@ -2131,15 +2223,27 @@ static GLuint mip_composite_get(const struct xgpu_texture_description *descripti
 		if (!target || target->width != width || target->height != height ||
 			target->gl_width != width || target->gl_height != height)
 			break;
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 		if (!xgpu_capabilities.copy_image)
 		{
 			copy_level_by_blit(target->texture, composite->texture, (GLint)level, (GLsizei)width, (GLsizei)height);
 		}
 		else
-#endif
+		{
+			glCopyImageSubData(target->texture, GL_TEXTURE_2D, 0, 0, 0, 0,
+				composite->texture, GL_TEXTURE_2D, (GLint)level, 0, 0, 0, (GLsizei)width, (GLsizei)height, 1);
+		}
+#elif defined(HALO_MACOS)
+		if (!copy_level_by_blit(target->texture, composite->texture, (GLint)level,
+			(GLsizei)width, (GLsizei)height))
+		{
+			platform_log("cannot copy mip %lu of render target texture %u through OpenGL 4.1", level, target->texture);
+			break;
+		}
+#else
 		glCopyImageSubData(target->texture, GL_TEXTURE_2D, 0, 0, 0, 0,
 			composite->texture, GL_TEXTURE_2D, (GLint)level, 0, 0, 0, (GLsizei)width, (GLsizei)height, 1);
+#endif
 		rendered_levels++;
 	}
 	glBindTexture(GL_TEXTURE_2D, composite->texture);
@@ -2359,7 +2463,7 @@ static void apply_raster_state(BOOL has_depth)
 	state_enable(&gl_state.cull_face, GL_CULL_FACE, rs[D3DRS_CULLMODE] != D3DCULL_NONE);
 	if (rs[D3DRS_CULLMODE] != D3DCULL_NONE)
 	{
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) || defined(HALO_MACOS)
 		/* the vertex shader flips y in clip space, which (unlike desktop
 		GL's upper-left clip origin) also flips the winding */
 		GLenum front_face = rs[D3DRS_FRONTFACE] == D3DFRONT_CCW ? GL_CW : GL_CCW;
@@ -2509,7 +2613,7 @@ static struct program_entry *prepare_draw(BOOL immediate)
 	key.alpha_test_function = D3D__RenderState[D3DRS_ALPHATESTENABLE] ? D3D__RenderState[D3DRS_ALPHAFUNC] : 0;
 	key.fog_enable = D3D__RenderState[D3DRS_FOGENABLE] != 0;
 	key.fog_table_mode = (unsigned char)D3D__RenderState[D3DRS_FOGTABLEMODE];
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 	key.count_samples = device.visibility_test_active && xgpu_capabilities.atomic_counters;
 #endif
 
@@ -2526,7 +2630,7 @@ static struct program_entry *prepare_draw(BOOL immediate)
 	else
 		stats.draws++;
 	state_program(entry->program);
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 	if (key.count_samples)
 		glBindBufferRange(GL_ATOMIC_COUNTER_BUFFER, 0, device.visibility_counters,
 			(GLintptr)(device.counter_active * sizeof(GLuint)), sizeof(GLuint));

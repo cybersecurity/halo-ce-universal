@@ -1,0 +1,2315 @@
+--- a/tools/recomp/lifter.py
++++ b/tools/recomp/lifter.py
+@@ -254,6 +254,7 @@
+ # this shape: "add reg, reg" to shift the top bit into CF, then jae on it.
+ CF_TRACKED = frozenset({
+     "add", "sub", "adc", "sbb", "shl", "shr", "sar",
++    "rol", "ror", "rcl", "rcr", "shld", "shrd", "tzcnt",
+ })
+ 
+ # Additional instructions that modify EFLAGS (tracked but handled as generic)
+@@ -263,6 +264,7 @@
+     "bt", "bts", "btr", "btc",  # Bit test sets CF
+     "cmpxchg",           # Compare-and-exchange sets ZF
+     "xadd",              # Exchange-and-add sets flags
++    "tzcnt",             # BMI1 sets ZF from result and CF when source is zero
+ })
+ 
+ # Instructions with undefined/unpredictable flags (clear tracking)
+@@ -278,7 +280,7 @@
+     "mov", "lea", "push", "pop", "nop", "leave", "ret",
+     "movzx", "movsx", "xchg", "bswap",
+     "cdq", "cwde", "cbw", "cwd",
+-    "lahf",
++    "lahf", "fcmovne",
+     "not",  # NOT does not modify flags
+     "call",
+     "int3", "int", "wait",
+@@ -297,7 +299,7 @@
+     "cmpss", "cmpsd",
+     "cmpltss", "cmpeqss", "cmpleps", "cmpneqss",
+     # SSE packed float
+-    "movaps", "movups", "movlps", "movhps", "movlhps", "movhlps",
++    "movaps", "movups", "movlps", "movhps", "movlpd", "movlhps", "movhlps",
+     "addps", "subps", "mulps", "divps",
+     "minps", "maxps", "sqrtps", "rsqrtps", "rcpps",
+     "shufps", "unpcklps", "unpckhps",
+@@ -306,7 +308,7 @@
+     "movmskps",
+     # SSE2 packed double
+     "movapd", "movupd",
+-    "addpd", "subpd", "mulpd", "divpd",
++    "addpd", "subpd", "mulpd", "divpd", "unpckhpd",
+     # SSE/MMX integer
+     "movd", "movq", "movntq",
+     "emms",
+@@ -333,15 +335,42 @@
+ })
+ 
+ 
++def _overflow_snapshot(state):
++    """Return a proven OF expression before SAHF, or None for unknown OF."""
++    if not state: return None
++    kind, ops = state
++    if kind == "sahf_of": return "_sahf_of"
++    if kind == "cmp" and len(ops) == 2:
++        bits = (_operand_width(ops[0]) or _operand_width(ops[1]) or 4) * 8
++        return f"!!(((_fa ^ _fb) & (_fa ^ (_fa - _fb))) & 0x{1 << (bits - 1):X}u)"
++    if kind == "test": return "0"
++    if kind in ("rol", "ror", "rcl", "rcr", "shl", "shr", "shld", "shrd"):
++        condition = _make_condition("jo", kind, ops)
++        return condition[0] if condition else None
++    return None
++
++
+ def _make_condition(jcc, flag_setter, flag_ops):
+     """
+     Generate a C condition expression for a jcc based on what set the flags.
+     Returns (cond_expr, description) or None.
+     """
++    locked_setter = flag_setter.startswith("lock ")
++    if locked_setter:
++        flag_setter = flag_setter[5:]
+     cond_info = COND_MAP.get(jcc)
+     if not cond_info:
+         return None
+     cmp_macro, test_macro, desc = cond_info
++    if flag_setter in ("snapshot_zf", "snapshot_sz"):
++        if jcc in ("je", "jz"): return "_zf", desc
++        if jcc in ("jne", "jnz"): return "!_zf", desc
++        if flag_setter == "snapshot_sz":
++            if jcc in ("jl", "jnge"): return "_slt", desc
++            if jcc in ("jge", "jnl"): return "!_slt", desc
++            if jcc in ("jle", "jng"): return "(_slt || _zf)", desc
++            if jcc in ("jg", "jnle"): return "(!_slt && !_zf)", desc
++        return None  # No CF, raw SF, or raw OF is established by this meet.
+ 
+     # A cmp/test that is not fused with its jcc snapshots its operands into
+     # _fa/_fb (zero-extended) and _fas/_fbs (sign-extended) at the point the
+@@ -360,10 +389,34 @@
+     else:
+         lhs = None
+         rhs = None
+-
+-    # ── FPU compare-to-EFLAGS and sahf: no standard operands ──
++    if locked_setter:
++        # Atomic RMW lifters snapshot the result at the linearization point;
++        # rereading the guest memory operand could observe a later thread's
++        # update and produce flags from a different instruction.
++        lhs = "_fa"
++
++    if flag_setter in ("sahf", "sahf_of"):
++        cf, zf, pf, sf = (f"!!(_sahf_flags & {mask}u)" for mask in (1, 64, 4, 128))
++        predicates = {
++            "jb": cf, "jnae": cf, "jc": cf,
++            "jae": f"!({cf})", "jnb": f"!({cf})", "jnc": f"!({cf})",
++            "jbe": f"({cf} || {zf})", "jna": f"({cf} || {zf})",
++            "ja": f"!({cf} || {zf})", "jnbe": f"!({cf} || {zf})",
++            "je": zf, "jz": zf, "jne": f"!({zf})", "jnz": f"!({zf})",
++            "jp": pf, "jnp": f"!({pf})", "js": sf, "jns": f"!({sf})",
++        }
++        if flag_setter == "sahf_of":
++            slt = f"({sf} != _sahf_of)"
++            predicates.update({"jo": "_sahf_of", "jno": "!_sahf_of",
++                "jl": slt, "jnge": slt, "jge": f"!{slt}", "jnl": f"!{slt}",
++                "jle": f"({slt} || {zf})", "jng": f"({slt} || {zf})",
++                "jg": f"!({slt} || {zf})", "jnle": f"!({slt} || {zf})"})
++        value = predicates.get(jcc)
++        return (value, desc) if value is not None else None
++
++    # ── FPU compare-to-EFLAGS: no standard operands ──
+     if flag_setter in ("fcompi", "fcomip", "fucomi", "fucompi",
+-                        "fucomip", "fcomi", "sahf"):
++                        "fucomip", "fcomi"):
+         fpu_cmp_map = {
+             "ja": ">", "jnbe": ">",
+             "jae": ">=", "jnb": ">=", "jnc": ">=",
+@@ -383,6 +436,19 @@
+ 
+     # If no operands available for other flag-setters, can't generate condition
+     if lhs is None:
++        return None
++
++    if flag_setter in ("rol", "ror", "rcl", "rcr"):
++        if jcc in ("jb", "jnae", "jc"): return "_cf", desc
++        if jcc in ("jae", "jnb", "jnc"): return "!_cf", desc
++        if (jcc in ("jo", "jno") and len(flag_ops) > 1 and
++                flag_ops[1].type == "imm" and (flag_ops[1].imm & 31) == 1):
++            bits = (_operand_width(flag_ops[0]) or 4) * 8
++            other = ("_rotate_result" if flag_setter == "rol" else "_cf" if flag_setter == "rcl"
++                     else f"(_rotate_result >> {bits - 2})")
++            overflow = f"(((_rotate_result >> {bits - 1}) ^ {other}) & 1u)"
++            return (overflow if jcc == "jo" else f"!{overflow}"), desc
++        # Rotation never establishes ZF/SF/PF. A multi-bit OF is undefined.
+         return None
+ 
+     # ── comiss/ucomiss: float comparison, sets CF/ZF/PF ──
+@@ -407,22 +473,24 @@
+         desc = f"{desc} ({void_a} vs {void_b})" if desc else desc
+         a, b = "_fca", "_fcb"
+         # comiss uses unsigned condition codes (CF, ZF)
++        unordered = f"(isnan({a}) || isnan({b}))"
++        ordered = f"(!{unordered})"
+         if jcc in ("ja", "jnbe"):
+-            return f"({a} > {b})", desc
++            return f"({ordered} && {a} > {b})", desc
+         if jcc in ("jae", "jnb", "jnc"):
+-            return f"({a} >= {b})", desc
++            return f"({ordered} && {a} >= {b})", desc
+         if jcc in ("jb", "jnae", "jc"):
+-            return f"({a} < {b})", desc
++            return f"({unordered} || {a} < {b})", desc
+         if jcc in ("jbe", "jna"):
+-            return f"({a} <= {b})", desc
++            return f"({unordered} || {a} <= {b})", desc
+         if jcc in ("je", "jz"):
+             return f"({a} == {b})", desc
+         if jcc in ("jne", "jnz"):
+-            return f"({a} != {b})", desc
++            return f"({ordered} && {a} != {b})", desc
+         if jcc == "jp":
+-            return f"0 /* {jcc}: unordered/NaN */", desc
++            return f"(isnan({a}) || isnan({b}))", desc
+         if jcc == "jnp":
+-            return f"1 /* {jcc}: ordered */", desc
++            return f"(!isnan({a}) && !isnan({b}))", desc
+         return None
+ 
+     # SF is the sign bit of the result at the OPERAND's width, not at 32 bits.
+@@ -448,8 +516,23 @@
+             return f"({lhs} != 0)", desc
+         return None
+ 
++    if flag_setter == "tzcnt":
++        if jcc in ("je", "jz", "sete", "setz"):
++            return "(_fa == 0)", desc
++        if jcc in ("jne", "jnz", "setne", "setnz"):
++            return "(_fa != 0)", desc
++        if jcc in ("jb", "jnae", "jc"):
++            return "_cf", desc
++        if jcc in ("jae", "jnb", "jnc"):
++            return "!_cf", desc
++        return None
++
+     # ── cmp: flags from (a - b), operands unchanged ──
+     if flag_setter == "cmp":
++        if jcc in ("jp", "jnp"):
++            result = f"((uint32_t)({lhs}) - (uint32_t)({rhs}))"
++            parity = f"RECOMP_PARITY8({result})"
++            return (parity if jcc == "jp" else f"!{parity}"), desc
+         if cmp_macro:
+             return f"{cmp_macro}({lhs}, {rhs})", desc
+         if jcc == "js":
+@@ -484,6 +567,10 @@
+         if jcc == "jnp":
+             return f"(!RECOMP_PARITY8(({lhs}) & ({rhs})))", desc
+         return None
++
++    if flag_setter in ("shl", "shr", "shld", "shrd"):
++        # Like CMP snapshots, this survives an intervening MOV to the operand.
++        lhs = "_shift_result"
+ 
+     # ── carry conditions, from the _cf the arithmetic already produced ──
+     #
+@@ -534,6 +621,9 @@
+ 
+     # ── add: a = a + b, flags from result ──
+     if flag_setter == "add":
++        if jcc in ("jp", "jnp"):
++            parity = f"RECOMP_PARITY8({lhs})"
++            return (parity if jcc == "jp" else f"!{parity}"), desc
+         if jcc in ("je", "jz"):
+             return f"({lhs} == 0)", desc
+         if jcc in ("jne", "jnz"):
+@@ -558,6 +648,35 @@
+ 
+     # ── adc/sbb: result-based (like add/sub but with carry) ──
+     if flag_setter in ("adc", "sbb"):
++        if flag_setter == "sbb":
++            slt = "(_sbb_sf != _sbb_of)"
++            if jcc in ("jl", "jnge"):
++                return slt, desc
++            if jcc in ("jge", "jnl"):
++                return f"!{slt}", desc
++            if jcc in ("jle", "jng"):
++                return f"({slt} || _sbb_result == 0)", desc
++            if jcc in ("jg", "jnle"):
++                return f"(!{slt} && _sbb_result != 0)", desc
++            if jcc in ("jo",):
++                return "_sbb_of", desc
++            if jcc in ("jno",):
++                return "!_sbb_of", desc
++            if jcc in ("js",):
++                return "_sbb_sf", desc
++            if jcc in ("jns",):
++                return "!_sbb_sf", desc
++            if jcc in ("je", "jz"):
++                return "(_sbb_result == 0)", desc
++            if jcc in ("jne", "jnz"):
++                return "(_sbb_result != 0)", desc
++            if jcc == "jp":
++                return "RECOMP_PARITY8(_sbb_result)", desc
++            if jcc == "jnp":
++                return "!RECOMP_PARITY8(_sbb_result)", desc
++        if jcc in ("jp", "jnp"):
++            parity = f"RECOMP_PARITY8({lhs})"
++            return (parity if jcc == "jp" else f"!{parity}"), desc
+         if jcc in ("je", "jz"):
+             return f"({lhs} == 0)", desc
+         if jcc in ("jne", "jnz"):
+@@ -570,6 +689,9 @@
+ 
+     # ── and/or/xor: result-based, CF=0, OF=0 ──
+     if flag_setter in ("and", "or", "xor"):
++        if jcc in ("jp", "jnp"):
++            parity = f"RECOMP_PARITY8({lhs})"
++            return (parity if jcc == "jp" else f"!{parity}"), desc
+         if jcc in ("je", "jz"):
+             return f"({lhs} == 0)", desc
+         if jcc in ("jne", "jnz"):
+@@ -590,6 +712,14 @@
+ 
+     # ── dec/inc: result-based, CF unchanged ──
+     if flag_setter in ("dec", "inc"):
++        if jcc in ("jp", "jnp"):
++            parity = f"RECOMP_PARITY8({lhs})"
++            return (parity if jcc == "jp" else f"!{parity}"), desc
++        if jcc in ("jo", "jno"):
++            width = (_operand_width(flag_ops[0]) or 4) * 8 if flag_ops else 32
++            overflow_value = (1 << (width - 1)) if flag_setter == "inc" else ((1 << (width - 1)) - 1)
++            overflow = f"((uint{width}_t)({lhs}) == 0x{overflow_value:X}u)"
++            return (overflow if jcc == "jo" else f"!{overflow}"), desc
+         if jcc in ("je", "jz"):
+             return f"({lhs} == 0)", desc
+         if jcc in ("jne", "jnz"):
+@@ -606,6 +736,13 @@
+ 
+     # ── neg: flags from (0 - a_orig), result is -a ──
+     if flag_setter == "neg":
++        if jcc in ("jp", "jnp"):
++            parity = f"RECOMP_PARITY8({lhs})"
++            return (parity if jcc == "jp" else f"!{parity}"), desc
++        if jcc in ("jo", "jno"):
++            width = (_operand_width(flag_ops[0]) or 4) * 8 if flag_ops else 32
++            overflow = f"((uint{width}_t)({lhs}) == 0x{1 << (width - 1):X}u)"
++            return (overflow if jcc == "jo" else f"!{overflow}"), desc
+         if jcc in ("je", "jz"):
+             return f"({lhs} == 0)", desc
+         if jcc in ("jne", "jnz"):
+@@ -630,27 +767,22 @@
+         return None
+ 
+     # ── shift: result-based ──
+-    if flag_setter in ("shl", "shr", "sar"):
++    if flag_setter in ("shl", "shr", "sar", "shld", "shrd"):
+         if jcc in ("je", "jz"):
+             return f"({lhs} == 0)", desc
+         if jcc in ("jne", "jnz"):
+             return f"({lhs} != 0)", desc
+         if jcc == "js":
+-            return f"((int32_t){lhs} < 0)", desc
++            return f"({_sf_cast}{lhs} < 0)", desc
+         if jcc == "jns":
+-            return f"((int32_t){lhs} >= 0)", desc
+-        return None
+-
+-    # ── shld/shrd: double-precision shift, result-based ──
+-    if flag_setter in ("shld", "shrd"):
+-        if jcc in ("je", "jz"):
+-            return f"({lhs} == 0)", desc
+-        if jcc in ("jne", "jnz"):
+-            return f"({lhs} != 0)", desc
+-        if jcc == "js":
+-            return f"((int32_t){lhs} < 0)", desc
+-        if jcc == "jns":
+-            return f"((int32_t){lhs} >= 0)", desc
++            return f"({_sf_cast}{lhs} >= 0)", desc
++        if flag_setter in ("shl", "shr", "shld", "shrd"):
++            if jcc in ("jp", "jnp"):
++                condition = f"RECOMP_PARITY8({lhs})"
++                return (condition if jcc == "jp" else f"!{condition}"), desc
++            if (jcc in ("jo", "jno") and len(flag_ops) > 1 and
++                    flag_ops[-1].type == "imm" and (flag_ops[-1].imm & 31) == 1):
++                return ("_shift_of" if jcc == "jo" else "!_shift_of"), desc
+         return None
+ 
+     # ── rol/ror/rcl/rcr: rotation, only CF/OF affected ──
+@@ -745,11 +877,11 @@
+         # Conditional tail call: same frame bridge as the unconditional tail
+         # jmp in _lift_jmp, applied only on the taken path.
+         if target in lifter.manual_functions:
+-            return (f"if ({cond_expr}) {{ g_seh_ebp = ebp; "
++            return (f"if ({cond_expr}) {{ g_ebp = g_seh_ebp = ebp; "
+                     f"RECOMP_ITAIL(0x{target:08X}u); return; }}"
+                     f" /* {jcc}: {desc}, manual tail */")
+         name = lifter._call_target_name(target)
+-        return (f"if ({cond_expr}) {{ g_seh_ebp = ebp; {name}(); return; }}"
++        return (f"if ({cond_expr}) {{ g_ebp = g_seh_ebp = ebp; {name}(); return; }}"
+                 f" /* {jcc}: {desc} */")
+     return f"if ({cond_expr}) goto loc_{target:08X}; /* {jcc}: {desc} */"
+ 
+@@ -938,8 +1070,12 @@
+         self._fp_top = 0  # FPU stack top index
+         self.func_start = 0  # Set per-function by translator
+         self.func_end = 0
++        # Per-function computed-goto destinations for register-indirect jump
++        # tables. The translator fills this only when the load/jump idiom and
++        # bounded table are both proven; values remain labels in this C frame.
++        self.local_indirect_targets = {}
+         self.needs_cf = False  # Set per-function by translator (has adc/sbb)
+-        self.publishes_ebp = False  # Set per-function: has a real frame
++        self.publishes_ebp = False  # Set per-function: has a local architectural EBP
+         self.trace_exit_name = None  # Set per-function when traced
+         # Every direct call target we emit a name for, as {addr: name}. The
+         # batch translator diffs this against the functions it actually defined
+@@ -1045,6 +1181,8 @@
+             return self._lift_sar(insn, ops)
+         if m in ("rol", "ror"):
+             return self._lift_rotate(insn, ops, m)
++        if m in ("rcl", "rcr"):
++            return self._lift_carry_rotate(insn, ops, m)
+ 
+         # ── Comparison / test (standalone, not part of cmp+jcc pattern) ──
+         if m == "cmp":
+@@ -1065,8 +1203,9 @@
+         # ── String operations ──
+         if m.startswith("rep ") or m.startswith("repe ") or m.startswith("repne "):
+             return self._lift_rep_string(insn, m)
+-        if m in ("movsb", "movsd", "movsw", "stosb", "stosd", "stosw",
+-                 "lodsb", "lodsd", "lodsw"):
++        if (m in ("movsb", "movsw", "stosb", "stosd", "stosw",
++                  "lodsb", "lodsd", "lodsw")
++                or (m == "movsd" and nops == 0)):
+             return self._lift_string_op(insn, m)
+         if m == "wait":
+             return ["/* wait - FPU sync */"]
+@@ -1163,7 +1302,9 @@
+         if m == "lahf":
+             return ["/* lahf - load AH from flags (used in FPU compare idiom) */"]
+         if m == "sahf":
+-            return ["/* sahf - store AH to flags */"]
++            out = ["_sahf_flags = (eax >> 8) & 0xD5u; /* SAHF snapshots AH; preserves OF */"]
++            if getattr(self, "needs_cf", False): out.append("_cf = _sahf_flags & 1u;")
++            return out
+         if m == "shld":
+             return self._lift_shld(insn, ops)
+         if m == "shrd":
+@@ -1172,12 +1313,9 @@
+             if len(ops) >= 2:
+                 return [f"/* bt {_fmt_operand_read(ops[0])}, {_fmt_operand_read(ops[1])} - bit test */"]
+             return [f"/* bt {insn.op_str} */"]
+-        if m == "emms":
+-            # A statement rather than a comment: emms genuinely has no
+-            # effect here (mm/x87 aliasing is not modelled), and a
+-            # comment-only lift is how the conformance suite reports a
+-            # silently dropped instruction.
+-            return ["(void)0; /* emms - empty MMX state */"]
++        if m in ("emms", "femms"):
++            # EMMS marks every physical x87 register empty without changing TOP.
++            return [f"g_fp_empty_mask = 0xFFu; /* {m}: all x87 registers empty */"]
+         if m in ("xlat", "xlatb"):
+             # AL indexes the byte table at EBX. With an address-size override,
+             # the effective offset is calculated and wrapped at 16 bits.
+@@ -1188,7 +1326,8 @@
+                 address = "ebx + LO8(eax)"
+             return [f"SET_LO8(eax, MEM8({address})); /* xlatb */"]
+         if m in ("sete", "setne", "setb", "setae", "setbe", "seta",
+-                 "setl", "setge", "setle", "setg", "sets", "setns"):
++                 "setl", "setge", "setle", "setg", "sets", "setns",
++                 "setp", "setnp", "seto", "setno"):
+             return self._lift_setcc(insn, ops, m)
+         if m in ("cmove", "cmovne", "cmovb", "cmovae", "cmovbe", "cmova",
+                  "cmovl", "cmovge", "cmovle", "cmovg", "cmovs", "cmovns"):
+@@ -1211,7 +1350,8 @@
+                    "emms", "femms"):
+             return self._lift_mmx(insn, m, ops)
+ 
+-        if m in ("movss", "movsd", "movaps", "movups", "movlps", "movhps",
++        if m in ("stmxcsr", "ldmxcsr",
++                 "movss", "movsd", "movaps", "movups", "movlps", "movhps", "movlpd",
+                  "movlhps", "movhlps", "movapd", "movupd",
+                  "addss", "subss", "mulss", "divss", "sqrtss",
+                  "addsd", "subsd", "mulsd", "divsd", "sqrtsd",
+@@ -1227,7 +1367,8 @@
+                  "minps", "maxps", "rsqrtss", "rcpss",
+                  "sqrtps", "rsqrtps", "rcpps",
+                  "cmpneqps", "cmpeqps", "cmpltps", "cmpleps",
+-                 "movmskps",
++                 "movmskps", "subpd", "punpckldq", "unpckhpd",
++                 "cmpltss", "cmpeqss", "pcmpeqb", "pmovmskb",
+                  "pand", "pandn", "por", "pxor", "pcmpgtd"):
+             return self._lift_sse(insn, m, ops)
+ 
+@@ -1244,7 +1385,7 @@
+         # Cache hints and store fences: nothing to model on a single-threaded
+         # interpreter over coherent host memory. Named so they stop showing up
+         # in the unimplemented report as if they were missing work.
+-        if m.startswith("prefetch") or m in ("sfence", "lfence", "mfence"):
++        if m.startswith("prefetch") or m in ("sfence", "lfence", "mfence", "pause"):
+             return [f"(void)0; /* {m}: cache/ordering hint, nothing to model */"]
+ 
+         if m in ("stc", "clc", "cmc"):
+@@ -1287,14 +1428,27 @@
+         # would leave, which is what _make_condition reads for a following jcc.
+         # The other flags are architecturally undefined here, so a jcc that
+         # reads them was already meaningless.
+-        if m in ("bsf", "bsr"):
++        if m in ("bsf", "bsr", "tzcnt"):
+             if len(ops) < 2:
+                 self.unimplemented.setdefault(m, []).append(insn.address)
+-                return [f"/* TODO: {m} {insn.op_str} */"]
++                return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* TODO: {m} {insn.op_str} */"]
+             dst = _fmt_operand_read(ops[0])
+             src = _fmt_operand_read(ops[1])
+             width = (_operand_width(ops[1]) or 4) * 8
+-            if m == "bsr":
++            if m == "tzcnt":
++                if width > 32:
++                    self.unimplemented.setdefault(m, []).append(insn.address)
++                    return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* unsupported wide {m} */"]
++                return [
++                    f"{{ uint32_t _tz_src = (uint32_t)({src}); uint32_t _tz_count = {width}u;",
++                    f"  if (_tz_src) for (uint32_t _tz_i = 0; _tz_i < {width}u; ++_tz_i)",
++                    "    if (_tz_src & (1u << _tz_i)) { _tz_count = _tz_i; break; }",
++                    "  " + _fmt_operand_write(ops[0], "_tz_count") + ";",
++                    "  _fa = _tz_count; _fb = _tz_src; _fas = (int32_t)_fa; _fbs = (int32_t)_fb;",
++                    ("  _cf = (_tz_src == 0);" if self.needs_cf else "  (void)_tz_src;")
++                    + " } /* tzcnt */",
++                ]
++            elif m == "bsr":
+                 init, cond, step = f"{width - 1}", "_bs_i >= 0", "_bs_i--"
+             else:
+                 init, cond, step = "0", f"_bs_i < {width}", "_bs_i++"
+@@ -1327,6 +1481,28 @@
+         # unlocked xadd on memory is single-CPU-safe on the console and
+         # costs nothing extra to make safe here.
+         atomic_m = m[5:] if m.startswith("lock ") else m
++        if m.startswith("lock ") and len(ops) >= 1:
++            width = _operand_width(ops[0]) or 4
++            if width == 4 and ops[0].type == "mem":
++                address = _fmt_mem(ops[0])
++                if atomic_m in ("inc", "dec"):
++                    delta = 1 if atomic_m == "inc" else -1
++                    return [
++                        f"{{ uint32_t _old = RECOMP_ATOMIC_ADD32(XBOX_PTR({address}), {delta}u);",
++                        f"  uint32_t _new = _old {'+' if delta > 0 else '-'} 1u;",
++                        "  _fa = _new; _fb = 0; _fas = (int32_t)_new; _fbs = 0; }"
++                        f" /* {m} */",
++                    ]
++                if atomic_m in ("or", "and") and len(ops) >= 2:
++                    value = _fmt_operand_read(ops[1])
++                    op = "|" if atomic_m == "or" else "&"
++                    helper = "RECOMP_ATOMIC_OR32" if atomic_m == "or" else "RECOMP_ATOMIC_AND32"
++                    return [
++                        f"{{ uint32_t _old = {helper}(XBOX_PTR({address}), {value});",
++                        f"  uint32_t _new = _old {op} (uint32_t)({value});",
++                        "  _fa = _new; _fb = 0; _fas = (int32_t)_new; _fbs = 0; }"
++                        f" /* {m} */",
++                    ]
+         if atomic_m in ("xadd", "cmpxchg") and len(ops) >= 2:
+             width = _operand_width(ops[0]) or 4
+             if width == 4 and ops[0].type == "mem":
+@@ -1359,11 +1535,14 @@
+         #
+         # Recorded, not merely commented -- see self.unimplemented.
+         self.unimplemented.setdefault(m, []).append(insn.address)
+-        return [f"/* TODO: {m} {insn.op_str} */"]
++        return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* TODO: {m} {insn.op_str} */"]
+ 
+     # ── MOV family ──
+ 
+     def _lift_mov(self, insn, ops):
++        if any(op.type == "reg" and op.reg.startswith(("dr", "cr")) for op in ops):
++            self.unimplemented.setdefault(insn.mnemonic, []).append(insn.address)
++            return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* privileged mov */"]
+         if nops := len(ops) < 2:
+             return [f"/* mov: bad operands */"]
+         src = _fmt_operand_read(ops[1])
+@@ -1490,7 +1669,15 @@
+                 out.append(f"_cf = (int)((uint32_t)({dst}) < (uint32_t)({src}));")
+             else:
+                 out.append("_cf = 0; /* logical op clears CF */")
+-        out.append(_fmt_operand_write(ops[0], expr))
++        if m == "sub" and getattr(self, "needs_zf_snapshot", False):
++            # Capture the executed result once, before a later MOV or join can
++            # change the destination. Do not re-read memory to reconstruct ZF.
++            mask = self._SNAP_MASK.get(_operand_width(ops[0]) or 4, "0xFFFFFFFFu")
++            out.extend([f"{{ uint32_t _zr = ((uint32_t)({dst}) - (uint32_t)({src})) & {mask};",
++                        "_zf = (_zr == 0);",
++                        _fmt_operand_write(ops[0], "_zr") + " }"])
++        else:
++            out.append(_fmt_operand_write(ops[0], expr))
+         return out
+ 
+     def _lift_inc_dec(self, insn, ops, m):
+@@ -1499,6 +1686,11 @@
+         val = _fmt_operand_read(ops[0])
+         delta = "1"
+         op_char = "+" if m == "inc" else "-"
++        if m == "dec" and getattr(self, "needs_zf_snapshot", False):
++            mask = self._SNAP_MASK.get(_operand_width(ops[0]) or 4, "0xFFFFFFFFu")
++            return [f"{{ uint32_t _zr = ((uint32_t)({val}) - 1u) & {mask};",
++                    "_zf = (_zr == 0);",
++                    _fmt_operand_write(ops[0], "_zr") + " }"]
+         # For sub-registers (al, cl, etc.), use the SET macro instead of ++
+         if ops[0].type == "reg" and ops[0].reg in (
+                 "eax", "ebx", "ecx", "edx", "esi", "edi", "ebp", "esp"):
+@@ -1514,7 +1706,7 @@
+         if preserve_carry or self.needs_cf:
+             # neg sets CF iff the operand was non-zero (neg/sbb sign-extract).
+             out.append(f"_cf = (int)(({val}) != 0);")
+-        out.append(_fmt_operand_write(ops[0], f"(uint32_t)(-(int32_t){val})"))
++        out.append(_fmt_operand_write(ops[0], f"(0u - (uint32_t)({val}))"))
+         return out
+ 
+     def _lift_not(self, insn, ops):
+@@ -1524,18 +1716,32 @@
+         return [_fmt_operand_write(ops[0], f"~{val}")]
+ 
+     def _lift_sbb(self, insn, ops):
+-        """SBB: subtract with borrow. Common idiom: sbb reg, reg → -CF (0 or -1)."""
++        """SBB: subtract with borrow and retain the flags consumed by later branches."""
+         if len(ops) < 2:
+             return ["/* sbb: bad operands */"]
+         dst = _fmt_operand_read(ops[0])
+         src = _fmt_operand_read(ops[1])
+-        # sbb reg, reg is a common idiom: result is 0 or 0xFFFFFFFF depending on CF
+-        if ops[0].type == "reg" and ops[1].type == "reg" and ops[0].reg == ops[1].reg:
+-            return [_fmt_operand_write(ops[0], "_cf ? 0xFFFFFFFF : 0") + " /* sbb self (CF extend) */"]
+-        w = (_operand_width(ops[0]) or 4) * 8
+-        return ["{ uint64_t _t = (uint64_t)(%s) - (uint64_t)(%s) - (uint64_t)_cf;"
+-                " _cf = (int)((_t >> %d) & 1); %s }  /* sbb */"
+-                % (dst, src, w, _fmt_operand_write(ops[0], "(uint32_t)_t"))]
++        size = _operand_width(ops[0]) or 4
++        bits = size * 8
++        mask = self._SNAP_MASK.get(size, "0xFFFFFFFFu")
++        sx = self._SNAP_SX.get(size, "(int32_t)")
++        min_signed = -(1 << (bits - 1))
++        max_signed = (1 << (bits - 1)) - 1
++        result_mask = f"0x{(1 << bits) - 1:X}ULL"
++        sign_mask = f"0x{1 << (bits - 1):X}ULL"
++        return [
++            "{",
++            f"  _fa = (uint32_t)({dst}) & {mask}; _fb = (uint32_t)({src}) & {mask};",
++            f"  _fas = (int32_t){sx}(_fa); _fbs = (int32_t){sx}(_fb);",
++            "  uint32_t _sbb_borrow_in = (uint32_t)!!_cf;",
++            f"  int64_t _sbb_math = (int64_t)_fas - (int64_t)_fbs - (int64_t)_sbb_borrow_in;",
++            f"  _sbb_result = (uint32_t)((uint64_t)_sbb_math & {result_mask});",
++            f"  _sbb_sf = !!((uint64_t)_sbb_result & {sign_mask});",
++            f"  _sbb_of = (_sbb_math < (int64_t)({min_signed}) || _sbb_math > (int64_t)({max_signed}));",
++            "  _cf = (int)(_fa < _fb || (_sbb_borrow_in && _fa == _fb));",
++            f"  {_fmt_operand_write(ops[0], '_sbb_result')}",
++            "} /* sbb */",
++        ]
+ 
+     def _lift_adc(self, insn, ops):
+         """ADC: add with carry."""
+@@ -1549,24 +1755,25 @@
+                 % (dst, src, w, _fmt_operand_write(ops[0], "(uint32_t)_t"))]
+ 
+     def _lift_shld(self, insn, ops):
+-        """SHLD: double-precision shift left."""
++        return self._lift_double_shift(insn, ops, False)
++
++    def _lift_shrd(self, insn, ops):
++        return self._lift_double_shift(insn, ops, True)
++
++    def _lift_double_shift(self, insn, ops, right):
+         if len(ops) < 3:
+-            return [f"/* shld: bad operands */"]
+-        dst = _fmt_operand_read(ops[0])
+-        src = _fmt_operand_read(ops[1])
+-        cnt = _fmt_operand_read(ops[2])
+-        return [_fmt_operand_write(ops[0],
+-            f"({dst} << {cnt}) | ({src} >> (32 - {cnt}))") + " /* shld */"]
+-
+-    def _lift_shrd(self, insn, ops):
+-        """SHRD: double-precision shift right."""
+-        if len(ops) < 3:
+-            return [f"/* shrd: bad operands */"]
+-        dst = _fmt_operand_read(ops[0])
+-        src = _fmt_operand_read(ops[1])
+-        cnt = _fmt_operand_read(ops[2])
+-        return [_fmt_operand_write(ops[0],
+-            f"({dst} >> {cnt}) | ({src} << (32 - {cnt}))") + " /* shrd */"]
++            return ["/* double shift: bad operands */"]
++        if ops[2].type == "imm" and (ops[2].imm & 31) == 0:
++            return ["(void)0; /* double shift: masked zero count preserves flags/result */"]
++        dst, src, cnt = [_fmt_operand_read(op) for op in ops[:3]]
++        bits = (_operand_width(ops[0]) or 4) * 8
++        carry = "&_cf" if self.needs_cf else "NULL"
++        snapshot = getattr(self, "needs_shift_snapshot", False)
++        overflow = "&_shift_of" if snapshot else "NULL"
++        expression = f"RECOMP_DOUBLE_SHIFT({dst}, {src}, {cnt}, {bits}, {int(right)}, {carry}, {overflow})"
++        if snapshot:
++            return [f"_shift_result = {expression};", _fmt_operand_write(ops[0], "_shift_result")]
++        return [_fmt_operand_write(ops[0], expression)]
+ 
+     def _lift_imul(self, insn, ops):
+         nops = len(ops)
+@@ -1614,36 +1821,53 @@
+ 
+     def _lift_shift(self, insn, ops, c_op):
+         if len(ops) < 2:
+-            return [f"/* shift: bad operands */"]
++            return ["/* shift: bad operands */"]
++        if ops[1].type == "imm" and (ops[1].imm & 31) == 0:
++            return ["(void)0; /* logical shift: masked zero count preserves flags/result */"]
+         dst = _fmt_operand_read(ops[0])
+         cnt = _fmt_operand_read(ops[1])
+-        out = []
+-        if self.needs_cf:
+-            w = (_operand_width(ops[0]) or 4) * 8
+-            # CF is the last bit shifted out; a zero count leaves CF alone.
+-            bit = f"({cnt}) - 1" if c_op == ">>" else f"{w} - ({cnt})"
+-            out.append(f"if ({cnt}) _cf = (int)((({dst}) >> ({bit})) & 1);")
+-        out.append(_fmt_operand_write(ops[0], f"{dst} {c_op} {cnt}"))
+-        return out
++        bits = (_operand_width(ops[0]) or 4) * 8
++        carry = "&_cf" if self.needs_cf else "NULL"
++        snapshot = getattr(self, "needs_shift_snapshot", False)
++        overflow = "&_shift_of" if snapshot else "NULL"
++        expression = f"RECOMP_SHIFT({dst}, {cnt}, {bits}, {int(c_op == '>>')}, {carry}, {overflow})"
++        if snapshot:
++            return [f"_shift_result = {expression};", _fmt_operand_write(ops[0], "_shift_result")]
++        return [_fmt_operand_write(ops[0], expression)]
+ 
+     def _lift_sar(self, insn, ops):
+         if len(ops) < 2:
+             return ["/* sar: bad operands */"]
+         dst = _fmt_operand_read(ops[0])
+         cnt = _fmt_operand_read(ops[1])
+-        out = []
+-        if self.needs_cf:
+-            out.append(f"if ({cnt}) _cf = (int)((({dst}) >> (({cnt}) - 1)) & 1);")
+-        out.append(_fmt_operand_write(ops[0], f"(uint32_t)((int32_t){dst} >> {cnt})"))
+-        return out
++        bits = (_operand_width(ops[0]) or 4) * 8
++        carry = "&_cf" if self.needs_cf else "NULL"
++        return [_fmt_operand_write(ops[0], f"RECOMP_SAR({dst}, {cnt}, {bits}, {carry})")]
+ 
+     def _lift_rotate(self, insn, ops, m):
+         if len(ops) < 2:
+             return [f"/* {m}: bad operands */"]
+         dst = _fmt_operand_read(ops[0])
+         cnt = _fmt_operand_read(ops[1])
+-        func = "ROL32" if m == "rol" else "ROR32"
+-        return [_fmt_operand_write(ops[0], f"{func}({dst}, {cnt})")]
++        bits = (_operand_width(ops[0]) or 4) * 8
++        carry = "&_cf" if self.needs_cf else "NULL"
++        expression = f"RECOMP_ROTATE({dst}, {cnt}, {bits}, {int(m == 'ror')}, {carry}, NULL)"
++        if getattr(self, "needs_rotate_snapshot", False):
++            return [f"_rotate_result = {expression};", _fmt_operand_write(ops[0], "_rotate_result")]
++        return [_fmt_operand_write(ops[0], expression)]
++
++    def _lift_carry_rotate(self, insn, ops, m):
++        if len(ops) < 2:
++            return [f"/* {m}: bad operands */"]
++        if ops[1].type == "imm" and (ops[1].imm & 31) == 0:
++            return ["(void)0; /* carry rotate: masked zero count preserves flags/result */"]
++        dst = _fmt_operand_read(ops[0])
++        cnt = _fmt_operand_read(ops[1])
++        bits = (_operand_width(ops[0]) or 4) * 8
++        expression = f"RECOMP_CARRY_ROTATE({dst}, {cnt}, {bits}, {int(m == 'rcr')}, &_cf, NULL)"
++        if getattr(self, "needs_rotate_snapshot", False):
++            return [f"_rotate_result = {expression};", _fmt_operand_write(ops[0], "_rotate_result")]
++        return [_fmt_operand_write(ops[0], expression)]
+ 
+     # ── Compare / Test (standalone) ──
+ 
+@@ -1681,6 +1905,14 @@
+             f"_fas = (int32_t){sx}(_fa); _fbs = (int32_t){sx}(_fb);"
+             f" /* {kind} {lhs}, {rhs} ({size*8}-bit) */",
+         ]
++        if getattr(self, "needs_zf_snapshot", False):
++            out.append("_zf = (_fa == _fb);" if kind == "cmp"
++                       else "_zf = ((_fa & _fb) == 0);")
++        if getattr(self, "needs_signed_snapshot", False):
++            # Signed-less is SF xor OF, not SF alone (CMP may overflow).
++            # TEST clears OF and takes SF from its width-masked AND result.
++            out.append("_slt = (_fas < _fbs);" if kind == "cmp"
++                       else f"_slt = ((int32_t){sx}(_fa & _fb) < 0);")
+         # A cmp sets the carry flag too, and sbb/adc/setc/rcl read it directly
+         # rather than through _fa/_fb. Leaving CF alone here let those pick up
+         # whatever an earlier instruction had left in it.
+@@ -1757,16 +1989,18 @@
+         # value -- so writing the true address costs nothing at the return side.
+         ret_va = insn.end_address
+         if insn.call_target:
++            # GCC/musl i386 position-independent code materializes the current
++            # instruction address with `call $+5; pop reg`.  The target is the
++            # call's fallthrough, so this is not a guest function boundary or
++            # a cross-function ABI call: only the architectural return-address
++            # push matters. Calling a synthetic `sub_<ret_va>` here makes a
++            # local label look unresolved and breaks the following PIC pop/add.
++            if insn.call_target == ret_va:
++                return [f"PUSH32(esp, 0x{ret_va:08X}u); /* call next: materialize EIP */"]
+             name = self._call_target_name(insn.call_target)
+             lines = []
+-            # Re-publish this function's frame before every call, not just once
+-            # at `mov ebp, esp`. g_ebp is "the last frame established anywhere",
+-            # so a callee that sets up its own frame overwrites it and leaves it
+-            # stale on return. A frameless helper called afterwards then
+-            # inherits the wrong frame -- in Halo, sub_001E1BA0 called one
+-            # function, returned, then called the frameless sub_001DEC07, which
+-            # inherited a long-dead frame of ~0xA6 and wrote [ebp-0xa2] and
+-            # [ebp-0xa0] onto Xbox VA 4 and 6: exactly the fs:[4] corruption.
++            # Publish the actual local register, including nonstandard EBP
++            # arguments, before crossing a compiled-function boundary.
+             if self.publishes_ebp:
+                 lines.append("g_ebp = ebp; /* frame stays current across calls */")
+                 lines.append("g_seh_ebp = ebp;")
+@@ -1856,7 +2090,8 @@
+             # target -- `call dword ptr [esp+8]`, the shape MSVC gives a
+             # callback invoked through a stack argument -- is read four bytes
+             # low and dispatches through the wrong slot.
+-            return [f"{{ uint32_t _icall_target = {target}; "
++            prefix = "g_ebp = g_seh_ebp = ebp; " if self.publishes_ebp else ""
++            return [f"{prefix}{{ uint32_t _icall_target = {target}; "
+                     f"PUSH32(esp, 0x{ret_va:08X}u); "
+                     "RECOMP_ICALL_SAFE(_icall_target, _icall_esp); }"
+                     " /* indirect call */"]
+@@ -1865,11 +2100,13 @@
+     def _lift_ret(self, insn, ops):
+         # x86 'ret' pops return address from stack.
+         # 'ret N' also pops N extra bytes (stdcall cleanup).
+-        # If this function IS __SEH_prolog or __SEH_epilog, bridge ebp
+-        # so the caller can read back the frame pointer.
++        # Publish the register after the original POP/LEAVE epilog. Relays
++        # without a local EBP then inherit the restored frame, not a dead child.
++        # SEH helpers deliberately return a changed frame; keep that exchange.
+         prefix = ""
+-        if self.func_start in (self.SEH_PROLOG, self.SEH_EPILOG):
+-            prefix = "g_seh_ebp = ebp; "
++        if (self.publishes_ebp
++                or self.func_start in (self.SEH_PROLOG, self.SEH_EPILOG)):
++            prefix = "g_ebp = g_seh_ebp = ebp; "
+         # Exit trace, for functions that return with a register the caller
+         # relied on holding something else. Entry tracing alone cannot show
+         # that: it tells you what went in, never what came back. Emitted at the
+@@ -1958,7 +2195,7 @@
+                 # Bridge ebp so the target function can inherit our frame pointer.
+                 if insn.jump_target in self.manual_functions:
+                     tail = (
+-                        f"g_seh_ebp = ebp; "
++                        f"g_ebp = g_seh_ebp = ebp; "
+                         f"RECOMP_ITAIL(0x{insn.jump_target:08X}u); return; "
+                         f"/* manual tail jmp 0x{insn.jump_target:08X} */"
+                     )
+@@ -1970,7 +2207,7 @@
+                         ]
+                     return [tail]
+                 name = self._call_target_name(insn.jump_target)
+-                tail = (f"g_seh_ebp = ebp; {name}(); return; "
++                tail = (f"g_ebp = g_seh_ebp = ebp; {name}(); return; "
+                         f"/* tail jmp 0x{insn.jump_target:08X} */")
+                 if self.trace_exit_name:
+                     # Tag the exit so a trace says which one was taken. A
+@@ -1982,6 +2219,15 @@
+                 return [tail]
+             return [f"goto loc_{insn.jump_target:08X};"]
+         elif len(ops) >= 1:
++            local_targets = self.local_indirect_targets.get(insn.address, ())
++            if local_targets:
++                target_expr = _fmt_operand_read(ops[0])
++                unique_targets = sorted(set(local_targets))
++                lines = [f"{{ uint32_t _jt = {target_expr}; /* recovered local computed goto */"]
++                for target in unique_targets:
++                    lines.append(f"if (_jt == 0x{target:08X}u) goto loc_{target:08X};")
++                lines.append(f"g_ebp = g_seh_ebp = ebp; RECOMP_ITAIL(_jt); return; }}")
++                return lines
+             # Detect intra-function switch tables (computed gotos)
+             switch_targets = self._analyze_switch_table(ops)
+             if switch_targets:
+@@ -1990,10 +2236,10 @@
+                 lines = [f"{{ uint32_t _jt = {target_expr}; /* switch: {len(switch_targets)} entries, {len(unique_targets)} targets */"]
+                 for t in unique_targets:
+                     lines.append(f"if (_jt == 0x{t:08X}u) goto loc_{t:08X};")
+-                lines.append(f"g_seh_ebp = ebp; RECOMP_ITAIL(_jt); return; }}")
++                lines.append(f"g_ebp = g_seh_ebp = ebp; RECOMP_ITAIL(_jt); return; }}")
+                 return lines
+             target = _fmt_operand_read(ops[0])
+-            return [f"g_seh_ebp = ebp; RECOMP_ITAIL({target}); return; /* indirect tail jmp */"]
++            return [f"g_ebp = g_seh_ebp = ebp; RECOMP_ITAIL({target}); return; /* indirect tail jmp */"]
+         return ["/* jmp: no target */"]
+ 
+     def _lift_jcc(self, insn):
+@@ -2007,7 +2253,7 @@
+             if target:
+                 if self._is_external_target(target):
+                     name = self._call_target_name(target)
+-                    return [f"if ({cond}) {{ g_seh_ebp = ebp; {name}(); return; }} /* {jcc} */"]
++                    return [f"if ({cond}) {{ g_ebp = g_seh_ebp = ebp; {name}(); return; }} /* {jcc} */"]
+                 return [f"if ({cond}) goto loc_{target:08X}; /* {jcc} */"]
+             return [f"/* {jcc} - no target */"]
+ 
+@@ -2030,7 +2276,7 @@
+         if target:
+             if self._is_external_target(target):
+                 name = self._call_target_name(target)
+-                return [f"if ({cond} /* {jcc}: {desc} */) {{ g_seh_ebp = ebp; {name}(); return; }}"]
++                return [f"if ({cond} /* {jcc}: {desc} */) {{ g_ebp = g_seh_ebp = ebp; {name}(); return; }}"]
+             return [f"if ({cond} /* {jcc}: {desc} */) goto loc_{target:08X};"]
+         return [f"/* {jcc}: {desc} - no target */"]
+ 
+@@ -2263,21 +2509,13 @@
+         if not ops:
+             return [f"/* {m}: no operands */"]
+ 
+-        # emms/femms: only the x87 tag word, which is not modelled.
+-        if m in ("emms", "femms"):
+-            # A real statement, not a comment: this instruction genuinely has
+-            # no effect in this model, and the conformance suite treats a
+-            # comment-only lift as a silently dropped instruction -- which is
+-            # exactly the signal that must stay meaningful for the ones that
+-            # really are missing.
+-            return [f"(void)0; /* {m}: mm/x87 aliasing is not modelled */"]
+ 
+         dst = ops[0]
+ 
+         if m in self._MMX_BINARY and len(ops) >= 2:
+             a, b = src(dst), src(ops[1])
+             if a is None or b is None:
+-                return [f"/* TODO: {m} {insn.op_str} */"]
++                return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* TODO: {m} {insn.op_str} */"]
+             if is_mm(dst):
+                 return [f"{dst.reg} = {self._MMX_BINARY[m]}({a}, {b}); /* {m} */"]
+             return [f"/* TODO: {m} {insn.op_str} (dst not mm) */"]
+@@ -2291,7 +2529,7 @@
+             elif count.type == "mem":
+                 cnt = f"MMX_MEM({_fmt_mem(count)}).q"
+             else:
+-                return [f"/* TODO: {m} {insn.op_str} */"]
++                return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* TODO: {m} {insn.op_str} */"]
+             return [f"{dst.reg} = {self._MMX_SHIFT[m]}({dst.reg}, {cnt}); /* {m} */"]
+ 
+         # cvtps2pi / cvttps2pi: two singles in, two dwords out. The source is
+@@ -2306,20 +2544,20 @@
+                 addr = _fmt_mem(s_op)
+                 lo, hi = f"MEMF({addr})", f"MEMF(({addr}) + 4)"
+             else:
+-                return [f"/* TODO: {m} {insn.op_str} */"]
++                return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* TODO: {m} {insn.op_str} */"]
+             return [f"{dst.reg} = MMX_FROM_PS({lo}, {hi}, {trunc}); /* {m} */"]
+ 
+         if m == "pshufw" and len(ops) >= 3 and is_mm(dst):
+             a = src(ops[1])
+             if a is None:
+-                return [f"/* TODO: {m} {insn.op_str} */"]
++                return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* TODO: {m} {insn.op_str} */"]
+             return [f"{dst.reg} = MMX_PSHUFW({a}, {ops[2].imm & 0xFF}u); /* pshufw */"]
+ 
+         if m == "pinsrw" and len(ops) >= 3 and is_mm(dst):
+             v = (f"{ops[1].reg}" if ops[1].type == "reg"
+                  else f"MEM16({_fmt_mem(ops[1])})" if ops[1].type == "mem" else None)
+             if v is None:
+-                return [f"/* TODO: {m} {insn.op_str} */"]
++                return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* TODO: {m} {insn.op_str} */"]
+             return [f"{dst.reg} = MMX_PINSRW({dst.reg}, {v}, "
+                     f"{ops[2].imm & 0xFF}u); /* pinsrw */"]
+ 
+@@ -2351,20 +2589,37 @@
+                              " /* movd */"])
+                 if dst.type == "reg":
+                     return [f"{dst.reg} = {ops[1].reg}.ud[0]; /* movd */"]
+-            return [f"/* TODO: {m} {insn.op_str} */"]
++            return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* TODO: {m} {insn.op_str} */"]
+ 
+         # movntq: a non-temporal store. The hint is irrelevant; the store is not.
+         if m == "movntq" and len(ops) >= 2 and dst.type == "mem" and is_mm(ops[1]):
+             return [f"MMX_STORE({_fmt_mem(dst)}, {ops[1].reg}); /* movntq */"]
+ 
+         self.unimplemented.setdefault(m, []).append(insn.address)
+-        return [f"/* TODO: {m} {insn.op_str} */"]
++        return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* TODO: {m} {insn.op_str} */"]
+ 
+     def _lift_sse(self, insn, m, ops):
+         """Translate SSE instructions to C float operations."""
+         nops = len(ops)
+         if nops < 1:
+             return [f"/* {m}: no operands */"]
++
++        if m in ("stmxcsr", "ldmxcsr"):
++            if len(ops) != 1 or ops[0].type != "mem":
++                return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* {m} requires m32 */"]
++            addr = _fmt_mem(ops[0])
++            if m == "stmxcsr":
++                return [f"MEM32({addr}) = g_mxcsr; /* stmxcsr: guest MXCSR */"]
++            # Pentium III's architecturally defined MXCSR bits (DAZ bit 6 is
++            # reserved on that target). Invalid reserved bits fault instead
++            # of being silently normalized into a different guest value.
++            return [
++                f"{{ uint32_t _new_mxcsr = MEM32({addr});",
++                "  if (_new_mxcsr & ~0x0000FFBFu)",
++                f"    recomp_unsupported_instruction(0x{insn.address:08X}u);",
++                "  else g_mxcsr = _new_mxcsr;",
++                "} /* ldmxcsr: guest MXCSR */",
++            ]
+ 
+         def _is_xmm(op):
+             return op.type == "reg" and op.reg and op.reg.startswith("xmm")
+@@ -2400,6 +2655,26 @@
+                 return f"MEMF({_fmt_mem(op)}) = {val};"
+             return f"/* sse_write? */;"
+ 
++        def _sse_read_double(op):
++            if _is_xmm(op):
++                return f"{op.reg}.d[0]"
++            if op.type == "reg":
++                return op.reg
++            if op.type == "mem":
++                return f"MEMD({_fmt_mem(op)})"
++            if op.type == "imm":
++                return _fmt_imm(op.imm)
++            return f"/* sse_read_double? */"
++
++        def _sse_write_double(op, val):
++            if _is_xmm(op):
++                return f"{op.reg}.d[0] = {val};"
++            if op.type == "reg":
++                return f"{op.reg} = {val};"
++            if op.type == "mem":
++                return f"MEMD({_fmt_mem(op)}) = {val};"
++            return f"/* sse_write_double? */;"
++
+         # ── Packed (128-bit) access ──
+         # A whole-register read yields a RecompXmm value; a whole-register
+         # write is a statement. Memory goes through the guest translation.
+@@ -2454,6 +2729,14 @@
+                             f"{ops[1].reg}); /* {m} */"]
+             return [f"/* {m} {insn.op_str} */"]
+ 
++        if m == "movlpd":
++            if nops >= 2:
++                if _is_xmm(ops[0]) and ops[1].type == "mem":
++                    return [f"XMM_LOAD_LOW({ops[0].reg}, {_fmt_mem(ops[1])}); /* movlpd */"]
++                if ops[0].type == "mem" and _is_xmm(ops[1]):
++                    return [f"XMM_STORE_LOW({_fmt_mem(ops[0])}, {ops[1].reg}); /* movlpd */"]
++            return [f"/* movlpd {insn.op_str} */"]
++
+         if m in ("movlhps", "movhlps"):
+             helper = ("XMM_MOVE_LOW_TO_HIGH" if m == "movlhps"
+                       else "XMM_MOVE_HIGH_TO_LOW")
+@@ -2466,6 +2749,15 @@
+         # a register-to-register move leaves them untouched.
+         if m in ("movss", "movsd"):
+             if nops >= 2:
++                if m == "movsd":
++                    dst, src = ops[0], ops[1]
++                    if _is_xmm(dst) and src.type == "mem":
++                        return [f"{dst.reg} = XMM_SCALAR_DOUBLE(MEMD({_fmt_mem(src)})); /* movsd */"]
++                    if _is_xmm(dst) and _is_xmm(src):
++                        return [f"{dst.reg}.q[0] = {src.reg}.q[0]; /* movsd xmm,xmm: preserve upper 64 */"]
++                    if dst.type == "mem" and _is_xmm(src):
++                        return [f"MEMD({_fmt_mem(dst)}) = {src.reg}.d[0]; /* movsd */"]
++                    return [f"/* movsd unsupported operands: {insn.op_str} */"]
+                 scalar = ("XMM_SCALAR" if m == "movss"
+                           else "XMM_SCALAR_DOUBLE")
+                 if _is_xmm(ops[0]) and ops[1].type == "mem":
+@@ -2497,30 +2789,43 @@
+                 return [f"{_fmt_operand_write(ops[0], src)} /* movd */"]
+             return [f"/* movd {insn.op_str} */"]
+ 
++        # SSE2 MOVQ transfers exactly the low 64 bits. Loads into an XMM
++        # register clear its upper 64 bits; a register copy has the same
++        # architectural zeroing behavior, and stores read only the low qword.
++        if m == "movq":
++            if nops >= 2 and _is_xmm(ops[0]):
++                src = ops[1]
++                if _is_xmm(src):
++                    return [f"{ops[0].reg}.q[0] = {src.reg}.q[0]; {ops[0].reg}.q[1] = 0; /* movq xmm,xmm */"]
++                if src.type == "mem":
++                    return [f"{ops[0].reg} = XMM_SCALAR_DOUBLE(MEMD({_fmt_mem(src)})); /* movq xmm,m64 */"]
++                return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* unsupported movq source: {insn.op_str} */"]
++            if nops >= 2 and ops[0].type == "mem" and _is_xmm(ops[1]):
++                return [f"MEMD({_fmt_mem(ops[0])}) = {ops[1].reg}.d[0]; /* movq m64,xmm */"]
++            return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* unsupported movq operands: {insn.op_str} */"]
++
+         # ── Arithmetic ──
+-        if m in ("addss", "addsd"):
+-            if nops >= 2:
+-                return [_sse_write(ops[0], f"{_sse_read(ops[0])} + {_sse_read(ops[1])}") + f" /* {m} */"]
+-        if m in ("subss", "subsd"):
+-            if nops >= 2:
+-                return [_sse_write(ops[0], f"{_sse_read(ops[0])} - {_sse_read(ops[1])}") + f" /* {m} */"]
+-        if m in ("mulss", "mulsd"):
+-            if nops >= 2:
+-                return [_sse_write(ops[0], f"{_sse_read(ops[0])} * {_sse_read(ops[1])}") + f" /* {m} */"]
+-        if m in ("divss", "divsd"):
+-            if nops >= 2:
+-                return [_sse_write(ops[0], f"{_sse_read(ops[0])} / {_sse_read(ops[1])}") + f" /* {m} */"]
+-        if m in ("sqrtss", "sqrtsd"):
+-            if nops >= 2:
+-                return [_sse_write(ops[0], f"sqrtf({_sse_read(ops[1])})") + f" /* {m} */"]
+-        if m in ("minss", "minsd"):
+-            if nops >= 2:
+-                a, b = _sse_read(ops[0]), _sse_read(ops[1])
+-                return [_sse_write(ops[0], f"({a} < {b} ? {a} : {b})") + f" /* {m} */"]
+-        if m in ("maxss", "maxsd"):
+-            if nops >= 2:
+-                a, b = _sse_read(ops[0]), _sse_read(ops[1])
+-                return [_sse_write(ops[0], f"({a} > {b} ? {a} : {b})") + f" /* {m} */"]
++        if m in ("addss", "addsd", "subss", "subsd", "mulss", "mulsd",
++                 "divss", "divsd") and nops >= 2:
++            double_op = m.endswith("sd")
++            read = _sse_read_double if double_op else _sse_read
++            write = _sse_write_double if double_op else _sse_write
++            operator = {"addss": "+", "addsd": "+", "subss": "-", "subsd": "-",
++                        "mulss": "*", "mulsd": "*", "divss": "/", "divsd": "/"}[m]
++            return [write(ops[0], f"{read(ops[0])} {operator} {read(ops[1])}") + f" /* {m} */"]
++        if m in ("sqrtss", "sqrtsd") and nops >= 2:
++            double_op = m == "sqrtsd"
++            read = _sse_read_double if double_op else _sse_read
++            write = _sse_write_double if double_op else _sse_write
++            root = "sqrt" if double_op else "sqrtf"
++            return [write(ops[0], f"{root}({read(ops[1])})") + f" /* {m} */"]
++        if m in ("minss", "minsd", "maxss", "maxsd") and nops >= 2:
++            double_op = m.endswith("sd")
++            read = _sse_read_double if double_op else _sse_read
++            write = _sse_write_double if double_op else _sse_write
++            a, b = read(ops[0]), read(ops[1])
++            operator = "<" if m.startswith("min") else ">"
++            return [write(ops[0], f"({a} {operator} {b} ? {a} : {b})") + f" /* {m} */"]
+ 
+         # ── Packed arithmetic ──
+         # These used to emit a bare comment, so a matrix concatenation built
+@@ -2532,6 +2837,11 @@
+             if lifted is not None:
+                 return lifted
+             return [f"/* {m} {insn.op_str} */"]
++        if m == "subpd":
++            lifted = _packed_binary("XMM_SUB_DOUBLE")
++            if lifted is not None:
++                return lifted
++            return [f"/* subpd {insn.op_str} */"]
+ 
+         # ── Conversions ──
+         if m == "cvtsi2ss":
+@@ -2544,16 +2854,16 @@
+         if m == "cvtsi2sd":
+             if nops >= 2:
+                 src = _fmt_operand_read(ops[1])
+-                return [_sse_write(ops[0], f"(double)(int32_t){src}") + " /* cvtsi2sd */"]
++                return [_sse_write_double(ops[0], f"(double)(int32_t){src}") + " /* cvtsi2sd */"]
+         if m in ("cvtsd2si", "cvttsd2si"):
+             if nops >= 2:
+-                return [_fmt_operand_write(ops[0], f"(int32_t){_sse_read(ops[1])}") + f" /* {m} */"]
++                return [_fmt_operand_write(ops[0], f"(int32_t){_sse_read_double(ops[1])}") + f" /* {m} */"]
+         if m == "cvtss2sd":
+             if nops >= 2:
+-                return [_sse_write(ops[0], f"(double){_sse_read(ops[1])}") + " /* cvtss2sd */"]
++                return [_sse_write_double(ops[0], f"(double){_sse_read(ops[1])}") + " /* cvtss2sd */"]
+         if m == "cvtsd2ss":
+             if nops >= 2:
+-                return [_sse_write(ops[0], f"(float){_sse_read(ops[1])}") + " /* cvtsd2ss */"]
++                return [_sse_write(ops[0], f"(float){_sse_read_double(ops[1])}") + " /* cvtsd2ss */"]
+ 
+         # ── Comparison ──
+         if m in ("comiss", "comisd", "ucomiss", "ucomisd"):
+@@ -2563,8 +2873,17 @@
+                 # frequently a write to a register the operand address was
+                 # built from -- so the operands have to be read now, while
+                 # they still mean what the compare meant.
+-                return [f"_fca = {_sse_read(ops[0])}; _fcb = {_sse_read(ops[1])};"
++                read = _sse_read_double if m.endswith("d") else _sse_read
++                return [f"_fca = {read(ops[0])}; _fcb = {read(ops[1])};"
+                         f" /* {m} */"]
++
++        if m in ("cmpltss", "cmpeqss") and nops >= 2 and _is_xmm(ops[0]):
++            lhs, rhs = _sse_read(ops[0]), _sse_read(ops[1])
++            comparison = "<" if m == "cmpltss" else "=="
++            # CMPSS writes an all-one/all-zero bit mask to the low dword and
++            # leaves the destination's upper 96 bits unchanged. Ordered
++            # predicates are false when either input is NaN.
++            return [f"{ops[0].reg}.u[0] = (!isnan({lhs}) && !isnan({rhs}) && ({lhs} {comparison} {rhs})) ? 0xFFFFFFFFu : 0u; /* {m} */"]
+ 
+         # ── Bitwise ──
+         # Done on the integer lanes: these carry sign-mask and select idioms
+@@ -2632,6 +2951,18 @@
+                 return lifted
+             return [f"/* {m} {insn.op_str} */"]
+ 
++        if m == "pcmpeqb":
++            lifted = _packed_binary("XMM_PCMPEQB")
++            if lifted is not None:
++                return lifted
++            return [f"/* pcmpeqb {insn.op_str} */"]
++
++        if m == "pmovmskb" and nops >= 2:
++            src = _packed_read(ops[1])
++            if src is not None:
++                return [_fmt_operand_write(ops[0], f"XMM_PMOVMSKB({src})") + " /* pmovmskb */"]
++            return [f"/* pmovmskb {insn.op_str} */"]
++
+         # ── Move mask ──
+         # This feeds branches, so a hardcoded 0 silently picked one side.
+         if m == "movmskps":
+@@ -2643,9 +2974,18 @@
+             return [f"/* {m} {insn.op_str} */"]
+ 
+         # ── MMX / integer SIMD ──
+-        if m in ("pand", "pandn", "por", "pxor", "pcmpgtd"):
+-            if nops >= 2:
+-                return [f"/* {m} {insn.op_str} (MMX/SIMD integer) */"]
++        if m in ("pand", "pandn", "por", "pxor"):
++            helper = {"pand": "XMM_AND", "pandn": "XMM_ANDN",
++                      "por": "XMM_OR", "pxor": "XMM_XOR"}[m]
++            lifted = _packed_binary(helper)
++            if lifted is not None:
++                return lifted
++            return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* unsupported {m} operands: {insn.op_str} */"]
++        if m == "pcmpgtd" and nops >= 2:
++            lifted = _packed_binary("XMM_PCMPGTD")
++            if lifted is not None:
++                return lifted
++            return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* unsupported {m} operands: {insn.op_str} */"]
+ 
+         # ── Shuffle/unpack ──
+         # shufps is the broadcast in every matrix concatenation.
+@@ -2660,15 +3000,16 @@
+                     if written is not None:
+                         return [written + f" /* {m} */"]
+             return [f"/* {m} {insn.op_str} */"]
+-        if m in ("unpcklps", "unpckhps"):
+-            helper = ("XMM_UNPACK_LOW" if m == "unpcklps"
++        if m in ("unpcklps", "unpckhps", "punpckldq", "unpckhpd"):
++            helper = ("XMM_UNPACK_LOW" if m in ("unpcklps", "punpckldq")
+                       else "XMM_UNPACK_HIGH")
+             lifted = _packed_binary(helper)
+             if lifted is not None:
+                 return lifted
+             return [f"/* {m} {insn.op_str} */"]
+ 
+-        return [f"/* SSE: {m} {insn.op_str} */"]
++        self.unimplemented.setdefault(m, []).append(insn.address)
++        return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* unsupported SSE: {m} {insn.op_str} */"]
+ 
+     # ── FPU (x87) ──
+ 
+@@ -2714,6 +3055,12 @@
+         if m == "fld":
+             if len(ops) >= 1:
+                 if ops[0].type == "mem":
++                    if ops[0].mem_size == 10:
++                        address = _fmt_mem(ops[0])
++                        va = f"0x{insn.address:08X}u"
++                        return [f"{{ double _v; if (mac_guest_x87_80_load((const void *)XBOX_PTR({address}), "
++                                f"(g_fp_control_word >> 10) & 3u, &_v) != 0) "
++                                f"recomp_unsupported_instruction({va}); else fp_push(_v); }} /* fld tbyte */"]
+                     if ops[0].mem_size == 4:
+                         return [f"fp_push(MEMF({_fmt_mem(ops[0])})); /* fld float */"]
+                     elif ops[0].mem_size == 8:
+@@ -2741,6 +3088,12 @@
+             do_pop = " fp_pop();" if m == "fstp" else ""
+             if len(ops) >= 1 and ops[0].type == "mem":
+                 pop = " fp_pop();" if m == "fstp" else ""
++                if ops[0].mem_size == 10:
++                    address = _fmt_mem(ops[0])
++                    va = f"0x{insn.address:08X}u"
++                    pop_on_success = " fp_pop();" if m == "fstp" else ""
++                    return [f"{{ if (mac_guest_x87_80_store((void *)XBOX_PTR({address}), fp_top()) != 0) "
++                            f"recomp_unsupported_instruction({va}); else {{{pop_on_success}}} }} /* {m} tbyte */"]
+                 if ops[0].mem_size == 4:
+                     return [f"MEMF({_fmt_mem(ops[0])}) = (float)fp_top();{do_pop} /* {m} */"]
+                 elif ops[0].mem_size == 8:
+@@ -2758,6 +3111,10 @@
+                     dst = "fp_st1()" if idx == 1 else \
+                           f"g_fp_stack[(g_fp_top + {idx}) & 7]"
+                     parts.append(f"{dst} = fp_top();")
++                    parts.append(f"g_fp_empty_mask = (uint8_t)((g_fp_empty_mask & "
++                                 f"~(1u << ((g_fp_top + {idx}) & 7u))) | "
++                                 f"(((g_fp_empty_mask >> g_fp_top) & 1u) << "
++                                 f"((g_fp_top + {idx}) & 7u)));")
+                 if m == "fstp":
+                     parts.append("fp_pop();")
+                 body = " ".join(parts) if parts else "(void)0;"
+@@ -2776,9 +3133,32 @@
+                 mem_acc = _smem_accessor(size)
+                 int_type = {2: "int16_t", 4: "int32_t", 8: "int64_t"}.get(
+                     size, "int32_t")
++                bits = {2: 16, 4: 32, 8: 64}.get(size, 32)
+                 pop = " fp_pop();" if m == "fistp" else ""
+-                return [f"{mem_acc}({_fmt_mem(ops[0])}) = "
+-                        f"({int_type})llrint(fp_top());{pop} /* {m} */"]
++                # FLDCW changes the guest rounding control, not the host's
++                # floating-point environment. D3DX explicitly selects truncate
++                # before FISTP(value*255 + .5); host llrint rounded white to 256
++                # and corrupted the compressed texture's color/alpha bytes.
++                # Implement nearest-even independently of host rounding too.
++                return [
++                    "{ double _fist_value = fp_top(), _fist_rounded;",
++                    "  switch ((g_fp_control_word >> 10) & 3u) {",
++                    "  case 1: _fist_rounded = floor(_fist_value); break;",
++                    "  case 2: _fist_rounded = ceil(_fist_value); break;",
++                    "  case 3: _fist_rounded = trunc(_fist_value); break;",
++                    "  default: { double _fist_floor = floor(_fist_value);",
++                    "    double _fist_fraction = _fist_value - _fist_floor;",
++                    "    _fist_rounded = _fist_floor + "
++                    "(_fist_fraction > 0.5 || (_fist_fraction == 0.5 && "
++                    "fmod(_fist_floor, 2.0) != 0.0)); break; }",
++                    "  }",
++                    # Masked invalid conversions store the x87 integer
++                    # indefinite value; avoid undefined out-of-range C casts.
++                    f"  {mem_acc}({_fmt_mem(ops[0])}) = "
++                    f"(!isfinite(_fist_rounded) || _fist_rounded < -0x1p{bits - 1} "
++                    f"|| _fist_rounded >= 0x1p{bits - 1}) ? INT{bits}_MIN : "
++                    f"({int_type})_fist_rounded;{pop} }} /* {m}: guest x87 RC */",
++                ]
+             return [f"/* {m} {insn.op_str} */"]
+ 
+         if m in ("fadd", "faddp", "fsub", "fsubp", "fsubr", "fsubrp",
+@@ -2895,15 +3275,29 @@
+         if m == "f2xm1":
+             return [f"fp_top() = exp2(fp_top()) - 1.0; /* f2xm1 */"]
+         if m in ("fprem", "fprem1"):
+-            # Both leave the remainder in st0 and clear C2 to say "complete".
+-            # fprem truncates toward zero, fprem1 rounds to nearest (IEEE), which
+-            # is the difference between fmod and remainder.
+-            fn = "fmod" if m == "fprem" else "remainder"
+-            return [f"fp_top() = {fn}(fp_top(), fp_st1()); /* {m} */"]
++            return [f"fp_top() = recomp_fp_remainder(fp_top(), fp_st1(), {int(m == 'fprem1')}, 0x{insn.address:08X}u); /* {m} */"]
+         if m == "fscale":
+             return [f"fp_top() = ldexp(fp_top(), (int)fp_st1()); /* fscale */"]
+         if m == "frndint":
+-            return [f"fp_top() = rint(fp_top()); /* frndint */"]
++            # FLDCW only updates the guest control word. Host rint therefore
++            # follows an unrelated rounding mode. Every finite binary64 value
++            # at or above2^52 is already integral; preserve NaNs/Inf and zeros.
++            return [
++                "{ double _round_value = fp_top(), _round_result = _round_value;",
++                "  if (isfinite(_round_value) && fabs(_round_value) < 0x1p52) {",
++                "    switch ((g_fp_control_word >> 10) & 3u) {",
++                "    case 1: _round_result = floor(_round_value); break;",
++                "    case 2: _round_result = ceil(_round_value); break;",
++                "    case 3: _round_result = trunc(_round_value); break;",
++                "    default: { double _round_floor = floor(_round_value);",
++                "      double _round_fraction = _round_value - _round_floor;",
++                "      _round_result = _round_floor + (_round_fraction > 0.5 ||",
++                "        (_round_fraction == 0.5 && fmod(_round_floor, 2.0) != 0.0)); break; }",
++                "    }",
++                "    _round_result = copysign(_round_result, _round_value);",
++                "  }",
++                "  fp_top() = _round_result; } /* frndint: guest x87 RC */",
++            ]
+         if m == "fldpi":
+             return [f"fp_push(3.14159265358979323846); /* fldpi */"]
+         if m == "fldl2e":
+@@ -2915,8 +3309,15 @@
+         if m == "fldln2":
+             return [f"fp_push(0.69314718055994530942); /* fldln2 */"]
+         if m == "ftst":
+-            return [f"g_fp_cmp = (fp_top() < 0.0) ? -1 : "
+-                    f"(fp_top() > 0.0) ? 1 : 0; /* ftst */"]
++            return ["g_fp_cmp = RECOMP_FCMP(fp_top(), 0.0); "
++                    "RECOMP_FP_COMPARE_STATUS(); /* ftst */"]
++        if m == "fxam":
++            return ["recomp_fp_examine(); /* fxam: class/sign/empty at current TOP */"]
++        if m in ("fnclex", "fclex"):
++            return ["g_fp_status_word &= (uint16_t)~0x80FFu; /* fnclex: preserve TOP/condition codes */"]
++        if m in ("fninit", "finit"):
++            return ["g_fp_control_word = 0x037Fu; g_fp_status_word = 0; "
++                    "g_fp_cmp = 0; g_fp_top = 0; g_fp_empty_mask = 0xFFu; /* fninit */"]
+         if m == "fxch":
+             # fxch st(i) swaps st0 with st(i); the bare form is st(1). Was
+             # hardcoded to st1, so fxch st(2)/st(3)/st(4) (86/7/1 sites in Halo)
+@@ -2930,7 +3331,12 @@
+             i = (self._st_index(ops[-1].reg)
+                  if (ops and ops[-1].type == "reg" and ops[-1].reg) else 1)
+             dst = self._st_expr(i)
+-            return [f"{{ double _t = fp_top(); fp_top() = {dst}; {dst} = _t; }}"
++            return [f"{{ double _t = fp_top(); fp_top() = {dst}; {dst} = _t; "
++                    f"unsigned _other = (g_fp_top + {i}) & 7u; "
++                    f"unsigned _different = ((g_fp_empty_mask >> g_fp_top) ^ "
++                    f"(g_fp_empty_mask >> _other)) & 1u; "
++                    f"g_fp_empty_mask ^= (uint8_t)((_different << g_fp_top) | "
++                    f"(_different << _other)); }}"
+                     f" /* fxch {insn.op_str} */"]
+         if m in ("fcom", "fcomp", "fcompp", "fucom", "fucomp", "fucompp"):
+             # Compare st0 against the operand, not always st1. `fcomp [mem]`
+@@ -2950,7 +3356,7 @@
+             npop = 2 if m.endswith("pp") else (1 if m.endswith("p") else 0)
+             pops = " fp_pop();" * npop
+             return [f"g_fp_cmp = RECOMP_FCMP(fp_top(), {rhs});"
+-                    f"{pops} /* {m} {insn.op_str} */"]
++                    f" RECOMP_FP_COMPARE_STATUS();{pops} /* {m} {insn.op_str} */"]
+         if m in ("fcompi", "fcomip", "fucomi", "fucompi", "fucomip", "fcomi"):
+             # These set EFLAGS directly (CF, ZF, PF) from FPU comparison
+             # fcompi/fucompi pop st(0) after comparing; fcomi/fucomi do not
+@@ -2976,10 +3382,7 @@
+             # `test ah, 0x44; jp` -- the standard isnan idiom -- reads exactly
+             # those two bits. Reporting equal for a NaN compare sends every
+             # float classification in a title down the wrong branch.
+-            status = ("(uint16_t)(((g_fp_top & 7u) << 11) |"
+-                      " (g_fp_cmp == 2 ? 0x4500u :"
+-                      " g_fp_cmp < 0 ? 0x0100u :"
+-                      " g_fp_cmp > 0 ? 0x0000u : 0x4000u))")
++            status = "RECOMP_FP_STATUS()"
+             if insn.op_str.strip() in ("ax", "eax"):
+                 # `fnstsw ax` writes the whole of AX, not just AH.
+                 return [f"eax = (eax & 0xFFFF0000u) | (uint32_t){status};"
+@@ -3010,12 +3413,140 @@
+                         f"{_fmt_operand_read(ops[0])};"
+                         f" /* fldcw {insn.op_str} */"]
+             return [f"/* fldcw {insn.op_str} - no source operand */"]
++        if m in ("fnstenv", "fstenv"):
++            if not ops or ops[0].type != "mem":
++                return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* {m} requires memory */"]
++            a = _fmt_mem(ops[0])
++            # 32-bit FSTENV layout: 28 bytes. We model control/status/tag,
++            # TOP, and empty tags; instruction/data pointers are not tracked.
++            return [
++                f"{{ uint32_t _env = (uint32_t)({a}); uint16_t _tag = 0;",
++                "  for (unsigned _i = 0; _i < 8; ++_i) {",
++                "    unsigned _physical = (g_fp_top + _i) & 7u;",
++                "    if (g_fp_empty_mask & (1u << _physical)) _tag |= (uint16_t)(3u << (2u * _physical));",
++                "  }",
++                "  MEM16(_env + 0u) = g_fp_control_word; MEM16(_env + 2u) = 0;",
++                "  MEM16(_env + 4u) = RECOMP_FP_STATUS(); MEM16(_env + 6u) = 0;",
++                "  MEM16(_env + 8u) = _tag; MEM16(_env + 10u) = 0;",
++                "  MEM32(_env + 12u) = 0; MEM32(_env + 16u) = 0;",
++                "  MEM32(_env + 20u) = 0; MEM32(_env + 24u) = 0;",
++                "  g_fp_control_word |= 0x003Fu; /* FSTENV masks x87 exceptions */",
++                f"}} /* {m}: 32-bit guest environment */",
++            ]
++        if m in ("fldenv",):
++            if not ops or ops[0].type != "mem":
++                return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* fldenv requires memory */"]
++            a = _fmt_mem(ops[0])
++            return [
++                f"{{ uint32_t _env = (uint32_t)({a});",
++                "  g_fp_control_word = MEM16(_env + 0u);",
++                "  g_fp_status_word = MEM16(_env + 4u);",
++                "  g_fp_top = (g_fp_status_word >> 11) & 7u;",
++                "  { uint16_t _tag = MEM16(_env + 8u); g_fp_empty_mask = 0;",
++                "    for (unsigned _i = 0; _i < 8; ++_i)",
++                "      if (((_tag >> (2u * _i)) & 3u) == 3u)",
++                "        g_fp_empty_mask |= (uint8_t)(1u << _i); }",
++                "  g_fp_cmp = (g_fp_status_word & 0x0400u) ? 2 :",
++                "      ((g_fp_status_word & 0x0100u) ? -1 :",
++                "       ((g_fp_status_word & 0x4000u) ? 0 : 1));",
++                "} /* fldenv: 32-bit guest environment */",
++            ]
+         if m == "fldz":
+             return [f"fp_push(0.0); /* fldz */"]
+         if m == "fld1":
+             return [f"fp_push(1.0); /* fld1 */"]
+ 
+-        return [f"/* FPU: {m} {insn.op_str} */"]
++        # Save/restore requires the original 108-byte x87 environment/register
++        # image, including exception/tag state not represented by this model.
++        # Preserve an explicit execution boundary instead of dropping the op.
++        self.unimplemented.setdefault(m, []).append(insn.address)
++        return [f"recomp_unsupported_instruction(0x{insn.address:08X}u); /* TODO: x87 {m} {insn.op_str} */"]
++
++
++
++def merge_flag_states(states, allow_zf=True):
++    """Meet known predecessor states without discarding compatible snapshots.
++
++    CMP/TEST already write runtime operand snapshots on every incoming path.
++    The operands' identities therefore need not agree, only operation and width
++    (SF conditions still select a width-specific cast). Different CMP/TEST
++    semantics meet at captured ZF and signed-less (SF xor OF). DEC/SUB only
++    supply captured result ZF here; no preserved carry is inferred. Unknown
++    states and other unlike setters that re-read operands are not merged.
++    """
++    if not states or any(state is None for state in states):
++        return None
++    first = states[0]
++    if all(state == first for state in states[1:]):
++        return first
++
++    if all(state[0] in ("sahf", "sahf_of") for state in states):
++        return ("sahf", [])  # Every path supplies AH flags, but not necessarily OF.
++
++    def snapshot_signature(state):
++        kind, ops = state
++        if kind not in ("cmp", "test") or len(ops) != 2:
++            return None
++        width = _operand_width(ops[0]) or _operand_width(ops[1]) or 4
++        return kind, width
++
++    signature = snapshot_signature(first)
++    if signature is not None and all(snapshot_signature(state) == signature
++                                     for state in states[1:]):
++        return first
++    # Capabilities intersect at a join. Existing same-kind operand snapshots
++    # remain valid above; mixed CMP/TEST can also supply signed comparisons.
++    if allow_zf and all(state[0] == "snapshot_sz" or snapshot_signature(state) is not None
++                        for state in states):
++        return ("snapshot_sz", [])
++    def supplies_zf(state):
++        kind, ops = state
++        return (kind in ("snapshot_zf", "snapshot_sz") or
++                snapshot_signature(state) is not None or
++                (kind == "dec" and len(ops) == 1) or
++                (kind == "sub" and len(ops) == 2))
++    if allow_zf and all(supplies_zf(state) for state in states):
++        return ("snapshot_zf", [])
++    return None
++
++
++def advance_flag_state(curr, state):
++    """Pure flag transfer shared by CFG analysis and instruction emission."""
++    original_m = curr.mnemonic
++    m = original_m[5:] if original_m.startswith("lock ") else original_m
++    if (m in ("rol", "ror", "rcl", "rcr", "sar", "shl", "shr") and len(curr.operands) > 1 and
++            curr.operands[1].type == "imm" and (curr.operands[1].imm & 31) == 0):
++        return state
++    if (m in ("shld", "shrd") and len(curr.operands) > 2 and
++            curr.operands[2].type == "imm" and (curr.operands[2].imm & 31) == 0):
++        return state
++    if m == "sahf":
++        return ("sahf_of" if _overflow_snapshot(state) is not None else "sahf", [])
++    if m in FLAG_SETTERS: return (original_m, list(curr.operands))
++    if m in _FLAGS_UNDEFINED: return None
++    if m in _EFLAGS_SETTERS: return (m, list(curr.operands))
++    if m in _EFLAGS_PRESERVE: return state
++    if m in ("fcompi", "fcomip", "fucomi", "fucompi", "fucomip", "fcomi", "sahf"):
++        return (m, list(curr.operands))
++    if m.startswith(("f", "cmov", "j", "set")): return state
++    if m.startswith("rep"):
++        rest = getattr(curr, "op_str", "")
++        if any(x in m or x in rest for x in ("cmpsb", "scasb")):
++            return (m, list(curr.operands))
++        return state
++    return None
++
++
++def block_flag_state(bb, incoming=None, conservative_calls=True):
++    state = incoming
++    for insn in bb.instructions:
++        # New cross-block proofs cannot assume an arbitrary callee preserves
++        # flags. Local emission/legacy state remain a separately staged policy.
++        if conservative_calls and (insn.is_call or insn.mnemonic == "popfd"):
++            state = None
++        else:
++            state = advance_flag_state(insn, state)
++    return state
+ 
+ 
+ def lift_basic_block(lifter, bb, flag_state=None):
+@@ -3087,7 +3618,7 @@
+ 
+         if (curr.mnemonic in ("sete", "setne", "setb", "setae", "setbe",
+                               "seta", "setl", "setge", "setle", "setg",
+-                              "sets", "setns")
++                              "sets", "setns", "setp", "setnp", "seto", "setno")
+                 and last_flag_setter and len(curr.operands) >= 1):
+             cond = _make_setcc_value(
+                 curr.mnemonic, last_flag_setter, last_flag_ops)
+@@ -3111,6 +3642,20 @@
+                     f"if ({cond}) "
+                     + _fmt_operand_write(curr.operands[0], src)
+                     + f" /* {curr.mnemonic} */")
++                i += 1
++                continue
++
++        if (curr.mnemonic == "fcmovne" and last_flag_setter and
++                curr.operands and curr.operands[-1].type == "reg" and
++                curr.operands[-1].reg):
++            # FCMOVcc uses EFLAGS and transfers ST(i) to ST(0). Unlike the
++            # similarly named integer CMOV, it belongs to x87 instruction
++            # dispatch, so handle it here while the preceding flag producer is
++            # still available to the block-level condition tracker.
++            cond = _make_cmovcc_cond("cmovne", last_flag_setter, last_flag_ops)
++            if cond:
++                source = lifter._st_expr(lifter._st_index(curr.operands[-1].reg))
++                stmts.append(f"if ({cond}) fp_top() = {source}; /* fcmovne */")
+                 i += 1
+                 continue
+ 
+@@ -3131,56 +3676,17 @@
+             results = lifter._lift_neg(
+                 curr, curr.operands, preserve_carry=preserve)
+         else:
++            if curr.mnemonic == "sahf":
++                overflow = _overflow_snapshot((last_flag_setter, last_flag_ops)
++                                              if last_flag_setter else None)
++                if overflow is not None:
++                    stmts.append(f"_sahf_of = {overflow}; /* OF survives SAHF */")
+             results = lifter.lift_instruction(insns[i])
+         stmts.extend(results)
+ 
+-        # Track flag-setting instructions
+-        if curr.mnemonic in FLAG_SETTERS:
+-            last_flag_setter = curr.mnemonic
+-            last_flag_ops = list(curr.operands)
+-        elif curr.mnemonic in _FLAGS_UNDEFINED:
+-            # Flags are undefined after these - clear tracking
+-            last_flag_setter = None
+-            last_flag_ops = []
+-        elif curr.mnemonic in _EFLAGS_SETTERS:
+-            # Additional flag-setting instructions
+-            last_flag_setter = curr.mnemonic
+-            last_flag_ops = list(curr.operands)
+-        elif curr.mnemonic in _EFLAGS_PRESERVE:
+-            pass  # These don't affect EFLAGS
+-        elif curr.mnemonic in ("fcompi", "fcomip", "fucomi", "fucompi",
+-                                "fucomip", "fcomi"):
+-            # FPU compare-to-EFLAGS: sets CF, ZF, PF directly
+-            last_flag_setter = curr.mnemonic
+-            last_flag_ops = list(curr.operands)
+-        elif curr.mnemonic == "sahf":
+-            # sahf loads AH into flags - typically after fnstsw ax
+-            # in the fcomp/fnstsw/sahf pattern for FPU comparisons
+-            last_flag_setter = "sahf"
+-            last_flag_ops = list(curr.operands)
+-        elif curr.mnemonic.startswith("f") or curr.mnemonic.startswith("cmov"):
+-            pass  # FPU and already-handled CMOVcc
+-        elif curr.mnemonic.startswith("j"):
+-            pass  # Jumps don't set flags
+-        elif curr.mnemonic.startswith("set"):
+-            pass  # SETcc doesn't set flags
+-        elif curr.mnemonic.startswith("rep"):
+-            # rep movsb/movsd = data copy, preserves flags
+-            # repe cmpsb/repne scasb = comparison, sets flags
+-            rest = curr.op_str.strip() if hasattr(curr, 'op_str') else ""
+-            raw_m = curr.mnemonic
+-            if "cmpsb" in raw_m or "scasb" in raw_m:
+-                last_flag_setter = raw_m
+-                last_flag_ops = list(curr.operands)
+-            elif "cmpsb" in rest or "scasb" in rest:
+-                last_flag_setter = raw_m
+-                last_flag_ops = list(curr.operands)
+-            else:
+-                pass  # rep movs/stos = data movement, flags preserved
+-        else:
+-            # Unknown instruction - conservatively clear flag state
+-            last_flag_setter = None
+-            last_flag_ops = []
++        state = advance_flag_state(curr, (last_flag_setter, last_flag_ops)
++                                   if last_flag_setter else None)
++        last_flag_setter, last_flag_ops = state if state else (None, [])
+ 
+         i += 1
+ 
+--- a/tools/recomp/translator.py
++++ b/tools/recomp/translator.py
+@@ -22,7 +22,7 @@
+ from .config import va_to_file_offset, is_code_address
+ from . import config as _config
+ from .disasm import Disassembler
+-from .lifter import (Lifter, lift_basic_block, detect_seh_helpers,
++from .lifter import (Lifter, lift_basic_block, merge_flag_states, block_flag_state, detect_seh_helpers,
+                      detect_setjmp_helpers)
+ 
+ 
+@@ -138,8 +138,10 @@
+ FP_STACK_MACROS = [
+     "    #define fp_push(v) do { double _fp_value = (v); \\",
+     "        g_fp_top = (g_fp_top + 7u) & 7u; \\",
++    "        g_fp_empty_mask &= (uint8_t)~(1u << g_fp_top); \\",
+     "        g_fp_stack[g_fp_top] = _fp_value; } while (0)",
+-    "    #define fp_pop() (g_fp_top = (g_fp_top + 1u) & 7u)",
++    "    #define fp_pop() (g_fp_empty_mask |= (uint8_t)(1u << g_fp_top), \\",
++    "                      g_fp_top = (g_fp_top + 1u) & 7u)",
+     "    #define fp_top() g_fp_stack[g_fp_top]",
+     "    #define fp_st(i) g_fp_stack[(g_fp_top + (i)) & 7u]",
+     "    #define fp_st1() fp_st(1)",
+@@ -506,6 +508,105 @@
+         backward.reverse()
+         return backward + forward
+ 
++    def _register_indirect_switch_targets(self, instructions, index,
++                                          function_start, function_end):
++        """Recover a guarded `mov reg,[table+index*4]; jmp reg` switch.
++
++        Only accepts the common bounded form with an unsigned `ja` guard and
++        a preceding `sub reg, imm` that reduces the switch index. The table
++        read is bounded to imm+1 entries, and every value must be an
++        executable instruction address inside the current function. This
++        avoids treating adjacent rodata or arbitrary indirect jumps as local
++        control flow.
++        """
++        if index <= 0 or not self.xbe_data:
++            return []
++        jump = instructions[index]
++        load = instructions[index - 1]
++        if (jump.mnemonic != "jmp" or jump.jump_target is not None
++                or len(jump.operands) != 1 or jump.operands[0].type != "reg"):
++            return []
++        if (load.mnemonic != "mov" or len(load.operands) != 2
++                or load.operands[0].type != "reg"
++                or load.operands[0].reg != jump.operands[0].reg
++                or load.operands[1].type != "mem"):
++            return []
++        mem = load.operands[1]
++        if not mem.mem_index or mem.mem_scale != 4 or mem.mem_base:
++            return []
++        table_va = mem.mem_disp
++        if not table_va:
++            return []
++
++        # Find the nearest unsigned upper-bound branch and its index
++        # subtraction. Keep the scan short so an unrelated earlier compare
++        # cannot authorize an unbounded table.
++        count = None
++        lower = max(0, index - 9)
++        for branch_index in range(index - 2, lower - 1, -1):
++            branch = instructions[branch_index]
++            if branch.mnemonic not in ("ja", "jnbe"):
++                continue
++            for sub_index in range(branch_index - 1, max(lower - 1, branch_index - 4), -1):
++                sub = instructions[sub_index]
++                if (sub.mnemonic == "sub" and len(sub.operands) == 2
++                        and sub.operands[0].type == "reg"
++                        and sub.operands[0].reg == mem.mem_index
++                        and sub.operands[1].type == "imm"):
++                    upper_bound = int(sub.operands[1].imm)
++                    if 0 <= upper_bound < 256:
++                        count = upper_bound + 1
++                break
++            if count is not None:
++                break
++        if count is None:
++            # Clang may spill a masked index, compare its low byte with SUB,
++            # then reload the original index before loading the table. The
++            # byte comparison only bounds the full register when its high
++            # bits were explicitly cleared; require that proof and the exact
++            # same stack slot, rather than accepting an arbitrary register
++            # reload following an unrelated guard.
++            if index < 6:
++                return []
++            mask, spill, compare, branch, reload = instructions[index - 6:index - 1]
++            index_reg = mem.mem_index
++            low_alias = {"eax": "al", "ebx": "bl", "ecx": "cl", "edx": "dl"}
++
++            def same_slot(a, b):
++                return (a.type == b.type == "mem" and a.mem_base in ("ebp", "esp")
++                        and not a.mem_index and not b.mem_index
++                        and a.mem_base == b.mem_base and a.mem_disp == b.mem_disp
++                        and a.mem_size == b.mem_size == 4)
++
++            if not (mask.mnemonic == "and" and len(mask.operands) == 2
++                    and mask.operands[0].type == "reg" and mask.operands[0].reg == index_reg
++                    and mask.operands[1].type == "imm" and 0 <= mask.operands[1].imm <= 255
++                    and spill.mnemonic == "mov" and len(spill.operands) == 2
++                    and spill.operands[1].type == "reg" and spill.operands[1].reg == index_reg
++                    and compare.mnemonic in ("cmp", "sub") and len(compare.operands) == 2
++                    and compare.operands[0].type == "reg"
++                    and compare.operands[0].reg in (index_reg, low_alias.get(index_reg))
++                    and compare.operands[1].type == "imm" and 0 <= compare.operands[1].imm < 256
++                    and branch.mnemonic in ("ja", "jnbe")
++                    and reload.mnemonic == "mov" and len(reload.operands) == 2
++                    and reload.operands[0].type == "reg" and reload.operands[0].reg == index_reg
++                    and same_slot(spill.operands[0], reload.operands[1])):
++                return []
++            count = int(compare.operands[1].imm) + 1
++
++        offset = va_to_file_offset(table_va)
++        if offset is None or offset + count * 4 > len(self.xbe_data):
++            return []
++        targets = []
++        for entry in range(count):
++            target = struct.unpack_from("<I", self.xbe_data,
++                                        offset + entry * 4)[0]
++            if not (function_start <= target < function_end
++                    and is_code_address(target)):
++                return []
++            targets.append(target)
++        return targets if len(set(targets)) >= 2 else []
++
+     def _read_func_bytes(self, start_va, end_va):
+         """Read raw bytes for a function from the XBE."""
+         offset = va_to_file_offset(start_va)
+@@ -537,7 +638,7 @@
+         last_setter = None
+         for insn in instructions:
+             m = insn.mnemonic
+-            if m in ("adc", "sbb", "stc", "clc", "cmc"):
++            if m in ("adc", "sbb", "stc", "clc", "cmc", "rcl", "rcr"):
+                 return True
+             cc = None
+             if m.startswith("j") and len(m) > 1:
+@@ -620,9 +721,26 @@
+         if not instructions:
+             return None
+ 
++        # Recover bounded computed-goto tables whose final instruction is
++        # `jmp reg` rather than `jmp [table + index*4]`. Musl's printf_core
++        # and pop_arg use this form: a guarded index loads a target from a
++        # read-only table, then jumps through the register. These targets are
++        # interior labels and must stay in this C activation (locals/flags and
++        # guest stack frame are live); dispatching them as functions corrupts
++        # the formatter's frame.
++        local_indirect_targets = {}
++        for index, insn in enumerate(instructions):
++            targets = self._register_indirect_switch_targets(
++                instructions, index, start, end)
++            if targets:
++                local_indirect_targets[insn.address] = targets
++
++        self.lifter.local_indirect_targets = local_indirect_targets
++
+         # Collect switch table targets as extra block leaders
+         switch_leaders = set()
+-        for insn in instructions:
++        for index, insn in enumerate(instructions):
++            switch_leaders.update(local_indirect_targets.get(insn.address, ()))
+             if insn.mnemonic == "jmp" and not insn.jump_target and insn.operands:
+                 targets = self.lifter._analyze_switch_table(insn.operands)
+                 for t in targets:
+@@ -774,35 +892,15 @@
+         # and must NOT be declared locally, otherwise the local shadows
+         # the global and cross-function register passing breaks.
+         # Volatile registers (eax, ecx, edx, esp) are also global via macros.
+-        reg_decls = []
++        # Even a standard prologue first PUSHes the incoming architectural EBP.
++        # Initializing only frameless functions corrupts saved guest frame bytes.
+         if "ebp" in used_regs:
+-            reg_decls.append("ebp")
+-        if reg_decls:
+-            lines.append(f"    uint32_t {', '.join(reg_decls)};")
+-
+-        # A function with no `push ebp; mov ebp, esp` prologue that still reads
+-        # ebp is addressing its *caller's* frame. MSVC emits these for shared
+-        # tails and helpers; Halo's CRT float formatting (sub_001DEC07) opens
+-        # with `cmp byte ptr [edx+0xe], 5` and goes straight to [ebp-0xa4].
+-        #
+-        # ebp is a per-function local, so without this it starts as garbage and
+-        # every [ebp-N] store lands wherever that points. In Halo that was the
+-        # fake TIB at Xbox VA 0: `mov [ebp-0xa2], bx` destroyed fs:[4], and the
+-        # next TLS lookup faulted, thousands of calls away from the cause.
+-        #
+-        # Inherit it instead. Frame-establishing functions publish g_ebp when
+-        # they execute `mov ebp, esp` (see the lifter), so the value is the
+-        # nearest enclosing frame -- which is exactly what the hardware ebp
+-        # would still hold. Deliberately not the same as making ebp global:
+-        # that also changes save/restore, and a callee that fails to restore
+-        # then corrupts its caller (tried; esp underflowed inside XapiStartup).
+-        if "ebp" in used_regs and not self._func_has_prologue(instructions):
+-            lines.append("    ebp = g_ebp;  /* frameless: caller's frame */")
++            lines.append("    uint32_t ebp = g_ebp;")
+ 
+         # Add _flags variable if function has conditional instructions
+         has_conditionals = any(
+             insn.is_cond_jump or insn.mnemonic.startswith("set")
+-            or insn.mnemonic.startswith("cmov")
++            or insn.mnemonic.startswith("cmov") or insn.mnemonic == "fcmovne"
+             for insn in instructions)
+         if has_conditionals:
+             lines.append(f"    int _flags = 0; /* fallback flag var */")
+@@ -816,12 +914,17 @@
+         # sub_000EEA10 in Wreckless is exactly `bsf eax, ecx; ret`.
+         # cmpxchg belongs here too: it snapshots the compare it performed,
+         # because eax may be replaced before the branch reads the result.
+-        if any(insn.mnemonic in ("cmp", "test", "bsf", "bsr", "cmpxchg",
+-                                 "lock cmpxchg")
++        if any(insn.mnemonic in ("cmp", "test", "sbb", "bsf", "bsr", "cmpxchg",
++                                 "lock cmpxchg", "lock inc", "lock dec",
++                                 "lock or", "lock and", "tzcnt")
+                for insn in instructions):
+             lines.append("    uint32_t _fa = 0, _fb = 0;")
+             lines.append("    int32_t _fas = 0, _fbs = 0;")
+             lines.append("    (void)_fa; (void)_fb; (void)_fas; (void)_fbs;")
++        if any(insn.mnemonic == "sbb" for insn in instructions):
++            lines.append("    uint32_t _sbb_result = 0;")
++            lines.append("    int _sbb_sf = 0, _sbb_of = 0;")
++            lines.append("    (void)_sbb_result; (void)_sbb_sf; (void)_sbb_of;")
+             # Flag snapshot: a cmp/test that is not fused with its jcc records
+             # its operands here, zero- and sign-extended to the compare's own
+             # width, so the branch tests what the compare saw.
+@@ -851,6 +954,9 @@
+         # setter a branch reads is the lifter's tracking rule, mirrored here so
+         # only the functions that consume CF declare it: computing it beside
+         # every add in the image would be a line per add in 48,000 functions.
++        if any(insn.mnemonic == "sahf" for insn in instructions):
++            lines.append("    uint32_t _sahf_flags = 0; int _sahf_of = 0;")
++            lines.append("    (void)_sahf_flags; (void)_sahf_of;")
+         has_carry = self._function_needs_cf(instructions)
+         if has_carry:
+             lines.append(f"    int _cf = 0; /* carry flag */")
+@@ -859,7 +965,14 @@
+         # corrupts multi-word arithmetic (add/adc pairs) and the shr/adc
+         # idiom MSVC emits for odd trailing elements.
+         self.lifter.needs_cf = has_carry
+-        self.lifter.publishes_ebp = self._func_owns_a_frame(instructions)
++        self.lifter.needs_shift_snapshot = any(insn.mnemonic in ("shl", "shr", "shld", "shrd") for insn in instructions)
++        if self.lifter.needs_shift_snapshot:
++            lines.append("    uint32_t _shift_result = 0; (void)_shift_result;")
++            lines.append("    int _shift_of = 0; (void)_shift_of;")
++        self.lifter.needs_rotate_snapshot = any(insn.mnemonic in ("rol", "ror", "rcl", "rcr") for insn in instructions)
++        if self.lifter.needs_rotate_snapshot:
++            lines.append("    uint32_t _rotate_result = 0; (void)_rotate_result;")
++        self.lifter.publishes_ebp = "ebp" in used_regs
+ 
+         # SSE and MMX are architectural state, declared globally by the
+         # runtime exactly like the GPRs and the x87 stack. Declaring either
+@@ -906,6 +1019,8 @@
+                 switch_targets = self.lifter._analyze_switch_table(insn.operands)
+                 for t in switch_targets:
+                     label_addrs.add(t)
++                for t in local_indirect_targets.get(insn.address, ()):
++                    label_addrs.add(t)
+ 
+         # Which blocks can reach each block. Flag state has to follow control
+         # flow, not address order: an optimising compiler routinely lets a jcc
+@@ -914,19 +1029,68 @@
+         # whatever instruction happens to sit above it -- silently, and with a
+         # perfectly plausible-looking condition.
+         preds = {bb.start: set() for bb in blocks}
++        legacy_preds = {bb.start: set() for bb in blocks}
+         for i, bb in enumerate(blocks):
+             last = bb.instructions[-1] if bb.instructions else None
+             if last is None:
+                 continue
+             if last.jump_target in preds:
+                 preds[last.jump_target].add(bb.start)
++                legacy_preds[last.jump_target].add(bb.start)
++            elif last.mnemonic == "jmp" and last.operands:
++                destinations = local_indirect_targets.get(last.address)
++                if destinations is None:
++                    destinations = self.lifter._analyze_switch_table(last.operands)
++                for destination in destinations:
++                    if destination in preds:
++                        preds[destination].add(bb.start)
+             # A conditional jump also falls through; ret and an unconditional
+             # jmp do not.
+             leaves = last.is_ret or last.mnemonic in ("jmp", "int3", "ud2", "hlt")
+             if not leaves and i + 1 < len(blocks):
+                 preds[blocks[i + 1].start].add(bb.start)
+-
+-        out_state = {}
++                legacy_preds[blocks[i + 1].start].add(bb.start)
++
++        # Establish terminal setters independently of address order. Propagate
++        # preserving blocks to a fixed point; unknown entry/call paths stay unknown.
++        out_state = {bb.start: block_flag_state(bb) for bb in blocks}
++        incoming_state = {}
++        for _ in range(len(blocks) + 1):
++            changed = False
++            for bb in blocks:
++                sources = preds[bb.start]
++                incoming = (merge_flag_states([out_state[p] for p in sorted(sources)])
++                            if bb.start != start and sources else None)
++                incoming_state[bb.start] = incoming
++                terminal = block_flag_state(bb, incoming)
++                if terminal != out_state[bb.start]:
++                    out_state[bb.start] = terminal
++                    changed = True
++            if not changed: break
++        # Preserve the previous emitter's behavior where the new solver has no
++        # proof. This is deliberately NOT a new interprocedural flags model.
++        # Reconstruct the old address-order meet without mixed-ZF acceptance;
++        # otherwise a legacy call could accidentally justify a new ZF join.
++        legacy_out = {}
++        for bb in blocks:
++            sources = legacy_preds[bb.start]
++            legacy_in = (merge_flag_states([legacy_out[p] for p in sorted(sources)],
++                                           allow_zf=False)
++                         if bb.start != start and sources and
++                            all(p in legacy_out for p in sources) else None)
++            legacy_out[bb.start] = block_flag_state(bb, legacy_in,
++                                                  conservative_calls=False)
++            if incoming_state[bb.start] is None:
++                incoming_state[bb.start] = legacy_in
++        self.lifter.needs_zf_snapshot = any(
++            state and state[0] in ("snapshot_zf", "snapshot_sz") for state in incoming_state.values())
++        self.lifter.needs_signed_snapshot = any(
++            state and state[0] == "snapshot_sz" for state in incoming_state.values())
++        if self.lifter.needs_zf_snapshot:
++            lines.append("    int _zf = 0; /* captured CMP/TEST/DEC/SUB zero flag */")
++        if self.lifter.needs_signed_snapshot:
++            lines.append("    int _slt = 0; /* captured CMP/TEST SF xor OF */")
++
+         for bb in blocks:
+             # Emit label if this block is a branch target
+             if bb.start in label_addrs or bb.start == start:
+@@ -937,25 +1101,8 @@
+                 # compile. The null statement costs nothing and is always valid.
+                 lines.append(f"loc_{bb.start:08X}: ;")
+ 
+-            # Inherit the flag state only when every predecessor agrees on it.
+-            # Blocks are walked in address order, so a back edge's predecessor
+-            # may not be computed yet -- treat that as unknown rather than
+-            # guessing, which costs a fallback condition and never a wrong one.
+-            sources = preds[bb.start]
+-            if bb.start == start or not sources:
+-                incoming = None
+-            elif all(p in out_state for p in sources):
+-                states = [out_state[p] for p in sources]
+-                incoming = states[0]
+-                for other in states[1:]:
+-                    if other != incoming:
+-                        incoming = None
+-                        break
+-            else:
+-                incoming = None
+-
+-            stmts, out_state[bb.start] = lift_basic_block(
+-                self.lifter, bb, flag_state=incoming)
++            stmts, _ = lift_basic_block(
++                self.lifter, bb, flag_state=incoming_state[bb.start])
+             for stmt in stmts:
+                 lines.append(f"    {stmt}")
+ 
+@@ -964,7 +1111,7 @@
+         # Continue into the next function when control runs off the bottom.
+         if fallthrough_target is not None:
+             ft_name = self.lifter._call_target_name(fallthrough_target)
+-            lines.append(f"    g_seh_ebp = ebp; {ft_name}(); return;"
++            lines.append(f"    g_ebp = g_seh_ebp = ebp; {ft_name}(); return;"
+                          f" /* fallthrough 0x{fallthrough_target:08X} */")
+             lines.append(f"")
+ 
+@@ -1378,7 +1525,7 @@
+             "/**",
+             f" * {_config.banner_name(getattr(self, 'title', None))}"
+             f" - Recompiled Function Declarations",
+-            f" * {stats['translated']} functions, auto-generated by tools/recomp",
++            " * Auto-generated by tools/recomp; native overrides share these declarations.",
+             " */",
+             "",
+             "#ifndef RECOMP_FUNCS_H",
+@@ -1387,22 +1534,14 @@
+             '#include "recomp_types.h"',
+             "",
+         ]
+-        for addr, name, _ in translations:
++        # Declaration order must not change when an SDK function becomes native:
++        # otherwise every game translation unit unnecessarily rebuilds.
++        declarations = {addr: name for addr, name, _ in translations}
++        declarations.update(manual_decls)
++        declarations.update(unresolved)
++        for addr, name in sorted(declarations.items()):
+             decl = self._make_declaration(addr, name)
+             header_lines.append(f"{decl};")
+-
+-        if manual_decls:
+-            header_lines.append("")
+-            header_lines.append("/* Hand-written overrides (defined by the project) */")
+-            for addr in sorted(manual_decls):
+-                header_lines.append(
+-                    f"void {manual_decls[addr]}(void);  /* 0x{addr:08X} */")
+-
+-        if unresolved:
+-            header_lines.append("")
+-            header_lines.append("/* Unresolved call targets (stubbed) */")
+-            for addr in sorted(unresolved):
+-                header_lines.append(f"void {unresolved[addr]}(void);")
+ 
+         header_lines.extend(["", "#endif /* RECOMP_FUNCS_H */", ""])
+ 
+@@ -1461,8 +1600,12 @@
+ 
+         # Split translations into chunks and write .c files
+         generated_files = [header_path]
+-        chunks = [translations[i:i+chunk_size]
+-                  for i in range(0, len(translations), chunk_size)]
++        # Keep each original function's chunk stable as native overrides are
++        # introduced. An omitted body must not shift all later functions.
++        chunk_index = {addr: i // chunk_size for i, (addr, _) in enumerate(func_list)}
++        chunks = [[] for _ in range((len(func_list) + chunk_size - 1) // chunk_size)]
++        for translation in translations:
++            chunks[chunk_index[translation[0]]].append(translation)
+ 
+         # Remove chunk files a previous, larger run left behind. Projects glob
+         # gen/*.c into their build, so a stale chunk keeps compiling: it still
+@@ -1485,8 +1628,8 @@
+                 "/**",
+                 f" * {_config.banner_name(getattr(self, 'title', None))}"
+                 f" - Recompiled code chunk {ci}",
+-                f" * Functions: {len(chunk)} "
+-                f"(0x{chunk[0][0]:08X} - 0x{chunk[-1][0]:08X})",
++                f" * Functions: {len(chunk)} " +
++                (f"(0x{chunk[0][0]:08X} - 0x{chunk[-1][0]:08X})" if chunk else "(native overrides only)"),
+                 " */",
+                 "",
+                 "#define RECOMP_GENERATED_CODE",
+@@ -1541,7 +1684,7 @@
+                 popped = self.translator._stub_ret_bytes(addr)
+                 note = (f"ret {popped}" if popped else "not detected")
+                 stub_lines.append(
+-                    f"void {unresolved[addr]}(void) {{ g_esp += {4 + popped}; "
++                    f"void {unresolved[addr]}(void) {{ recomp_icall_fail_log(0x{addr:08X}u); "
+                     f"/* 0x{addr:08X}: {note} */ }}"
+                 )
+             stub_lines.append("")
+--- a/templates/runtime/recomp_types.h
++++ b/templates/runtime/recomp_types.h
+@@ -60,6 +60,8 @@
+  * CMakeLists) -- MSVC's C4013 was emitted and discarded. Same failure as the
+  * missing stdlib.h in kernel_bridge.c, in a hotter path. */
+ #include <math.h>
++/* Development builds stop when reachable code is not yet lifted. */
++void recomp_unsupported_instruction(uint32_t xbox_va);
+ 
+ /* MSVC's __forceinline -> gcc/clang equivalent on POSIX. */
+ #if !defined(_MSC_VER) && !defined(__forceinline)
+@@ -160,6 +162,11 @@
+ extern RECOMP_TLS double g_fp_stack[8];
+ extern RECOMP_TLS int g_fp_top;
+ 
++/* MXCSR is modeled per translated thread, just like the x87 control/status
++ * words. The macOS AOT backend cannot rely on native host FP state matching
++ * guest SSE state, so translated MXCSR instructions operate on this value. */
++extern RECOMP_TLS uint32_t g_mxcsr;
++
+ /**
+  * SEH frame pointer bridge.
+  *
+@@ -213,9 +220,13 @@
+ #include <intrin.h>
+ #define RECOMP_ATOMIC_ADD32(p, v)     ((uint32_t)_InterlockedExchangeAdd((volatile long *)(p), (long)(v)))
+ #define RECOMP_ATOMIC_CAS32(p, cmp, val)     ((uint32_t)_InterlockedCompareExchange((volatile long *)(p),                                            (long)(val), (long)(cmp)))
++#define RECOMP_ATOMIC_OR32(p, v)      ((uint32_t)_InterlockedOr((volatile long *)(p), (long)(v)))
++#define RECOMP_ATOMIC_AND32(p, v)     ((uint32_t)_InterlockedAnd((volatile long *)(p), (long)(v)))
+ #else
+ #define RECOMP_ATOMIC_ADD32(p, v)     ((uint32_t)__sync_fetch_and_add((volatile uint32_t *)(p), (uint32_t)(v)))
+ #define RECOMP_ATOMIC_CAS32(p, cmp, val)     ((uint32_t)__sync_val_compare_and_swap((volatile uint32_t *)(p),                                            (uint32_t)(cmp), (uint32_t)(val)))
++#define RECOMP_ATOMIC_OR32(p, v)      ((uint32_t)__sync_fetch_and_or((volatile uint32_t *)(p), (uint32_t)(v)))
++#define RECOMP_ATOMIC_AND32(p, v)     ((uint32_t)__sync_fetch_and_and((volatile uint32_t *)(p), (uint32_t)(v)))
+ #endif
+ 
+ #include <setjmp.h>
+@@ -244,6 +255,11 @@
+    word has to survive a call. (g_fp_stack/g_fp_top are declared above.) */
+ extern RECOMP_TLS uint16_t g_fp_control_word;
+ extern RECOMP_TLS int g_fp_cmp;
++/* Separate x87 status from the comparison snapshot used by EFLAGS branches.
++ * TOP comes from g_fp_top. Empty bits track physical registers, with 1=empty.
++ * This does not add 80-bit arithmetic or arithmetic exception generation. */
++extern RECOMP_TLS uint16_t g_fp_status_word;
++extern RECOMP_TLS uint8_t g_fp_empty_mask;
+ 
+ /* Result of an x87 compare, in the shape the status word wants:
+  *   -1 less, 0 equal, 1 greater, 2 unordered (either operand is NaN).
+@@ -251,6 +267,58 @@
+  * followed by `test ah, 0x44; jp` is how this era's CRT asks "is this a NaN",
+  * and collapsing it to "equal" answers no every time. */
+ #define RECOMP_FCMP(a, b)     (((a) != (a) || (b) != (b)) ? 2 : (a) < (b) ? -1 : (a) > (b) ? 1 : 0)
++#define RECOMP_FP_COMPARE_STATUS() do { \
++    g_fp_status_word = (uint16_t)((g_fp_status_word & ~0x4700u) | \
++        (g_fp_cmp == 2 ? 0x4500u : g_fp_cmp < 0 ? 0x0100u : \
++         g_fp_cmp > 0 ? 0u : 0x4000u)); \
++} while (0)
++#define RECOMP_FP_STATUS() ((uint16_t)((g_fp_status_word & ~0x3800u) | \
++                                     ((g_fp_top & 7u) << 11)))
++/* FPREM/FPREM1 in the existing binary64 execution model, not x87 extended
++ * precision. Each large-exponent step uses Intel's permitted N=32 reduction.
++ * Invalid/NaN inputs need unmodeled x87 exception semantics: fail explicitly. */
++static inline double recomp_fp_remainder(double x, double y, int nearest, uint32_t address)
++{
++    if (isnan(x) || isnan(y) || isinf(x) || y == 0.0) {
++        recomp_unsupported_instruction(address);
++        return NAN; /* diagnostic is non-returning in the runtime */
++    }
++    if (x == 0.0 || isinf(y)) {
++        g_fp_status_word &= (uint16_t)~0x4700u;
++        return x;
++    }
++    int difference = ilogb(fabs(x)) - ilogb(fabs(y));
++    if (difference >= 64) {
++        double scaled = scalbn(y, difference - 32);
++        /* C0/C1/C3 are undefined on an incomplete step; retain their bits. */
++        g_fp_status_word |= 0x0400u;
++        double result = fmod(x, scaled);
++        return result == 0.0 ? copysign(0.0, x) : result;
++    }
++    int quotient;
++    double near = remquo(fabs(x), fabs(y), &quotient);
++    /* The condition bits encode the quotient magnitude, not its sign.
++     * remquo chooses nearest-even; a negative remainder rounded up and must
++     * decrement the magnitude for FPREM's truncation toward zero. */
++    unsigned low = (unsigned)quotient;
++    if (!nearest && near < 0.0) --low;
++    uint16_t condition = (uint16_t)(((low & 4u) << 6) |
++                                   ((low & 2u) << 13) | ((low & 1u) << 9));
++    g_fp_status_word = (g_fp_status_word & (uint16_t)~0x4700u) | condition;
++    double result = nearest ? remainder(x, y) : fmod(x, y);
++    return result == 0.0 ? copysign(0.0, x) : result;
++}
++
++static inline void recomp_fp_examine(void)
++{
++    double value = g_fp_stack[g_fp_top & 7u];
++    unsigned category = (g_fp_empty_mask & (1u << (g_fp_top & 7u))) ? 0x4100u :
++        isnan(value) ? 0x0100u : isinf(value) ? 0x0500u : value == 0 ? 0x4000u : 0x0400u;
++    /* Every nonzero finite binary64 value is normal in x87's extended range,
++     * including a binary64 subnormal loaded by FLD. C1 reports sign even empty. */
++    g_fp_status_word = (uint16_t)((g_fp_status_word & ~0x4700u) | category |
++                                 (signbit(value) ? 0x0200u : 0u));
++}
+ 
+ /* ================================================================
+  * ICALL trace ring buffer (for debugging indirect calls)
+@@ -347,6 +415,13 @@
+ /** Float/double memory access. */
+ #define MEMF(addr)   (*(volatile float    *)XBOX_PTR(addr))
+ #define MEMD(addr)   (*(volatile double   *)XBOX_PTR(addr))
++
++/* The AOT guest models x87 registers as doubles, but musl's strtod path
++ * stores/reloads an 80-bit x87 temporary. These byte-oriented helpers decode
++ * the guest binary80 representation without relying on host long double
++ * (which is binary64 on Apple Silicon). */
++int mac_guest_x87_80_load(const void *bytes10, unsigned rounding_mode, double *out);
++int mac_guest_x87_80_store(void *bytes10, double value);
+ 
+ /* ================================================================
+  * SSE / XMM register state
+@@ -511,6 +586,46 @@
+     RecompXmm r;
+     r.u[0] = a.u[2]; r.u[1] = b.u[2]; r.u[2] = a.u[3]; r.u[3] = b.u[3];
+     return r;
++}
++
++/** subpd: subtract the two independent IEEE-754 binary64 lanes. */
++static inline RecompXmm XMM_SUB_DOUBLE(RecompXmm a, RecompXmm b) {
++    RecompXmm r;
++    r.d[0] = a.d[0] - b.d[0];
++    r.d[1] = a.d[1] - b.d[1];
++    return r;
++}
++
++/** pcmpeqb: all-one bytes for equality, all-zero bytes otherwise. */
++static inline RecompXmm XMM_PCMPEQB(RecompXmm a, RecompXmm b) {
++    RecompXmm r;
++    for (unsigned i = 0; i < 4; ++i) {
++        r.u[i] = 0;
++        for (unsigned lane = 0; lane < 4; ++lane) {
++            uint32_t shift = lane * 8u;
++            uint32_t av = (a.u[i] >> shift) & 0xFFu;
++            uint32_t bv = (b.u[i] >> shift) & 0xFFu;
++            r.u[i] |= (av == bv ? 0xFFu : 0u) << shift;
++        }
++    }
++    return r;
++}
++
++/** pcmpgtd: each signed 32-bit lane becomes all ones iff a > b. */
++static inline RecompXmm XMM_PCMPGTD(RecompXmm a, RecompXmm b) {
++    RecompXmm r;
++    for (unsigned i = 0; i < 4; ++i)
++        r.d[i] = a.d[i] > b.d[i] ? -1 : 0;
++    return r;
++}
++
++/** pmovmskb: collect the sign bit of each byte into a 16-bit mask. */
++static inline uint32_t XMM_PMOVMSKB(RecompXmm a) {
++    uint32_t mask = 0;
++    for (unsigned i = 0; i < 4; ++i)
++        for (unsigned lane = 0; lane < 4; ++lane)
++            mask |= ((a.u[i] >> (lane * 8u + 7u)) & 1u) << (i * 4u + lane);
++    return mask;
+ }
+ 
+ /* ================================================================
+@@ -573,6 +688,95 @@
+ /* ================================================================
+  * Rotation / shift helpers
+  * ================================================================ */
++
++/* Operand-width rotation; counts use the x86 five-bit mask. OF is defined
++ * only when that masked count is 1. Zero count leaves both output flags alone. */
++static inline uint32_t RECOMP_ROTATE(uint32_t value, unsigned count, unsigned bits,
++                                    int right, int *cf, int *of)
++{
++    uint32_t mask = bits == 32 ? UINT32_MAX : (1u << bits) - 1u;
++    value &= mask;
++    unsigned masked = count & 31u, shift = masked & (bits - 1u);
++    uint32_t result = value;
++    if (shift) result = right ? (value >> shift) | (value << (bits - shift)) :
++                               (value << shift) | (value >> (bits - shift));
++    result &= mask;
++    if (masked) {
++        unsigned carry = right ? result >> (bits - 1u) : result & 1u;
++        if (cf) *cf = (int)carry;
++        if (of && masked == 1u)
++            *of = (int)(((result >> (bits - 1u)) ^
++                         (right ? result >> (bits - 2u) : carry)) & 1u);
++    }
++    return result;
++}
++/* Rotate the operand and CF as a 9/17/33-bit ring. The count is masked to 5
++ * bits before reducing modulo the ring width. OF is defined only at count 1. */
++static inline uint32_t RECOMP_CARRY_ROTATE(uint32_t value, unsigned count, unsigned bits,
++                                          int right, int *cf, int *of)
++{
++    uint32_t mask = bits == 32 ? UINT32_MAX : (1u << bits) - 1u;
++    unsigned masked = count & 31u, shift = masked % (bits + 1u);
++    uint64_t ring_mask = (UINT64_C(1) << (bits + 1u)) - 1u;
++    uint64_t ring = (value & mask) | ((uint64_t)(*cf & 1) << bits);
++    if (shift) ring = (right ? (ring >> shift) | (ring << (bits + 1u - shift)) :
++                              (ring << shift) | (ring >> (bits + 1u - shift))) & ring_mask;
++    uint32_t result = (uint32_t)ring & mask;
++    *cf = (int)((ring >> bits) & 1u);
++    if (of && masked == 1u)
++        *of = (int)(((result >> (bits - 1u)) ^
++                     (right ? result >> (bits - 2u) : (unsigned)*cf)) & 1u);
++    return result;
++}
++
++/* Logical shifts truncate to operand width before shifting. CF is undefined
++ * for nonzero masked counts >= width; choose 0 there. OF is defined at count 1. */
++static inline uint32_t RECOMP_SHIFT(uint32_t value, unsigned count, unsigned bits,
++                                   int right, int *cf, int *of)
++{
++    uint32_t mask = bits == 32 ? UINT32_MAX : (1u << bits) - 1u;
++    value &= mask; count &= 31u;
++    if (!count) return value;
++    unsigned carry = count < bits ?
++        (right ? (value >> (count - 1u)) & 1u : (value >> (bits - count)) & 1u) : 0;
++    uint32_t result = count >= bits ? 0 :
++        (right ? value >> count : (value << count) & mask);
++    if (cf) *cf = (int)carry;
++    if (of && count == 1u)
++        *of = right ? (int)(value >> (bits - 1u)) :
++                      (int)((result >> (bits - 1u)) ^ carry);
++    return result;
++}
++/* SHLD/SHRD: counts above 16 for 16-bit operands have undefined result/flags;
++ * choose the unchanged value there. Count 0 always preserves all state. */
++static inline uint32_t RECOMP_DOUBLE_SHIFT(uint32_t value, uint32_t source,
++                                          unsigned count, unsigned bits,
++                                          int right, int *cf, int *of)
++{
++    uint32_t mask = bits == 32 ? UINT32_MAX : (1u << bits) - 1u;
++    value &= mask; source &= mask; count &= 31u;
++    if (!count || count > bits) return value;
++    unsigned carry = right ? (value >> (count - 1u)) & 1u :
++                             (value >> (bits - count)) & 1u;
++    uint32_t result = count == bits ? source : right ?
++        (value >> count) | ((source << (bits - count)) & mask) :
++        ((value << count) & mask) | (source >> (bits - count));
++    if (cf) *cf = (int)carry;
++    if (of && count == 1u)
++        *of = right ? (int)((value ^ result) >> (bits - 1u)) :
++                      (int)((result >> (bits - 1u)) ^ carry);
++    return result;
++}
++static inline uint32_t RECOMP_SAR(uint32_t value, unsigned count, unsigned bits, int *cf)
++{
++    uint32_t mask = bits == 32 ? UINT32_MAX : (1u << bits) - 1u;
++    value &= mask;count &= 31u;
++    if (!count) return value;
++    uint32_t sign = value >> (bits - 1u);
++    if (cf) *cf = count >= bits ? (int)sign : (int)((value >> (count - 1u)) & 1u);
++    if (count >= bits) return sign ? mask : 0;
++    return (value >> count) | (sign ? mask ^ (mask >> count) : 0);
++}
+ 
+ static inline uint32_t ROL32(uint32_t val, int n) {
+     n &= 31;
+@@ -886,9 +1090,8 @@
+  *
+  * mm0..mm7 alias the x87 stack on real hardware. Nothing here does, and
+  * nothing needs to: a title that interleaves the two calls emms between, and
+- * emms is a no-op for us. Modelling the aliasing would mean giving up the
+- * separate x87 model that the FPU work depends on, to reproduce a hazard the
+- * hardware exists to let software avoid.
++ * EMMS empties the x87 tags; the register values remain separate. MMX/x87
++ * value aliasing and MMX writes marking x87 registers valid remain unmodeled.
+  * ================================================================ */
+ 
+ #ifndef RECOMP_MMX_DEFINED
+@@ -981,6 +1184,9 @@
+                  recomp_sat_u8((int32_t)a.ub[i] + b.ub[i]))
+ RECOMP_MMX_BINOP(MMX_PSUBUSB, 8, ub,
+                  recomp_sat_u8((int32_t)a.ub[i] - b.ub[i]))
++/* psubusw: unsigned packed-word subtraction, saturating each underflow to 0. */
++RECOMP_MMX_BINOP(MMX_PSUBUSW, 4, uw,
++                 (uint16_t)(a.uw[i] > b.uw[i] ? a.uw[i] - b.uw[i] : 0))
+ RECOMP_MMX_BINOP(MMX_PMULLW, 4, w, (int16_t)((int32_t)a.w[i] * b.w[i]))
+ RECOMP_MMX_BINOP(MMX_PMULHW, 4, w, (int16_t)(((int32_t)a.w[i] * b.w[i]) >> 16))
+ RECOMP_MMX_BINOP(MMX_PAVGB, 8, ub, (uint8_t)(((int32_t)a.ub[i] + b.ub[i] + 1) >> 1))

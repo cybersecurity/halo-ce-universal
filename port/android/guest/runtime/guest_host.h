@@ -44,6 +44,18 @@ void host_memory_watch_initialize(void);
 void host_memory_watch_protect(unsigned int address, unsigned int size);
 unsigned int host_memory_watch_generation(unsigned int address, unsigned int size);
 unsigned int host_memory_watch_serial(void);
+#ifdef HALO_MACOS
+int host_memory_fingerprint_page(unsigned int address, unsigned long long *hashes);
+int host_memory_fingerprint_range(unsigned int address, unsigned int pages,
+	void *entries, volatile unsigned long *counter, unsigned long *newest);
+unsigned int host_bink_open(const char *path, void *info, int audio_enabled);
+int host_bink_decode(unsigned int token);
+int host_bink_next(unsigned int token, void *info);
+int host_bink_wait(unsigned int token);
+int host_bink_copy(unsigned int token, void *destination, int pitch,
+	unsigned int height, unsigned int x, unsigned int y, unsigned int flags);
+void host_bink_close(unsigned int token);
+#endif
 void host_memory_watch_prepare_write(unsigned int address, unsigned int size);
 void host_memory_watch_forget(unsigned int address, unsigned int size);
 
@@ -59,6 +71,13 @@ long long host_sdl_ticks(void);
 long long host_sdl_thread_id(void);
 unsigned int host_sdl_create_window(const char *title, int width, int height, long long flags);
 void host_sdl_window_size_in_pixels(unsigned int window, int *width, int *height);
+#ifdef HALO_MACOS
+int host_sdl_window_size(unsigned int window, int *width, int *height);
+long long host_sdl_window_flags(unsigned int window);
+int host_sdl_set_window_fullscreen(unsigned int window, int enabled);
+int host_sdl_set_window_size(unsigned int window, int width, int height);
+int host_sdl_warp_mouse(unsigned int window, float x, float y);
+#endif
 int host_sdl_set_relative_mouse(unsigned int window, int enabled);
 int host_sdl_gl_set_attribute(int attribute, int value);
 unsigned int host_sdl_gl_create_context(unsigned int window);

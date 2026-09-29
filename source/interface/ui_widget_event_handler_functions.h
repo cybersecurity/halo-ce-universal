@@ -19,6 +19,11 @@ struct widget_instance;
 
 /* ---------- prototypes/UI_WIDGET_EVENT_HANDLER_FUNCTIONS.C */
 
+#ifdef HALO_MACOS
+/* A false condition selects another UI branch; it is not a failed action. */
+boolean ui_widget_event_handler_function_is_branch_condition(word function_index);
+#endif
+
 boolean ui_widget_event_handler_function_invoke(
 	struct widget_instance *widget,
 	struct event_record *event,

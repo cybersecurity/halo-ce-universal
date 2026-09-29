@@ -548,6 +548,16 @@ boolean game_state_read_header_from_persistent_storage(
 		{
 			stored_checksum = *header_checksum;
 
+#ifdef HALO_MACOS
+			/* A new profile's storage is intentionally zero-filled by
+			 * game_state_open_persistent_storage. It has no checkpoint yet. */
+			if (!stored_checksum)
+			{
+				CloseHandle(file);
+				return FALSE;
+			}
+#endif
+
 			crc_new(&checksum);
 			*header_checksum = 0;
 			crc_checksum_buffer(&checksum, header, header_size);

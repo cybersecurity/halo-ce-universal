@@ -13,15 +13,16 @@ device itself (d3d8_gl.c).
 #include "platform.h"
 #include "gl.h"
 
-#ifdef HALO_ANDROID
-/* OpenGL ES features that are optional (d3d8_gl.c gl_initialize) */
+#if defined(HALO_ANDROID) || defined(HALO_MACOS)
+/* GL features that are optional on the Android and native macOS renderers
+ * (d3d8_gl.c gl_initialize). */
 struct xgpu_capabilities
 {
 	BOOL copy_image;
 	BOOL border_clamp;
 	BOOL anisotropy;
 	BOOL s3tc;
-	/* ES 3.2: glDrawElementsBaseVertex */
+	/* GL ES 3.2 / desktop GL 3.2: glDrawElementsBaseVertex */
 	BOOL base_vertex;
 	/* ES 3.1 with fragment atomic counters: exact visibility test counts */
 	BOOL atomic_counters;

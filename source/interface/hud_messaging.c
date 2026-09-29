@@ -198,6 +198,10 @@ enum text_justification
 	NUMBER_OF_TEXT_JUSTIFICATIONS
 };
 
+#ifdef HALO_MACOS
+extern wchar_t const *halo_macos_control_prompt(short icon);
+#endif
+
 enum hud_icon_type
 {
 	_icon_a_button,
@@ -1650,6 +1654,9 @@ void hud_messaging_update(
 							if (icon_index < hud_globals->messaging.button_icons.count)
 							{
 								struct icon_hud_element_definition const *icon;
+#ifdef HALO_MACOS
+                                wchar_t const *mac_prompt;
+#endif
 
 								icon_index = remap_sticks_for_local_player(
 									icon_index,
@@ -1658,7 +1665,12 @@ void hud_messaging_update(
 									&hud_globals->messaging.button_icons,
 									icon_index,
 									struct icon_hud_element_definition);
+#ifdef HALO_MACOS
+                                mac_prompt = halo_macos_control_prompt(icon_index);
+                                if (mac_prompt || TEST_FLAG(icon->flags, _hud_icon_use_text_bit))
+#else
 								if (TEST_FLAG(icon->flags, _hud_icon_use_text_bit))
+#endif
 								{
 									real_argb_color text_color;
 									wchar_t const *icon_text;
@@ -1677,6 +1689,9 @@ void hud_messaging_update(
 									icon_text = unicode_string_list_get_string(
 										hud_globals->messaging.alternate_icon_text.index,
 										icon->text_index);
+#ifdef HALO_MACOS
+                                    if (mac_prompt) icon_text = mac_prompt;
+#endif
 									draw_string_set_indents(line_cursor.x0 - line_bounds.x0, 0);
 									draw_unicode_string_compute_bounds(
 										&line_bounds,

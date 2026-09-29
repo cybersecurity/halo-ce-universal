@@ -63,13 +63,30 @@ struct config_setting
 	const char *comment;
 };
 
+#ifdef HALO_MACOS
+#define DEFAULT_FULLSCREEN "false"
+#define DEFAULT_WINDOW_SCALE "1"
+#else
+#define DEFAULT_FULLSCREEN "true"
+#define DEFAULT_WINDOW_SCALE "2"
+#endif
+
 static const struct config_setting config_settings[] =
 {
-	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
+#ifdef HALO_MACOS
+	{ "display.resolution", _config_string, "\"1280x720\"", "HALO_RESOLUTION", _environment_value, _platform_desktop,
+		"Render pixels: 1280x720 or 1920x1080 for widescreen, 640x480 for\n"
+		"the original picture, native for the display's shape. Retina window\n"
+		"density does not multiply the internal rendering resolution." },
+#endif
+	{ "display.fullscreen", _config_boolean, DEFAULT_FULLSCREEN, "HALO_FULLSCREEN", _environment_value, _platform_desktop,
 		"Start fullscreen, drawing at the display's resolution and shape; false\n"
 		"starts in a window, which draws the Xbox's 640x480. F11 switches." },
-	{ "display.window_scale", _config_integer, "2", "HALO_WINDOW_SCALE", _environment_value, _platform_desktop,
+	{ "display.window_scale", _config_integer, DEFAULT_WINDOW_SCALE, "HALO_WINDOW_SCALE", _environment_value, _platform_desktop,
 		"The window's size as a multiple of 640x480 (it can be resized)." },
+	{ "display.render_width", _config_integer, "0", "HALO_RENDER_WIDTH", _environment_value, _platform_desktop,
+		"Fullscreen rendering width in pixels: 0 uses the display; positive\n"
+		"values from 640 up to the display width keep the display's shape." },
 	{ "display.screen_width", _config_integer, "0", "HALO_SCREEN_WIDTH", _environment_value, _platform_android,
 		"Columns of the 480-line picture: 0 for the display's shape, 640 for the\n"
 		"Xbox's 4:3." },
@@ -88,6 +105,27 @@ static const struct config_setting config_settings[] =
 		"How far the view turns for the mouse's movement." },
 	{ "input.invert_mouse", _config_boolean, "false", "HALO_MOUSE_INVERT", _environment_set_is_true, _platform_desktop,
 		"Moving the mouse forward looks down." },
+
+	/* Physical key bindings: comma separated keys, Mouse1..5, Wheel; empty disables. */
+	{ "input.forward", _config_string, "\"W\"", "HALO_KEY_FORWARD", _environment_value, _platform_desktop, "Gameplay binding; comma separated physical key names." },
+	{ "input.backward", _config_string, "\"S\"", "HALO_KEY_BACKWARD", _environment_value, _platform_desktop, "Gameplay binding; comma separated physical key names." },
+	{ "input.left", _config_string, "\"A\"", "HALO_KEY_LEFT", _environment_value, _platform_desktop, "Gameplay binding; comma separated physical key names." },
+	{ "input.right", _config_string, "\"D\"", "HALO_KEY_RIGHT", _environment_value, _platform_desktop, "Gameplay binding; comma separated physical key names." },
+	{ "input.jump", _config_string, "\"Space\"", "HALO_KEY_JUMP", _environment_value, _platform_desktop, "Gameplay binding; comma separated physical key names." },
+	{ "input.melee", _config_string, "\"F,Mouse4\"", "HALO_KEY_MELEE", _environment_value, _platform_desktop, "Gameplay binding; comma separated physical key names." },
+	{ "input.action", _config_string, "\"E,R\"", "HALO_KEY_ACTION", _environment_value, _platform_desktop, "Gameplay binding; comma separated physical key names." },
+	{ "input.change_weapon", _config_string, "\"Tab,Wheel\"", "HALO_KEY_CHANGE_WEAPON", _environment_value, _platform_desktop, "Gameplay binding; comma separated physical key names." },
+	{ "input.flashlight", _config_string, "\"Q\"", "HALO_KEY_FLASHLIGHT", _environment_value, _platform_desktop, "Gameplay binding; comma separated physical key names." },
+	{ "input.change_grenade", _config_string, "\"X\"", "HALO_KEY_CHANGE_GRENADE", _environment_value, _platform_desktop, "Gameplay binding; comma separated physical key names." },
+	{ "input.fire", _config_string, "\"Mouse1\"", "HALO_KEY_FIRE", _environment_value, _platform_desktop, "Gameplay binding; comma separated physical key names." },
+	{ "input.crouch", _config_string, "\"LeftCtrl,C\"", "HALO_KEY_CROUCH", _environment_value, _platform_desktop, "Gameplay binding; comma separated physical key names." },
+#ifdef HALO_MACOS
+ { "input.grenade", _config_string, "\"G\"", "HALO_KEY_GRENADE", _environment_value, _platform_desktop, "Throw grenade." },
+ { "input.zoom", _config_string, "\"Z,Mouse2,Mouse3\"", "HALO_KEY_ZOOM", _environment_value, _platform_desktop, "Toggle weapon zoom." },
+#else
+ { "input.grenade", _config_string, "\"G,Mouse2\"", "HALO_KEY_GRENADE", _environment_value, _platform_desktop, "Throw grenade." },
+ { "input.zoom", _config_string, "\"Z,Mouse3\"", "HALO_KEY_ZOOM", _environment_value, _platform_desktop, "Toggle weapon zoom." },
+#endif
 
 	{ "game.language", _config_string, "\"\"", "HALO_LANGUAGE", _environment_value, _platform_all,
 		"The language the game asks the Xbox for: \"ja\", \"de\", \"fr\", \"es\" or \"it\";\n"
@@ -217,7 +255,7 @@ static const struct config_setting config_settings[] =
 
 #define NUMBER_OF_CONFIG_SETTINGS (sizeof(config_settings) / sizeof(config_settings[0]))
 
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 #define CONFIG_PLATFORM _platform_android
 #else
 #define CONFIG_PLATFORM _platform_desktop
@@ -239,7 +277,14 @@ static pthread_mutex_t config_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void config_path(char *path, size_t size)
 {
-#ifdef HALO_ANDROID
+#ifdef HALO_MACOS
+	/* Native AOT keeps user settings beside its isolated saves. The data
+	root may contain read-only links to the original extracted maps. */
+	const char *root = getenv("HALO_CONFIG_ROOT");
+	if (!root || !*root)
+		root = getenv("HALO_SAVE_ROOT");
+	snprintf(path, size, "%s/config.toml", root && *root ? root : ".");
+#elif defined(HALO_ANDROID)
 	/* the data folder, which the app names (port/android/host/host_main.c) */
 	const char *root = getenv("HALO_DATA_ROOT");
 
@@ -367,7 +412,7 @@ static void config_append_setting(struct config_text *text, const struct config_
 		if (*line)
 			line++;
 	}
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) || defined(HALO_MACOS)
 	/* (Android apps have no environment to set) */
 	switch (setting->environment_style)
 	{
@@ -394,7 +439,7 @@ static char *config_default_text(void)
 	char section[32] = "";
 	size_t index;
 
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 	config_append(&text,
 		"# Halo settings\n"
 		"#\n"
@@ -769,9 +814,9 @@ static int config_line_section(const char *line, const char *end, char *section,
 	return 1;
 }
 
-/* sets a boolean setting, for now and in config.toml: its line there is
-changed (or added), the rest of the file kept as it is */
-int config_write_boolean(const char *name, int value)
+/* Set a typed value now and in config.toml; replace only its line and
+preserve the rest of the player's file. String callers supply checked TOML. */
+static int config_write_serialized(const char *name, const char *value, enum config_type type)
 {
 	const char *dot = strchr(name, '.');
 	long index = config_setting_index(name);
@@ -782,15 +827,21 @@ int config_write_boolean(const char *name, int value)
 	const char *line;
 	int written = 0, in_section = 0, succeeded;
 
-	if (index < 0 || config_settings[index].type != _config_boolean || !dot || (size_t)(dot - name) >= sizeof(section))
+	if (index < 0 || config_settings[index].type != type || !dot || (size_t)(dot - name) >= sizeof(section))
 		return 0;
 	/* (the file read first, as the other settings are) */
-	config_boolean(name);
+	config_value(name, type);
 	pthread_mutex_lock(&config_lock);
-	config_values[index].boolean = value != 0;
+	if (type == _config_boolean) config_values[index].boolean = !strcmp(value, "true");
+	else {
+		char *copy = config_copy(value + 1, strlen(value) - 2);
+		if (!copy) { pthread_mutex_unlock(&config_lock); return 0; }
+		free(config_values[index].string);
+		config_values[index].string = copy;
+	}
 	snprintf(section, sizeof(section), "%.*s", (int)(dot - name), name);
 	snprintf(key, sizeof(key), "%s", dot + 1);
-	snprintf(line_text, sizeof(line_text), "%s = %s\n", key, value ? "true" : "false");
+	snprintf(line_text, sizeof(line_text), "%s = %s\n", key, value);
 	snprintf(wanted, sizeof(wanted), "%s", section);
 	config_path(path, sizeof(path));
 	text = config_read_file(path, &size);
@@ -845,6 +896,22 @@ int config_write_boolean(const char *name, int value)
 	free(out.buffer);
 	free(text);
 	return succeeded;
+}
+
+int config_write_boolean(const char *name, int value)
+{
+ return config_write_serialized(name, value ? "true" : "false", _config_boolean);
+}
+
+int config_write_string(const char *name, const char *value)
+{
+ char quoted[80];
+ size_t length;
+ if (!value || (length = strlen(value)) > sizeof(quoted) - 3) return 0;
+ for (size_t i = 0; i < length; ++i)
+  if ((unsigned char)value[i] < 32 || value[i] == '"' || value[i] == '\\') return 0;
+ snprintf(quoted, sizeof(quoted), "\"%s\"", value);
+ return config_write_serialized(name, quoted, _config_string);
 }
 
 /* ---------- public code */

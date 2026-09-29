@@ -64,6 +64,7 @@ symbols in this file:
 #include "interface/terminal.h"
 
 #include <stdarg.h>
+#include <stdlib.h>
 #include <time.h>
 
 /* ---------- constants */
@@ -274,6 +275,17 @@ void error(
 		"c:\\halo\\SOURCE\\cseries\\errors.c",
 		0x61,
 		priority>=0 && priority<NUMBER_OF_ERROR_MESSAGE_PRIORITIES);
+
+#ifdef HALO_MACOS
+	/* Xbox developer messages remain in debug.txt without covering gameplay.
+	 * Fatal/delayed errors and their handling are unchanged. */
+	if (priority == _error_silent)
+	{
+		const char *show_messages = getenv("HALO_DEBUG_MESSAGES");
+		if (!show_messages || csstrcmp(show_messages, "1") != 0)
+			priority = _error_log;
+	}
+#endif
 
 	if (error_globals.overflow_suppression && priority == _error_silent)
 	{

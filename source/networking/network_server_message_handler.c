@@ -1494,6 +1494,17 @@ boolean network_game_server_handle_datagram(
 					struct network_game_server_client_machine *client_machine =
 						network_game_server_get_client_machine_at_address(server, source_address->address.long_words[0]);
 
+#ifdef HALO_MACOS
+					/* Opt-in local transport diagnosis; no packet or state changes. */
+					{
+						static long traced, enabled = -1;
+						if (enabled < 0) enabled = getenv("HALO_NETWORK_TRACE") && strcmp(getenv("HALO_NETWORK_TRACE"), "1") == 0;
+						if (enabled && (++traced <= 16 || traced % 300 == 0))
+							fprintf(stderr, "[mp-predecode] n=%ld source=%08lX port=%u size=%u match=%d state=%d\n", traced,
+								source_address->address.long_words[0], (unsigned)source_address->port,
+								(unsigned)datagram_size, client_machine != NULL, (int)network_game_server_get_state(server, NULL));
+					}
+#endif
 					if (client_machine && network_game_server_get_state(server, NULL) == _network_game_server_state_ingame)
 					{
 						long machine_index;

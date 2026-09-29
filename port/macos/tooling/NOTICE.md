@@ -1,0 +1,5 @@
+The MIT license in port/macos/LICENSE applies to independently authored macOS host/build glue, original host fixtures and Mac documentation, plus the original added macos_* and test/check/run_macos_* tools and portable guest compilation helper. It does not relicense existing source, upstream patch context, Halo data, Xbox SDK material, artwork or screenshots. Existing source files keep the root CC0 license and retained third-party notices.
+
+XboxRecomp is fetched at the public pin in pins.json. The runtime patch modifies its MIT-licensed translator; licenses/XboxRecomp-MIT.txt preserves the upstream copyright. Bundled compiler-rt keeps its Apache 2.0 WITH LLVM-exception license. SHA-verified musl retains licenses/musl.txt. Upstream vendors and Homebrew libraries keep their own licenses; they are not covered by this MIT file.
+
+The generated helmet icon and prompt are fan artwork, excluded from the original-code MIT grant. This unofficial project is not endorsed by Microsoft, Bungie or Xbox. Game images/data and generated translation are not committed or uploaded. Build from your own supported retail Xbox image; setup never downloads Halo.

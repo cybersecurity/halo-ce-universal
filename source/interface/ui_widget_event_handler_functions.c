@@ -3504,6 +3504,14 @@ static boolean multiplayer_profiles_list_initialize(
 	return TRUE;
 }
 
+#ifdef HALO_MACOS
+boolean ui_widget_event_handler_function_is_branch_condition(word function_index)
+{
+ return (short)function_index >= 0 && function_index < NUMBEROF(event_handler_function_list.functions) &&
+  event_handler_function_list.functions[function_index] == new_campaign_if_no_custom_player_profiles_exist;
+}
+#endif
+
 boolean ui_widget_event_handler_function_invoke(
 	struct widget_instance *widget,
 	struct event_record *event,
@@ -3518,7 +3526,11 @@ boolean ui_widget_event_handler_function_invoke(
 	if ((short)function_index >= 0 && function_index < 102)
 	{
 		result = event_handler_function_list.functions[(short)function_index](widget, event, widget_deleted);
-		if (!result)
+		if (!result
+#ifdef HALO_MACOS
+            && !ui_widget_event_handler_function_is_branch_condition(function_index)
+#endif
+        )
 			console_warning("event handler '%s' failed", event_handler_function_list.names[(short)function_index]);
 		return result;
 	}

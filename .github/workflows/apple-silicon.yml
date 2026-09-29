@@ -1,0 +1,35 @@
+name: Fresh Apple Silicon installer build
+on:
+  workflow_dispatch:
+  push:
+    paths: ['port/macos/**', 'port/linux/**', 'source/**', 'tools/**', 'validation/**', '.github/workflows/apple-silicon.yml']
+  pull_request:
+    paths: ['port/macos/**', 'port/linux/**', 'source/**', 'tools/**', 'validation/**', '.github/workflows/apple-silicon.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm ARM64 and create synthetic disc fixture
+        env:
+          FIXTURE_ISO: ${{ runner.temp }}/synthetic-halo.iso
+        run: |
+          test "$(uname -m)" = arm64
+          python3 - <<'PY'
+          import importlib.util, os
+          from pathlib import Path
+          spec = importlib.util.spec_from_file_location('fixture', 'port/macos/tooling/tests/test_xbox_assets.py')
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          module.fixture(Path(os.environ['FIXTURE_ISO']))
+          PY
+      - name: Run installer without game downloads or game launches
+        env:
+          HALO_WORK_DIR: ${{ runner.temp }}/fresh-build
+          HALO_APP_OUTPUT: ${{ runner.temp }}/Halo Fixture Build.app
+        run: ./port/macos/setup.sh "$RUNNER_TEMP/synthetic-halo.iso" --jobs 2
+      - name: Static native bundle check
+        run: '"$RUNNER_TEMP/Halo Fixture Build.app/Contents/MacOS/Halo Combat Evolved" --check'

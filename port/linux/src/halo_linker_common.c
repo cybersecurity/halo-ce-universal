@@ -25,7 +25,7 @@ missing from the reconstruction (docs/xbox_link_probe_20260924.md).
 /* ---------- pooled COMMON globals */
 
 #define HALO_COMMON(name, size) \
-	__attribute__((weak, aligned(16))) unsigned char name[size]
+	__attribute__((__weak__, aligned(16))) unsigned char name[size]
 
 HALO_COMMON(ai_globals, 12); /* struct ai_globals_data *ai_globals */
 HALO_COMMON(antenna_data, 12); /* struct data_array *antenna_data */
@@ -168,14 +168,14 @@ HALO_COMMON(window_globals, 160); /* struct window_globals_prefix window_globals
 
 /* Round-to-integer as the x87 does in the current rounding mode, like the
 inline fast_ftol in cseries.h (fld/fistp). */
-__attribute__((weak)) long fast_ftol_C(float value)
+__attribute__((__weak__)) long fast_ftol_C(float value)
 {
 	return lrintf(value);
 }
 
 /* The debug console's "crash" command, which deliberately brings the game
 down to exercise crash handling. */
-__attribute__((weak)) void main_crash(const char *reason)
+__attribute__((__weak__)) void main_crash(const char *reason)
 {
 	platform_log("main_crash: %s", reason ? reason : "");
 	abort();

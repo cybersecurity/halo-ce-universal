@@ -3162,7 +3162,11 @@ static void event_handler_dispatch(
 			handler->function,
 			&widget_deleted))
 	{
-		error(_error_silent, "event handler function failed");
+#ifdef HALO_MACOS
+        if (!ui_widget_event_handler_function_is_branch_condition(handler->function))
+#endif
+		    error(_error_silent, "event handler function failed");
+        /* FALSE still chooses conditional widgets, including new-profile naming. */
 		function_failed = TRUE;
 	}
 	else

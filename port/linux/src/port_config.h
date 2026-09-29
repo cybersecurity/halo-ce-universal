@@ -21,5 +21,7 @@ const char *config_string(const char *name);
 /* sets a boolean setting, and writes it into config.toml (only its line
 changes); 1 on success */
 int config_write_boolean(const char *name, int value);
+/* Plain strings without control characters, quotes or backslashes; preserves other settings. */
+int config_write_string(const char *name, const char *value);
 
 #endif

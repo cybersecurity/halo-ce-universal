@@ -799,6 +799,19 @@ static void distributed_client_send_predictions(
 
 /* (the host) a client's own players: the latest of each, taken at the next
 tick */
+#ifdef HALO_MACOS
+/* Fixed-size counters and opt-in output; disabled in ordinary human play. */
+static void distributed_trace(short stage, long machine, long type, long tick, long count)
+{
+	static long enabled = -1, counters[10];
+	if (enabled < 0) enabled = getenv("HALO_NETWORK_TRACE") && strcmp(getenv("HALO_NETWORK_TRACE"), "1") == 0;
+	if (enabled && stage >= 0 && stage < 10 && (++counters[stage] <= 16 || counters[stage] % 300 == 0))
+		fprintf(stderr, "[mp-decoder] stage=%d n=%ld machine=%ld type=%ld tick=%ld count=%ld\n", (int)stage, counters[stage], machine, type, tick, count);
+}
+#else
+#define distributed_trace(stage,machine,type,tick,count) ((void)0)
+#endif
+
 static void distributed_handle_predictions(
 	long machine_index,
 	struct distributed_unit_state const *states,
@@ -813,8 +826,10 @@ static void distributed_handle_predictions(
 		if (state->player_index >= MAXIMUM_TRACKED_PLAYERS ||
 			!distributed_machine_has_player(machine_index, state->player_index))
 		{
+			distributed_trace(5, machine_index, state->player_index, state->unit_index, count);
 			continue;
 		}
+		distributed_trace(6, machine_index, state->player_index, state->unit_index, count);
 		distributed_predictions[state->player_index].valid = TRUE;
 		distributed_predictions[state->player_index].state = *state;
 	}
@@ -843,6 +858,7 @@ static void distributed_apply_predictions(
 			real dy = state->position.y - object->object.position.y;
 			real dz = state->position.z - object->object.position.z;
 
+			distributed_trace(7, player_index, unit_index, (long)((dx * dx + dy * dy + dz * dz) * 1000.0f), game_time_get());
 			if (dx * dx + dy * dy + dz * dz <= HOST_ACCEPT_TOLERANCE * HOST_ACCEPT_TOLERANCE)
 				distributed_apply_state(unit_index, state, 0.0f, HOST_BLEND_DISTANCE);
 		}
@@ -1016,11 +1032,13 @@ static void distributed_handle_inputs(
 		if (input->player_index >= MAXIMUM_TRACKED_PLAYERS ||
 			!distributed_machine_has_player(machine_index, input->player_index))
 		{
+			distributed_trace(8, machine_index, input->player_index, input->tick, count);
 			continue;
 		}
 		player = distributed_player(input->player_index);
 		if (!player)
 			continue;
+		distributed_trace(9, machine_index, input->player_index, input->tick, input->control_flags);
 		update_server_handle_distributed_input(DATUM_INDEX_NEW(input->player_index, player->identifier), input->tick,
 			&input->action, input->control_flags, DISTRIBUTED_INPUT_HISTORY);
 		if (input->host_time != NONE && machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES)
@@ -1681,6 +1699,7 @@ void network_distributed_handle_message(
 	if (size < sizeof(header) || !network_game_distributed() || !game_in_progress())
 		return;
 	csmemcpy(&header, message, sizeof(header));
+	distributed_trace(0, machine_index, header.type, header.game_time, header.count);
 	/* a tick's messages in one: each as if it came alone */
 	if (header.type == _distributed_message_batch)
 	{
@@ -1738,7 +1757,10 @@ void network_distributed_handle_message(
 	case _distributed_message_vehicle_prediction:
 	case _distributed_message_player_inputs:
 		if (machine_index == NONE || game_connection() != _game_connection_network_server)
+		{
+			distributed_trace(1, machine_index, header.type, header.game_time, header.count);
 			return;
+		}
 		break;
 	default:
 		if (game_connection() != _game_connection_network_client)
@@ -1750,7 +1772,11 @@ void network_distributed_handle_message(
 		break;
 	}
 	if (distributed_message_stale(machine_index, &header))
+	{
+		distributed_trace(2, machine_index, header.type, header.game_time, header.count);
 		return;
+	}
+	distributed_trace(3, machine_index, header.type, header.game_time, header.count);
 
 	switch (header.type)
 	{

@@ -33,6 +33,7 @@ struct bitmap_data;
 struct cache_file_header;
 struct cache_file_tag_header;
 struct cache_file_structure_bsp_header;
+struct scenario_structure_bsp_reference;
 
 struct tag_iterator
 {

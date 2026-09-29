@@ -1,0 +1,12 @@
+Generated with built-in image_gen.imagegen; transparent_background=true.
+Reference: https://www.halowaypoint.com/news/master-class
+Reference image: https://content.halocdn.com/media/Default/community/CANON_FODDER_Franchise/cf_ce-chief-sc-7ee8f83847a6425699d6eda3e5d7eea8.jpg
+
+Use case: stylized-concept
+Asset type: polished macOS Dock application icon, square transparent PNG.
+Primary request: create an accurately recognizable classic Master Chief MJOLNIR Mark V helmet from Halo: Combat Evolved (2001), helmet only, on a genuinely transparent background.
+Input image: official Halo Waypoint original Halo Combat Evolved screenshot is a reference image for helmet identity and geometry only. Preserve the classic broad angular green brow shelf with two pointed outer corners, flattened polygonal crown, wide uninterrupted wraparound gold visor, angular olive green lower face shield, two small paired circular side fittings and inset horizontal black vent slots beside the chin. This is the original CE Mark V silhouette.
+Style/medium: exceptionally clean premium 3D app icon rendering with crisp faceted military armor and simplified details that stay legible in a small Dock; subtle realistic material texture, luminous amber gold visor, rich olive green armor.
+Composition/framing: centered symmetrical front view helmet only; square canvas; helmet occupies about 84 percent of canvas height; complete silhouette visible with balanced transparent margin. No shoulders or neck.
+Lighting/mood: controlled studio highlights define the green armor and gold visor; confident and iconic.
+Constraints: actual transparent alpha around helmet; preserve accurate original CE Mark V design; all shading contained inside helmet silhouette; no rounded rectangle app tile; no floor; no external shadow; no background; no glow outside silhouette; no lettering, logo, badge, watermark, weapons, extra objects, or scene. Do not substitute a Halo 2/3/Infinite Mark VI helmet.

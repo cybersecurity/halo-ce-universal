@@ -47,7 +47,7 @@ emitting them so the redefinition above cannot reach them. */
 
 /* ---------- __declspec(selectany) data (XDK D3DCONST tables) */
 
-#define DECLSPEC_SELECTANY __attribute__((weak))
+#define DECLSPEC_SELECTANY __attribute__((__weak__))
 
 /* ---------- MSVC intrinsics
 

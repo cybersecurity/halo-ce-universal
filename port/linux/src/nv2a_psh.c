@@ -323,6 +323,9 @@ static void dot_input(struct xgpu_text *text, const DWORD *state, int stage)
 	"precision highp sampler2D;\n" \
 	"precision highp sampler3D;\n" \
 	"precision highp samplerCube;\n"
+#elif defined(HALO_MACOS)
+#define SAMPLE_BIAS ""
+#define SHADER_VERSION "#version 410 core\n"
 #else
 #define SAMPLE_BIAS ""
 #define SHADER_VERSION "#version 450 core\n"
