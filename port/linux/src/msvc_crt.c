@@ -295,7 +295,7 @@ static unsigned short msvc_to_control_word(unsigned int value, unsigned short wo
 	return word;
 }
 
-#ifdef HALO_ANDROID
+#if defined(__aarch64__)
 /* AArch64: the rounding mode lives in FPCR.RMode, the sticky exception
 flags in FPSR. Precision control and exception unmasking have no
 equivalent; the rest of the MSVC control word is only remembered. */
@@ -350,6 +350,57 @@ unsigned int _clearfp(void)
 
 	__builtin_arm_wsr64("fpsr", __builtin_arm_rsr64("fpsr") & ~0x9fULL);
 	return status;
+}
+#elif defined(__x86_64__)
+/* x86-64 (the macOS port's x32 guest): all floating-point arithmetic is
+SSE, whose MXCSR holds the rounding mode (bits 13-14), the exception masks
+(bits 7-12) and the sticky exception flags (bits 0-5). Precision control has
+no SSE equivalent and is only remembered, as are the unmasked exceptions:
+the game's code must not trap. */
+static unsigned int msvc_control_word = CW_DEFAULT;
+
+unsigned int _control87(unsigned int new_value, unsigned int mask)
+{
+	unsigned int mxcsr;
+
+	if (mask)
+	{
+		msvc_control_word = (msvc_control_word & ~mask) | (new_value & mask);
+		mxcsr = __builtin_ia32_stmxcsr();
+		mxcsr &= ~(3u << 13);
+		switch (msvc_control_word & _MCW_RC)
+		{
+		case _RC_DOWN: mxcsr |= 1u << 13; break;
+		case _RC_UP: mxcsr |= 2u << 13; break;
+		case _RC_CHOP: mxcsr |= 3u << 13; break;
+		default: break;
+		}
+		/* every exception stays masked */
+		mxcsr |= 0x3fu << 7;
+		__builtin_ia32_ldmxcsr(mxcsr);
+	}
+	return msvc_control_word;
+}
+
+unsigned int _controlfp(unsigned int new_value, unsigned int mask)
+{
+	/* _controlfp ignores the denormal mask */
+	return _control87(new_value, mask & ~_EM_DENORMAL);
+}
+
+unsigned int _statusfp(void)
+{
+	/* MXCSR's flags are in the x87 status word's order: invalid,
+	denormal, zero divide, overflow, underflow, precision */
+	return __builtin_ia32_stmxcsr() & 0x3fu;
+}
+
+unsigned int _clearfp(void)
+{
+	unsigned int mxcsr = __builtin_ia32_stmxcsr();
+
+	__builtin_ia32_ldmxcsr(mxcsr & ~0x3fu);
+	return mxcsr & 0x3fu;
 }
 #else
 /* x87: glibc's floating-point environment holds the control and status

@@ -27,8 +27,13 @@ This header is included by both halves.
 #include <stdint.h>
 
 /* the guest image is linked to run here, just above the Xbox window: ART
-keeps its heaps low in the address space and fills it upwards */
+keeps its heaps low in the address space and fills it upwards. The macOS
+port links its x32 image below 2 GB instead (-DHALO_GUEST_IMAGE_BASE, see
+port/macos/README.md), where x86-64 code can use sign-extended 32-bit
+absolute addresses. */
+#ifndef HALO_GUEST_IMAGE_BASE
 #define HALO_GUEST_IMAGE_BASE 0x88000000u
+#endif
 
 /* the Xbox contiguous memory window (port/linux/src/platform.h) */
 #define HALO_GUEST_WINDOW_BASE 0x80000000u

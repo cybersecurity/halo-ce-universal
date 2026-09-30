@@ -2242,6 +2242,10 @@ boolean lights_distant_lighting_at_point(
 								radiosity_accuracy,
 								&color);
 						}
+						/* the native ports' traced light, where there is a
+						probe of it near (port/linux/src/raytrace_gl.c) */
+						halo_ray_traced_object_lighting(&position->x, &lightmap_color.red, &radiosity_normal.i,
+							&radiosity_accuracy);
 						build_distant_lights(
 							flags,
 							&surface_normal,
@@ -2381,4 +2385,75 @@ void lights_prepare_for_object_static(
 	}
 
 	return;
+}
+
+/* the native ports' ray-traced lighting (port/linux/src/raytrace_gl.c):
+this frame's dynamic lights, as lights_render_diffuse draws them - 12
+floats each: the position and the radius, the direction and the cosine of
+the cone's cutoff (-2 for a light all round), and how far short of the
+light its rays stop (its object's size: a light inside what carries it, a
+marine's flashlight, a plasma bolt's, is not shadowed by it); returns how
+many, at most maximum */
+long halo_ray_tracing_lights(
+	float *lights,
+	long maximum,
+	long all)
+{
+	long count = 0;
+	short light_index;
+
+	if (!should_render_lights())
+		return 0;
+	for (light_index = 0;
+		light_index < lights_globals.scene_point_light_count && count < maximum;
+		light_index++)
+	{
+		struct light_datum *light = light_get(lights_globals.scene_point_lights[light_index]);
+		struct point_light_definition *definition;
+		float *out = lights + count * 12;
+
+		real radius = light->radius;
+
+		definition = light_definition_get(light->definition_index);
+		/* (the game's own lights, which it draws on the objects only - Guilty
+		Spark's - have no radius of their own: their definition's) */
+		if (!TEST_FLAG(light->flags, _point_light_dynamic_bit))
+		{
+			if (!all || !definition)
+				continue;
+			/* (at most 25 world units: each pixel it reaches traces a ray to it) */
+			radius = MIN(definition->radius * MAX(definition->radius_modifier_upper_bound, 1.0f), 25.0f);
+		}
+		else if (light->rasterizer_light_index == NONE)
+		{
+			continue;
+		}
+		if (!(radius > 0.0f) ||
+			light->color.red + light->color.green + light->color.blue < 0.01f)
+		{
+			continue;
+		}
+		out[0] = light->position.x;
+		out[1] = light->position.y;
+		out[2] = light->position.z;
+		out[3] = radius;
+		out[4] = light->forward.i;
+		out[5] = light->forward.j;
+		out[6] = light->forward.k;
+		out[7] = definition && definition->cutoff_angle < _pi * 0.99f ?
+			definition->runtime_cosine_cutoff_angle : -2.0f;
+		out[8] = 0.0f;
+		if (light->object_index != NONE)
+		{
+			struct object_datum *owner = object_try_and_get(light->object_index);
+
+			if (owner)
+				out[8] = PIN(owner->object.bounding_sphere_radius, 0.0f, 1.0f);
+		}
+		out[9] = light->color.red;
+		out[10] = light->color.green;
+		out[11] = light->color.blue;
+		count++;
+	}
+	return count;
 }

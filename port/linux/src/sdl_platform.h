@@ -37,6 +37,20 @@ BOOL platform_sdl_initialize(void);
 BOOL platform_video_initialize(unsigned long width, unsigned long height);
 #ifndef HALO_ANDROID
 BOOL platform_screen_mode(long *width, long *height);
+BOOL platform_output_size(long *width, long *height);
+#endif
+/* F8: the next of the resolutions (d3d8_gl.c, display.resolution) */
+const char *halo_screen_resolution_next(void);
+#ifndef HALO_ANDROID
+/* the resolution now (F8's or display.resolution), and the settings
+overlay's choice of it (d3d8_gl.c) */
+const char *halo_screen_resolution_current(void);
+void halo_screen_resolution_set(const char *name);
+/* whether the window is fullscreen; 0 or 1 makes it so first (F11's), -1
+only asks (a hidden window stays a window) */
+int platform_window_fullscreen(int fullscreen);
+/* waits for the display between frames, or not (display.vsync) */
+void platform_video_set_vsync(int vsync);
 #endif
 void platform_video_drawable_size(int *width, int *height);
 void platform_video_swap(void);
@@ -65,5 +79,7 @@ BOOL platform_ui_pointer_read(struct platform_ui_pointer *pointer);
 void platform_video_window_size(int *width, int *height);
 #endif
 BOOL platform_next_keystroke(struct platform_keystroke *keystroke);
+/* Command-X (switch_camera) and Command-Z: the debug cameras (xinput_sdl.c) */
+void halo_debug_camera_key(int switch_camera);
 
 #endif

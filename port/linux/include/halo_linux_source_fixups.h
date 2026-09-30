@@ -39,10 +39,42 @@ float render_interpolation_game_time_sec(long ticks);
 /* the width of the screen the game draws, 480 lines tall: the device's or
 the display's shape, or 640 (port/linux/src/d3d8_gl.c) */
 long halo_screen_width(void);
+/* the screen's pixels to the Xbox's one (port/linux/src/d3d8_gl.c) */
+float halo_screen_scale(void);
 /* takes up a new width between frames (F11); returns the width */
 long halo_screen_commit(void);
 /* while TRUE, drawing shifts right to center 640-column layouts */
 void halo_screen_ui_offset(unsigned char centered);
+/* screen-space ray-traced lighting, after a window's opaque world
+(port/linux/src/raytrace_gl.c) */
+void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of_view, const float *position,
+	const float *forward, const float *up);
+/* the light in the window before and after the dynamic lights (0: the
+lightmaps, 1: with the flashlight's, the plasma's and the other dynamic
+lights): the occlusion darkens only the lightmaps' share; 2: the objects
+drawn, before the level (their pixels take the sun's traced shadows) */
+void halo_ray_traced_light_stage(int stage);
+/* whether the level's lightmaps are left out of the light buffer this
+frame (the traced light is added in their place, after the light decals):
+the lightmap pass draws the self-illumination alone, and the game's
+unshadowed dynamic lights on the level are not drawn (the rays trace them) */
+int halo_ray_traced_lightmaps_hidden(void);
+/* an object's light, as the game samples it from the lightmap under it
+(object_lights.c): the colour, the way it comes from and how much from that
+way, replaced by the traced light's probe near the point, if there is one
+(and a probe asked for there, for the next frame) */
+void halo_ray_traced_object_lighting(const float *position, float *color, float *normal, float *accuracy);
+/* after the dynamic lights, before the textures (render.c): the traced light
+in place of the lightmaps' (display.ray_tracing_gi); the camera as for
+halo_ray_traced_lighting */
+void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_field_of_view, const float *position,
+	const float *forward, const float *up);
+/* the console command that starts game.map (HALO_MAP), or NULL
+(port/linux/src/port_config.c) */
+const char *halo_startup_map_command(void);
+/* the next of debug.commands (HALO_COMMANDS) whose time has come, or NULL
+(port/linux/src/port_config.c) */
+const char *halo_timed_command_next(void);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
 

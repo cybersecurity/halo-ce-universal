@@ -16,6 +16,10 @@ Keyboard and mouse (port 0):
 	left ctrl, C     left stick click    Z, middle button right stick click
 	escape           start               F1               back
 	F12              release or recapture the mouse
+	Command-X        the next debug camera
+	Command-Z        take or let go of the flying camera's controls; with
+	                 them, Space rises, left ctrl or C sinks, shift (or Q)
+	                 speeds up (source/camera/director.c)
 
 In the menus the mouse is free and drives a pointer instead
 (port/linux/include/halo_ui_pointer.h, source/interface/ui_widget.c): its
@@ -35,6 +39,7 @@ drive the controller.
 #include "platform.h"
 #include "sdl_platform.h"
 #include "port_config.h"
+#include "settings_overlay.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -87,10 +92,21 @@ static Uint64 stick_aimed_ms = 0;
 worn stick's drift */
 #define STICK_AIMING_DEFLECTION 8000
 
+/* the mouse's settings, read when first needed (and again after the settings
+overlay changes them: halo_input_settings_changed) */
+static float sensitivity = -1.0f;
+static int invert = -1;
+static int aim_assist = -1;
+
+void halo_input_settings_changed(void)
+{
+	sensitivity = -1.0f;
+	invert = -1;
+	aim_assist = -1;
+}
+
 static float mouse_sensitivity(void)
 {
-	static float sensitivity = -1.0f;
-
 	if (sensitivity < 0.0f)
 	{
 		sensitivity = (float)config_real("input.mouse_sensitivity");
@@ -106,7 +122,6 @@ int halo_linux_mouse_look(short gamepad_index, float *yaw, float *pitch)
 {
 	/* radians per pixel of relative motion at sensitivity 1 */
 	const float scale = 0.0022f;
-	static int invert = -1;
 	float x, y;
 
 	*yaw = 0.0f;
@@ -134,7 +149,6 @@ right stick last did) and input.mouse_aim_assist is off: then the view's
 magnetism leaves them be (player_control.c); the bullets' autoaim stays */
 int halo_linux_mouse_aiming(short gamepad_index)
 {
-	static int aim_assist = -1;
 	int aiming;
 
 	if (gamepad_index != 0)
@@ -147,6 +161,65 @@ int halo_linux_mouse_aiming(short gamepad_index)
 	aiming = mouse_aimed_ms != 0 && mouse_aimed_ms >= stick_aimed_ms;
 	pthread_mutex_unlock(&mouse_lock);
 	return aiming;
+}
+
+/* ---------- the debug cameras' keys */
+
+/* Command-X and Command-Z on macOS (sdl_platform.c): the next debug camera,
+and taking or letting go of the flying camera's controls, at once, as the
+black button held for a second and the right stick's button do
+(source/camera/director.c). When each was last pressed, until the game
+takes it; a press the game does not take within half a second (in the
+menus, while loading) is dropped. */
+static Uint64 debug_camera_pressed_ms[2];
+
+#define DEBUG_CAMERA_KEY_MS 500
+
+void halo_debug_camera_key(int switch_camera)
+{
+	pthread_mutex_lock(&mouse_lock);
+	debug_camera_pressed_ms[switch_camera ? 1 : 0] = SDL_GetTicks() + 1;
+	pthread_mutex_unlock(&mouse_lock);
+}
+
+/* whether the player on the gamepad asked for the next camera
+(switch_camera) or for the flying camera's controls since the last call */
+int halo_debug_camera_request(short gamepad_index, int switch_camera)
+{
+	Uint64 pressed;
+
+	if (gamepad_index != 0)
+		return FALSE;
+	pthread_mutex_lock(&mouse_lock);
+	pressed = debug_camera_pressed_ms[switch_camera ? 1 : 0];
+	debug_camera_pressed_ms[switch_camera ? 1 : 0] = 0;
+	pthread_mutex_unlock(&mouse_lock);
+	return pressed && SDL_GetTicks() + 1 - pressed <= DEBUG_CAMERA_KEY_MS;
+}
+
+/* port 0's last poll: shift held (the flying camera's speed), and the black
+button and the right stick's button held on the SDL gamepad, not by the
+keyboard's X and Z (XInputGetState) */
+static BOOL debug_camera_shift;
+static BOOL pad_black_held, pad_right_thumb_held;
+/* debug.test_input's "fast" */
+static BOOL test_script_fast;
+
+/* whether shift is held, for the flying camera's speed */
+int halo_debug_camera_fast(short gamepad_index)
+{
+	return gamepad_index == 0 && (debug_camera_shift || test_script_fast);
+}
+
+/* whether the black button (black) or the right stick's button is held on
+a gamepad: the director's own switches (a camera a second the black button
+is held, the flying camera's controls at the stick's click) are the
+gamepads' alone; on the keyboard, Command-X and Command-Z do them */
+int halo_debug_camera_pad_held(short gamepad_index, int black)
+{
+	if (gamepad_index != 0)
+		return TRUE;
+	return black ? pad_black_held : pad_right_thumb_held;
 }
 
 /* collects the motion the game has not asked for yet; motion that nobody
@@ -254,6 +327,121 @@ void test_input_hold_action(int hold)
 	test_input_holding_action = hold;
 }
 
+/* debug.test_input "script:<from>-<to>=<action>,...": the player drives
+as scripted, for tests with screenshots (debug.screenshot_every). The times
+are seconds since the game started; <to> may be left out for a tap (a
+tenth of a second). The actions: forward, back, left, right (walking),
+turnleft, turnright, up, down (looking), fire, grenade, jump, crouch, zoom,
+action, flashlight, reload, switch (weapons), black (the grenade, as the
+keyboard's X), start; camera and
+cameracontrol press Command-X and Command-Z once (the debug cameras);
+fast holds shift; mouseleft, mouseright, mouseup, mousedown move the mouse,
+400 pixels a second. */
+static struct
+{
+	double from, to;
+	char action[16];
+	BOOL pressed;
+} test_script[64];
+static int test_script_count = -1;
+
+static void test_script_load(const char *script)
+{
+	test_script_count = 0;
+	while (*script && test_script_count < (int)(sizeof(test_script) / sizeof(test_script[0])))
+	{
+		char *end;
+		double from = strtod(script, &end), to;
+		int length = 0;
+
+		if (end == script)
+			break;
+		to = from + 0.1;
+		if (*end == '-')
+			to = strtod(end + 1, &end);
+		if (*end != '=')
+			break;
+		end++;
+		while (end[length] && end[length] != ',' && length < 15)
+			length++;
+		test_script[test_script_count].from = from;
+		test_script[test_script_count].to = to;
+		memcpy(test_script[test_script_count].action, end, (size_t)length);
+		test_script[test_script_count].action[length] = 0;
+		test_script_count++;
+		script = end + length;
+		while (*script && *script != ',')
+			script++;
+		if (*script == ',')
+			script++;
+	}
+	platform_log("test input: %d scripted actions", test_script_count);
+}
+
+static void test_script_gamepad(XINPUT_GAMEPAD *pad)
+{
+	static double last_t = -1.0;
+	double t = (double)SDL_GetTicks() / 1000.0;
+	/* the seconds since the last poll, for the mouse's motion */
+	float dt = last_t < 0.0 || t - last_t > 0.1 ? 0.0f : (float)(t - last_t);
+	int index;
+
+	last_t = t;
+	test_script_fast = FALSE;
+	for (index = 0; index < test_script_count; index++)
+	{
+		const char *action = test_script[index].action;
+		float mouse_x = 0.0f, mouse_y = 0.0f;
+
+		if (t < test_script[index].from || t >= test_script[index].to)
+			continue;
+		if (!strcmp(action, "camera") || !strcmp(action, "cameracontrol"))
+		{
+			if (!test_script[index].pressed)
+				halo_debug_camera_key(!strcmp(action, "camera"));
+			test_script[index].pressed = TRUE;
+			continue;
+		}
+		if (!strcmp(action, "fast"))
+		{
+			test_script_fast = TRUE;
+			continue;
+		}
+		if (!strcmp(action, "mouseleft")) mouse_x = -400.0f * dt;
+		else if (!strcmp(action, "mouseright")) mouse_x = 400.0f * dt;
+		else if (!strcmp(action, "mouseup")) mouse_y = -400.0f * dt;
+		else if (!strcmp(action, "mousedown")) mouse_y = 400.0f * dt;
+		if (mouse_x != 0.0f || mouse_y != 0.0f)
+		{
+			pthread_mutex_lock(&mouse_lock);
+			mouse_pending_x += mouse_x;
+			mouse_pending_y += mouse_y;
+			mouse_aimed_ms = SDL_GetTicks();
+			pthread_mutex_unlock(&mouse_lock);
+			continue;
+		}
+		if (!strcmp(action, "forward")) pad->sThumbLY = 32000;
+		else if (!strcmp(action, "back")) pad->sThumbLY = -32000;
+		else if (!strcmp(action, "left")) pad->sThumbLX = -32000;
+		else if (!strcmp(action, "right")) pad->sThumbLX = 32000;
+		else if (!strcmp(action, "turnleft")) pad->sThumbRX = -16000;
+		else if (!strcmp(action, "turnright")) pad->sThumbRX = 16000;
+		else if (!strcmp(action, "up")) pad->sThumbRY = 16000;
+		else if (!strcmp(action, "down")) pad->sThumbRY = -16000;
+		else if (!strcmp(action, "fire")) pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 255;
+		else if (!strcmp(action, "grenade")) pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = 255;
+		else if (!strcmp(action, "jump")) pad->bAnalogButtons[XINPUT_GAMEPAD_A] = 255;
+		else if (!strcmp(action, "action")) pad->bAnalogButtons[XINPUT_GAMEPAD_X] = 255;
+		else if (!strcmp(action, "reload")) pad->bAnalogButtons[XINPUT_GAMEPAD_B] = 255;
+		else if (!strcmp(action, "switch")) pad->bAnalogButtons[XINPUT_GAMEPAD_Y] = 255;
+		else if (!strcmp(action, "flashlight")) pad->bAnalogButtons[XINPUT_GAMEPAD_WHITE] = 255;
+		else if (!strcmp(action, "black")) pad->bAnalogButtons[XINPUT_GAMEPAD_BLACK] = 255;
+		else if (!strcmp(action, "crouch")) pad->wButtons |= XINPUT_GAMEPAD_LEFT_THUMB;
+		else if (!strcmp(action, "zoom")) pad->wButtons |= XINPUT_GAMEPAD_RIGHT_THUMB;
+		else if (!strcmp(action, "start")) pad->wButtons |= XINPUT_GAMEPAD_START;
+	}
+}
+
 static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 {
 	static int checked;
@@ -275,7 +463,11 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 			seed = atoi(setting + 5);
 			looking = 1;
 		}
+		else if (!strncmp(setting, "script:", 7))
+			test_script_load(setting + 7);
 	}
+	if (test_script_count > 0)
+		test_script_gamepad(pad);
 	if (seed < 0)
 		return;
 	if (test_input_holding_action)
@@ -547,6 +739,10 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 			keyboard_gamepad(&input, &state->Gamepad);
 		if (count > 0)
 			sdl_gamepad_state(gamepads[0], &state->Gamepad);
+		debug_camera_shift = !console_is_active() &&
+			(input.keys[SDL_SCANCODE_LSHIFT] || input.keys[SDL_SCANCODE_RSHIFT]);
+		pad_black_held = count > 0 && SDL_GetGamepadButton(gamepads[0], SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER);
+		pad_right_thumb_held = count > 0 && SDL_GetGamepadButton(gamepads[0], SDL_GAMEPAD_BUTTON_RIGHT_STICK);
 		test_input_gamepad(&state->Gamepad);
 		if (abs(state->Gamepad.sThumbRX) > STICK_AIMING_DEFLECTION ||
 			abs(state->Gamepad.sThumbRY) > STICK_AIMING_DEFLECTION)
@@ -561,6 +757,32 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		sdl_gamepad_state(gamepads[port], &state->Gamepad);
 	}
 
+	/* the settings overlay (F10) takes the controllers while it is open, the
+	first one's pad moving through it, and until their buttons are let go
+	after it closes (the button that closed it does not also act) */
+	{
+		static BOOL held[PORT_COUNT];
+
+		if (settings_overlay_active())
+		{
+			if (port == 0)
+				settings_overlay_gamepad(state->Gamepad.wButtons, state->Gamepad.bAnalogButtons[XINPUT_GAMEPAD_A] > 30,
+					state->Gamepad.bAnalogButtons[XINPUT_GAMEPAD_B] > 30);
+			held[port] = TRUE;
+		}
+		if (held[port])
+		{
+			int button;
+			BOOL any = state->Gamepad.wButtons != 0;
+
+			for (button = 0; button < 8; button++)
+				any |= state->Gamepad.bAnalogButtons[button] > 30;
+			held[port] = any || settings_overlay_active();
+			memset(&state->Gamepad, 0, sizeof(state->Gamepad));
+			if (port == 0)
+				debug_camera_shift = pad_black_held = pad_right_thumb_held = FALSE;
+		}
+	}
 	if (memcmp(&state->Gamepad, &controllers[port].previous, sizeof(state->Gamepad)))
 	{
 		controllers[port].packet_number++;

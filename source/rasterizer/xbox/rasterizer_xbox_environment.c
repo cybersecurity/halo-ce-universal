@@ -1101,7 +1101,9 @@ void _rasterizer_environment_lightmap_begin(
 		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_diffuse_texture_times_bump_edge) &&
 		rasterizer_debug_options.draw_environment_lightmaps)
 	{
-		if (lightmap_bitmap)
+		/* (port: the traced light in the lightmaps' place - the pass draws
+		the self-illumination alone) */
+		if (lightmap_bitmap && !halo_ray_traced_lightmaps_hidden())
 		{
 			rasterizer_set_texture_bitmap_data(2, lightmap_bitmap);
 			D3DDevice_SetTextureState_Deferred(2, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);

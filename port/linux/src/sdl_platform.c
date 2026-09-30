@@ -15,8 +15,11 @@ and the debug keyboard that the game's console reads.
 #include "port_config.h"
 #include "p2p.h"
 #include "xiso.h"
+#include "raytrace_gl.h"
+#include "settings_overlay.h"
 
 #include <SDL3/SDL.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,10 +51,40 @@ void updater_start(void);
 void updater_poll(SDL_Window *window);
 #endif
 
+/* the game's console (source/interface/terminal.c): a line on the screen
+that fades */
+void terminal_printf(const void *color, const char *format, ...);
+/* the game's log, debug.txt (source/cseries/errors.c); not error(), which
+shows the game's error screen */
+void write_to_error_file(char *string, unsigned char date);
+
+/* the game's frames-a-second counter (source/main/main.c) */
+extern unsigned char display_framerate;
+
+/* what the port's keys did: on the screen and in the log */
+static void notice(const char *format, ...)
+{
+	char text[256];
+	va_list arguments;
+
+	va_start(arguments, format);
+	vsnprintf(text, sizeof(text), format, arguments);
+	va_end(arguments);
+	platform_log("%s", text);
+	{
+		char line[sizeof(text) + 2];
+
+		snprintf(line, sizeof(line), "%s\r\n", text);
+		write_to_error_file(line, TRUE);
+	}
+	terminal_printf(NULL, "%s", text);
+}
+
 BOOL platform_sdl_initialize(void)
 {
 	if (platform_sdl_started)
 		return TRUE;
+	display_framerate = config_boolean("display.show_fps") ? 1 : 0;
 	/* a copy of the game started to open an invite link hands it to the
 	one already running, and goes */
 	if (p2p_hand_off_invite())
@@ -343,7 +376,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	if (scale < 1)
 		scale = 1;
 
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
@@ -384,7 +417,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		return FALSE;
 	}
 	platform_gl_context = SDL_GL_CreateContext(platform_window);
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 	/* ES 3.2 where the driver has it, otherwise the renderer makes do with
 	3.0 plus extensions */
 	if (!platform_gl_context)
@@ -411,6 +444,38 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	return TRUE;
 }
 
+#ifndef HALO_ANDROID
+/* the pixels the picture goes to: the display's in fullscreen, else the
+window's (as display.window_scale makes it, before there is one) */
+BOOL platform_output_size(long *width, long *height)
+{
+	if (platform_screen_mode(width, height))
+		return TRUE;
+	if (platform_window)
+	{
+		int w = 0, h = 0;
+
+		SDL_GetWindowSizeInPixels(platform_window, &w, &h);
+		if (w > 0 && h > 0)
+		{
+			*width = w;
+			*height = h;
+			return TRUE;
+		}
+		return FALSE;
+	}
+	{
+		long scale = config_integer("display.window_scale");
+
+		if (scale < 1)
+			scale = 1;
+		*width = 640 * scale;
+		*height = 480 * scale;
+		return TRUE;
+	}
+}
+#endif
+
 void platform_video_drawable_size(int *width, int *height)
 {
 	SDL_GetWindowSizeInPixels(platform_window, width, height);
@@ -423,9 +488,39 @@ void platform_video_swap(void)
 
 void platform_mouse_capture(BOOL capture)
 {
+	/* (never while the settings overlay is open: its pointer is the mouse) */
 	if (platform_window)
-		SDL_SetWindowRelativeMouseMode(platform_window, capture ? true : false);
+		SDL_SetWindowRelativeMouseMode(platform_window, capture && !settings_overlay_active() ? true : false);
 }
+
+#ifndef HALO_ANDROID
+int platform_window_fullscreen(int fullscreen)
+{
+	if (!platform_window)
+		return 0;
+	if (fullscreen >= 0 && !config_boolean("debug.hidden_window"))
+		SDL_SetWindowFullscreen(platform_window, fullscreen != 0);
+	return (SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) != 0;
+}
+
+void platform_video_set_vsync(int vsync)
+{
+	if (platform_window)
+		SDL_GL_SetSwapInterval(vsync ? 1 : 0);
+}
+
+/* a point SDL reports (the window's points) in the window's pixels, as the
+settings overlay is drawn */
+static void overlay_point(float x, float y, float *pixel_x, float *pixel_y)
+{
+	int width = 0, height = 0, pixel_width = 0, pixel_height = 0;
+
+	SDL_GetWindowSize(platform_window, &width, &height);
+	SDL_GetWindowSizeInPixels(platform_window, &pixel_width, &pixel_height);
+	*pixel_x = width > 0 ? x * (float)pixel_width / (float)width : x;
+	*pixel_y = height > 0 ? y * (float)pixel_height / (float)height : y;
+}
+#endif
 
 /* ---------- keyboard translation */
 
@@ -670,6 +765,11 @@ static void platform_show_pending_message(void)
 
 /* ---------- events */
 
+#ifdef HALO_MACOS
+/* whether Command is held, from the key events (Command-W's close) */
+static BOOL platform_command_held;
+#endif
+
 void platform_pump_events(void)
 {
 	/* debug.exit_after (seconds) ends the game that long after the window
@@ -696,42 +796,159 @@ void platform_pump_events(void)
 #ifndef HALO_ANDROID
 	updater_poll(platform_window);
 #endif
+	/* the controller's presses in the settings overlay, and its test script */
+	settings_overlay_update();
 	pthread_mutex_lock(&input_lock);
 	while (SDL_PollEvent(&event))
 	{
 		switch (event.type)
 		{
+#ifdef HALO_MACOS
+		/* the window's close button quits at once; Command-W (the menu's
+		Close, with Command held for the port's keys and W moving you
+		forward) does nothing */
+		case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+			if (platform_command_held)
+			{
+				notice("Command-W does not close the game: press Command-Q twice to quit");
+				break;
+			}
+			pthread_mutex_unlock(&input_lock);
+			platform_log("window closed");
+			exit(EXIT_SUCCESS);
+#endif
 		case SDL_EVENT_QUIT:
+#ifdef HALO_MACOS
+			/* Command-Q quits on a second press within two seconds: Q is the
+			flashlight, and Command is held for the port's keys */
+			{
+				static Uint64 first_quit;
+				Uint64 now = SDL_GetTicks();
+
+				if (!first_quit || now - first_quit > 2000)
+				{
+					first_quit = now;
+					notice("press Command-Q again to quit");
+					break;
+				}
+			}
+#endif
 			pthread_mutex_unlock(&input_lock);
 			platform_log("window closed");
 			exit(EXIT_SUCCESS);
 		case SDL_EVENT_KEY_DOWN:
 		case SDL_EVENT_KEY_UP:
-			if (event.key.scancode < SDL_SCANCODE_COUNT)
+		{
+			/* the port's keys: F4 to F12, or on macOS, whose own keys F11 and
+			the media keys are, Command with a letter (the letter then does
+			nothing in the game) */
+			SDL_Scancode action = event.key.scancode;
+
+#ifdef HALO_MACOS
+			platform_command_held = event.key.scancode == SDL_SCANCODE_LGUI ||
+				event.key.scancode == SDL_SCANCODE_RGUI ? event.key.down : (event.key.mod & SDL_KMOD_GUI) != 0;
+			if (event.key.mod & SDL_KMOD_GUI)
 			{
-				input_state.keys[event.key.scancode] = event.key.down;
-				if (event.key.down)
-					keys_pressed[event.key.scancode] = 1;
+				switch (event.key.scancode)
+				{
+				case SDL_SCANCODE_F: action = SDL_SCANCODE_F11; break;
+				case SDL_SCANCODE_R: action = SDL_SCANCODE_F8; break;
+				case SDL_SCANCODE_T: action = SDL_SCANCODE_F9; break;
+				case SDL_SCANCODE_G: action = SDL_SCANCODE_F12; break;
+				case SDL_SCANCODE_P: action = SDL_SCANCODE_F7; break;
+				case SDL_SCANCODE_B: action = SDL_SCANCODE_F6; break;
+				case SDL_SCANCODE_L: action = SDL_SCANCODE_F5; break;
+				case SDL_SCANCODE_J: action = SDL_SCANCODE_F4; break;
+				/* the next debug camera, and the flying camera's controls
+				(xinput_sdl.c, source/camera/director.c) */
+				case SDL_SCANCODE_X:
+				case SDL_SCANCODE_Z:
+					action = SDL_SCANCODE_UNKNOWN;
+					if (event.key.down && !event.key.repeat)
+						halo_debug_camera_key(event.key.scancode == SDL_SCANCODE_X);
+					break;
+				/* (Command-comma: a Mac's Settings) */
+				case SDL_SCANCODE_COMMA: action = SDL_SCANCODE_F10; break;
+				default: break;
+				}
 			}
-			queue_keystroke(&event.key);
+#endif
+			/* F10: the settings overlay, which takes every key while it is
+			open (the port's keys below still act) */
+			if (settings_overlay_active())
+			{
+				if (action == SDL_SCANCODE_F10 || action == event.key.scancode)
+					settings_overlay_key(action, event.key.down, event.key.repeat);
+			}
+			else if (action == SDL_SCANCODE_F10)
+			{
+				if (event.key.down && !event.key.repeat)
+					settings_overlay_set_active(1);
+			}
+			else if (action == event.key.scancode)
+			{
+				if (event.key.scancode < SDL_SCANCODE_COUNT)
+				{
+					input_state.keys[event.key.scancode] = event.key.down;
+					if (event.key.down)
+						keys_pressed[event.key.scancode] = 1;
+				}
+				queue_keystroke(&event.key);
+			}
 			/* F12 releases or recaptures the mouse */
-			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F12)
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F12)
 			{
 				input_state.mouse_released = !input_state.mouse_released;
 				platform_mouse_capture(!input_state.mouse_released && !input_state.ui_pointer);
+				notice("mouse %s", input_state.mouse_released ? "released" : "captured");
 			}
+			/* F4: the objects' shapes in the rays (raytrace_gl.c) */
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F4)
+				notice("ray tracing shapes: %s", halo_ray_tracing_shapes_next());
+			/* F5: the ray probe, the rays of the crosshair's surface drawn
+			(raytrace_gl.c) */
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F5)
+				notice("ray probe: %s", halo_ray_tracing_probe_next());
+			/* F6 steps through what the ray tracing shows (raytrace_gl.c) */
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F6)
+				notice("ray tracing view: %s", halo_ray_tracing_next_view());
+			/* F7 shows or hides the game's frames-a-second counter (its own
+			display_framerate: source/main/main.c) */
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F7)
+			{
+				display_framerate = !display_framerate;
+				notice("frame rate counter: %s", display_framerate ? "on" : "off");
+			}
+			/* F8 steps through the resolutions (d3d8_gl.c) */
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F8)
+				notice("resolution: %s", halo_screen_resolution_next());
+			/* F9 switches the ray-traced lighting (raytrace_gl.c) */
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F9)
+				notice("ray tracing: %s", halo_ray_tracing_toggle());
 #ifndef HALO_ANDROID
 			/* F11 switches between fullscreen and the window (SDL keeps the
 			window's size and place while fullscreen) */
-			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F11)
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F11)
 			{
-				SDL_SetWindowFullscreen(platform_window,
-					(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) ? false : true);
+				bool fullscreen = !(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN);
+
+				SDL_SetWindowFullscreen(platform_window, fullscreen);
+				notice("%s", fullscreen ? "fullscreen" : "window");
 			}
 #endif
 			break;
+		}
 		case SDL_EVENT_MOUSE_MOTION:
 #ifndef HALO_ANDROID
+			/* the settings overlay's pointer */
+			if (settings_overlay_active())
+			{
+				float x, y;
+
+				overlay_point(event.motion.x, event.motion.y, &x, &y);
+				settings_overlay_mouse_motion(x, y);
+				break;
+			}
 			/* in the menus the mouse moves the pointer, not the view */
 			if (input_state.ui_pointer)
 			{
@@ -747,6 +964,14 @@ void platform_pump_events(void)
 		case SDL_EVENT_MOUSE_BUTTON_DOWN:
 		case SDL_EVENT_MOUSE_BUTTON_UP:
 #ifndef HALO_ANDROID
+			if (settings_overlay_active())
+			{
+				float x, y;
+
+				overlay_point(event.button.x, event.button.y, &x, &y);
+				settings_overlay_mouse_button(event.button.button, event.button.down, x, y);
+				break;
+			}
 			/* clicks in the menus go to the pointer; a button held down
 			when the menu closes stays up until pressed again, so the click
 			that resumes the game does not also fire */
@@ -770,6 +995,26 @@ void platform_pump_events(void)
 			break;
 		case SDL_EVENT_MOUSE_WHEEL:
 #ifndef HALO_ANDROID
+			if (settings_overlay_active())
+			{
+				static float overlay_wheel;
+				int steps = 0;
+
+				/* whole notches, as the menus' */
+				overlay_wheel += event.wheel.y;
+				while (overlay_wheel >= 1.0f)
+				{
+					steps++;
+					overlay_wheel -= 1.0f;
+				}
+				while (overlay_wheel <= -1.0f)
+				{
+					steps--;
+					overlay_wheel += 1.0f;
+				}
+				settings_overlay_mouse_wheel(steps);
+				break;
+			}
 			if (input_state.ui_pointer)
 			{
 				/* whole notches: smooth-scrolling wheels send fractions */
@@ -809,6 +1054,37 @@ void platform_pump_events(void)
 			break;
 		}
 	}
+#ifndef HALO_ANDROID
+	/* the settings overlay opened or closed (its key, its script, a map
+	loaded from it): the game's keys and buttons let go; the mouse released
+	while it is open (its pointer in the window's middle) and captured again
+	after, as it was */
+	{
+		static BOOL overlay_was_active;
+		BOOL active = settings_overlay_active() != 0;
+
+		if (active != overlay_was_active)
+		{
+			BOOL captured = !input_state.mouse_released && !input_state.ui_pointer;
+
+			overlay_was_active = active;
+			memset(input_state.keys, 0, sizeof(input_state.keys));
+			memset(keys_pressed, 0, sizeof(keys_pressed));
+			memset(input_state.mouse_buttons, 0, sizeof(input_state.mouse_buttons));
+			input_state.mouse_dx = 0.0f;
+			input_state.mouse_dy = 0.0f;
+			input_state.mouse_wheel = 0.0f;
+			platform_mouse_capture(!active && captured);
+			if (active && captured)
+			{
+				int width, height;
+
+				SDL_GetWindowSize(platform_window, &width, &height);
+				SDL_WarpMouseInWindow(platform_window, width * 0.5f, height * 0.5f);
+			}
+		}
+	}
+#endif
 	pthread_mutex_unlock(&input_lock);
 	looked_at_clipboard = TRUE;
 	platform_invite_clipboard(look_at_clipboard);

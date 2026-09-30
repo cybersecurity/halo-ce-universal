@@ -18,7 +18,7 @@ memory_watch.c detects that by write-protecting the pages.
 #include "port_config.h"
 
 #include <stdio.h>
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 #define GL_BGRA GL_RGBA
 #endif
 #include <stdlib.h>
@@ -395,7 +395,7 @@ static void decode_level(const struct xgpu_texture_description *description, uns
 	}
 }
 
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 /* ---------- DXT decoding, for ES drivers without S3TC (Mali) */
 
 static unsigned long color565(unsigned long value)
@@ -535,7 +535,7 @@ static GLenum compressed_format(unsigned char kind)
 /* debug.texture_dump_directory writes level 0 of every upload as a TGA, read back from GL */
 static void texture_dump(GLenum target, const struct xgpu_texture_description *description)
 {
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 	/* ES cannot read textures back */
 	(void)target;
 	(void)description;
@@ -583,13 +583,13 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 	unsigned long *converted;
 	unsigned long face, level;
 
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 	decode_compressed = description->compressed && !xgpu_capabilities.s3tc;
 #endif
 	converted = description->compressed && !decode_compressed ? NULL : malloc(largest * sizeof(unsigned long));
 	glBindTexture(target, texture);
 	xgpu_gl_state_invalidate();
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 	/* converted texels are BGRA in memory (32-bit ARGB words); ES takes
 	RGBA */
 	glTexParameteri(target, GL_TEXTURE_SWIZZLE_R, converted ? GL_BLUE : GL_RED);
@@ -620,7 +620,7 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 			}
 			else
 			{
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 				if (decode_compressed)
 					dxt_decode_level(information.kind, source, (unsigned long)width, (unsigned long)height,
 						(unsigned long)depth, converted);

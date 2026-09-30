@@ -520,12 +520,11 @@ static struct observer_result const *render_interpolation_direct_camera(
 	(void)local_player_index;
 	return observer;
 #else
-	static int enabled = -1;
+	/* (read each frame: the settings overlay changes it while playing) */
+	int enabled = config_boolean("display.direct_camera");
 	struct observer_result *direct;
 	long unit_index;
 
-	if (enabled < 0)
-		enabled = config_boolean("display.direct_camera");
 	if (!enabled || !observer ||
 		director_get_perspective(local_player_index) != _director_perspective_first_person ||
 		director_inhibited_facing(local_player_index) ||

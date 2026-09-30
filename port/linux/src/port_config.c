@@ -63,11 +63,41 @@ struct config_setting
 	const char *comment;
 };
 
+/* the ray-traced lighting's default: on for the macOS port, which it was
+made for; off elsewhere */
+#ifdef HALO_MACOS
+#define HALO_CONFIG_RAY_TRACING "\"on\""
+#else
+#define HALO_CONFIG_RAY_TRACING "\"off\""
+#endif
+
+/* the resolution: 1080p on macOS (Retina displays' native pixels are many,
+and the ray-traced lighting's cost follows them); the display's elsewhere */
+#ifdef HALO_MACOS
+#define HALO_CONFIG_RESOLUTION "\"1080p\""
+#else
+#define HALO_CONFIG_RESOLUTION "\"native\""
+#endif
+
+/* a default the macOS port turns off */
+#ifdef HALO_MACOS
+#define HALO_CONFIG_MACOS_FALSE "false"
+#else
+#define HALO_CONFIG_MACOS_FALSE "true"
+#endif
+
 static const struct config_setting config_settings[] =
 {
 	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
-		"Start fullscreen, drawing at the display's resolution and shape; false\n"
-		"starts in a window, which draws the Xbox's 640x480. F11 switches." },
+		"Start fullscreen, in the display's shape; false starts in a window, in\n"
+		"the window's shape. display.resolution sets the pixels. F11 switches." },
+	{ "display.resolution", _config_string, HALO_CONFIG_RESOLUTION, "HALO_RESOLUTION", _environment_value, _platform_desktop,
+		"The picture's pixels: \"native\" (the display's in fullscreen, the window's\n"
+		"in a window), \"720p\", \"1080p\", \"1440p\", \"2160p\", \"<width>x<height>\",\n"
+		"or \"xbox\" for the Xbox's 640x480. F8 steps through them while playing." },
+	{ "display.render_scale", _config_real, "1.0", "HALO_RENDER_SCALE", _environment_value, _platform_desktop,
+		"Multiplies the resolution: below 1.0 draws fewer pixels (faster),\n"
+		"above 1.0 more (supersampling, smoother edges); up to 4.0." },
 	{ "display.window_scale", _config_integer, "2", "HALO_WINDOW_SCALE", _environment_value, _platform_desktop,
 		"The window's size as a multiple of 640x480 (it can be resized)." },
 	{ "display.screen_width", _config_integer, "0", "HALO_SCREEN_WIDTH", _environment_value, _platform_android,
@@ -82,6 +112,77 @@ static const struct config_setting config_settings[] =
 		"In first person, point the view where the player aims now instead of\n"
 		"where the last tick left it: the view turns the frame the mouse moves,\n"
 		"not up to two ticks (66 ms) later." },
+
+	{ "display.show_fps", _config_boolean, "false", "HALO_SHOW_FPS", _environment_value, _platform_desktop,
+		"Show the game's frames-a-second counter (F7, or Command-P on a Mac,\n"
+		"shows or hides it)." },
+
+	{ "display.ray_tracing", _config_string, HALO_CONFIG_RAY_TRACING, "HALO_RAY_TRACING", _environment_value,
+		_platform_all,
+		"Ray-traced lighting on the 3D world (port/linux/src/raytrace_gl.c): \"on\"\n"
+		"(on macOS with Metal's rays through the level), \"screen\" (the screen's rays\n"
+		"only), \"off\", or \"occlusion\" and \"depth\" to see what it works from, or\n"
+		"\"rays\" and \"split\" to see what Metal's rays find. F9 switches it while\n"
+		"playing; F6 steps through the views." },
+	{ "display.ray_tracing_occlusion", _config_real, "0.8", "HALO_RAY_TRACING_OCCLUSION", _environment_value,
+		_platform_all,
+		"How much traced ambient occlusion darkens creases and corners, 0.0 to 1.0." },
+	{ "display.ray_tracing_reflections", _config_real, "0.25", "HALO_RAY_TRACING_REFLECTIONS", _environment_value,
+		_platform_all,
+		"How strongly surfaces reflect the traced scene, 0.0 to 1.0." },
+	{ "display.ray_tracing_bounce", _config_real, "0.25", "HALO_RAY_TRACING_BOUNCE", _environment_value,
+		_platform_all,
+		"How much light one traced bounce carries between surfaces, 0.0 to 1.0." },
+	{ "display.ray_tracing_shadows", _config_real, "1.0", "HALO_RAY_TRACING_SHADOWS", _environment_value,
+		_platform_all,
+		"How dark the sun's traced shadows on characters, vehicles and items are,\n"
+		"0.0 to 1.0 (macOS, with Metal's rays)." },
+	{ "display.ray_tracing_shapes", _config_string, "\"model\"", "HALO_RAY_TRACING_SHAPES", _environment_value,
+		_platform_all,
+		"The characters' and vehicles' shapes in Metal's rays: \"model\" (their drawn\n"
+		"models, skinned as drawn) or \"collision\" (the meshes their bullets hit);\n"
+		"F4 switches them (macOS)." },
+	{ "display.ray_tracing_lights", _config_string, "\"traced\"", "HALO_RAY_TRACING_LIGHTS", _environment_value,
+		_platform_all,
+		"The lights on the level in Metal's rays: \"traced\" (every light the game has,\n"
+		"its own lights too - Guilty Spark's, the glows' - traced in its colour, with\n"
+		"its shadows, in place of the game's) or \"game\" (the game's dynamic lights as\n"
+		"it draws them, only their shadows traced) (macOS)." },
+	{ "display.ray_tracing_level", _config_string, "\"render\"", "HALO_RAY_TRACING_LEVEL", _environment_value,
+		_platform_all,
+		"The level in Metal's rays: \"render\" (its drawn triangles, as you see them)\n"
+		"or \"collision\" (the surfaces the game collides with) (macOS)." },
+	{ "display.ray_tracing_gi", _config_string, "\"traced\"", "HALO_RAY_TRACING_GI", _environment_value,
+		_platform_all,
+		"The level's light traced in place of its lightmaps (macOS): \"traced\" (the\n"
+		"sun, the sky, the glowing surfaces and the lights, with the lightmaps' light\n"
+		"where the rays land as the light that bounced), \"black\" (without the\n"
+		"lightmaps at all: only what the rays find lit), \"path\" (without the lightmaps,\n"
+		"traced over 3 bounces: the sun, the sky and the glowing surfaces lighting\n"
+		"each place the light bounces from; the slowest) or \"off\"." },
+	{ "display.ray_tracing_gi_sun", _config_real, "1.0", "HALO_RAY_TRACING_GI_SUN", _environment_value,
+		_platform_all, "The traced sun's strength (display.ray_tracing_gi)." },
+	{ "display.ray_tracing_gi_bounce", _config_real, "1.0", "HALO_RAY_TRACING_GI_BOUNCE", _environment_value,
+		_platform_all, "The traced bounced light's strength (display.ray_tracing_gi)." },
+	{ "display.ray_tracing_gi_glow", _config_real, "1.0", "HALO_RAY_TRACING_GI_GLOW", _environment_value,
+		_platform_all, "The glowing surfaces' traced light's strength (display.ray_tracing_gi)." },
+	{ "display.ray_tracing_bounces", _config_real, "3", "HALO_RAY_TRACING_BOUNCES", _environment_value,
+		_platform_all,
+		"How many times the path tracer's light bounces at most, 1 to 4 (display.ray_tracing_gi\n"
+		"\"path\"): more reach farther into the shade, and cost more. The governor takes one\n"
+		"off under load, and all but one when the frames are slow." },
+	{ "display.ray_tracing_samples", _config_real, "1", "HALO_RAY_TRACING_SAMPLES", _environment_value,
+		_platform_all,
+		"The traced light's rays a pixel each time it takes new ones, 1 to 8: more, less\n"
+		"noise and blotches, and that many times the cost of its rays." },
+	{ "display.ray_tracing_gi_split", _config_boolean, "false", "HALO_RAY_TRACING_GI_SPLIT", _environment_set_is_true,
+		_platform_all, "The game's light on the screen's left half, the traced on its right (display.ray_tracing_gi)." },
+	{ "display.ray_tracing_gi_lights", _config_real, "0.5", "HALO_RAY_TRACING_GI_LIGHTS", _environment_value,
+		_platform_all, "The traced lights' and glows' strength in the light buffer (display.ray_tracing_gi)." },
+	{ "display.ray_tracing_objects", _config_boolean, "true", "HALO_RAY_TRACING_OBJECTS", _environment_value,
+		_platform_all,
+		"The characters and vehicles in Metal's rays too: their contact shadows on\n"
+		"the level, and your own body's shadow (macOS)." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },
@@ -98,6 +199,10 @@ static const struct config_setting config_settings[] =
 		"right stick to move decides. The bullets' autoaim (bent toward the\n"
 		"target) stays either way." },
 
+	{ "game.map", _config_string, "\"\"", "HALO_MAP", _environment_value, _platform_all,
+		"A map to start at start-up, after init.txt: a campaign level's name\n"
+		"(\"a10\", \"b30\"), a multiplayer map's (\"bloodgulch\"), or a scenario\n"
+		"path (\"levels\\\\b30\\\\b30\"); empty for the menu." },
 	{ "game.language", _config_string, "\"\"", "HALO_LANGUAGE", _environment_value, _platform_all,
 		"The language the game asks the Xbox for: \"ja\", \"de\", \"fr\", \"es\" or \"it\";\n"
 		"empty for English. The game data decides what is translated." },
@@ -108,7 +213,8 @@ static const struct config_setting config_settings[] =
 		"single quotes: 'C:\\Games\\Halo'." },
 	{ "paths.saves", _config_string, "\"\"", "HALO_SAVE_ROOT", _environment_value, _platform_desktop,
 		"Where saved games and profiles go; empty for the usual place\n"
-		"(~/.local/share/halo-linux, or %APPDATA%\\halo on Windows)." },
+		"(~/.local/share/halo-linux, %APPDATA%\\halo on Windows,\n"
+		"~/Library/Application Support/Halo on macOS)." },
 
 	{ "network.address", _config_string, "\"\"", "HALO_NET_ADDRESS", _environment_value, _platform_all,
 		"This machine's IPv4 address for system link, for a machine on several\n"
@@ -122,14 +228,19 @@ static const struct config_setting config_settings[] =
 		"clipboard) that lets whoever has it join over the internet; opening a\n"
 		"link (or copying one before switching to the game) joins. Only people\n"
 		"with the invite can join. Off keeps system link to the local network." },
-	{ "network.join_from_clipboard", _config_boolean, "true", "HALO_NET_JOIN_FROM_CLIPBOARD", _environment_value,
+	/* off on macOS: a link that happens to be on the clipboard should not
+	join a stranger's game (port/macos/README.md) */
+	{ "network.join_from_clipboard", _config_boolean, HALO_CONFIG_MACOS_FALSE, "HALO_NET_JOIN_FROM_CLIPBOARD",
+		_environment_value,
 		_platform_all,
 		"Join the game of an invite link found on the clipboard when the game\n"
 		"comes to the front." },
 	{ "network.tunnel_port", _config_integer, "0", "HALO_NET_TUNNEL_PORT", _environment_value, _platform_all,
 		"The UDP port internet play uses; 0 picks one. A fixed one can be\n"
 		"forwarded on the router, for networks whose NAT stops connections." },
-	{ "network.allow_upnp", _config_boolean, "true", "HALO_NET_ALLOW_UPNP", _environment_value, _platform_all,
+	/* off on macOS: the local network needs no forwarded port */
+	{ "network.allow_upnp", _config_boolean, HALO_CONFIG_MACOS_FALSE, "HALO_NET_ALLOW_UPNP", _environment_value,
+		_platform_all,
 		"Let internet play ask the router (UPnP) to forward its port, for\n"
 		"networks whose NAT stops connections: when a player joins this\n"
 		"machine's game, and when joining a game takes too long. False never\n"
@@ -180,10 +291,23 @@ static const struct config_setting config_settings[] =
 		"machines of twice it), to test the netcode as over the internet; 0 none." },
 	{ "debug.network_loss", _config_real, "0.0", "HALO_NETWORK_LOSS", _environment_value, _platform_all,
 		"Percent of datagrams received that are dropped, for the same; 0 none." },
+	{ "debug.commands", _config_string, "\"\"", "HALO_COMMANDS", _environment_value, _platform_all,
+		"Console commands at times, for tests: \"<seconds>=<command>;...\" (seconds\n"
+		"since the game started), such as \"47=cheat_all_weapons;50=cheat_spawn_warthog\";\n"
+		"empty for none." },
 	{ "debug.test_input", _config_string, "\"\"", "HALO_TEST_INPUT", _environment_value, _platform_all,
 		"\"bot:<seed>\" plays controller 1 with a scripted pattern (automated\n"
 		"network tests); \"look:<seed>\" stands still, only turning and looking\n"
-		"up and down; empty for none." },
+		"up and down; \"script:<from>-<to>=<action>,...\" plays the actions in\n"
+		"those seconds (forward, back, left, right, turnleft, turnright, up, down,\n"
+		"fire, grenade, jump, crouch, zoom, action, flashlight, reload, switch, start);\n"
+		"empty for none." },
+	{ "debug.settings_script", _config_string, "\"\"", "HALO_SETTINGS_SCRIPT", _environment_value, _platform_desktop,
+		"Keys for the settings overlay (F10) at times, for tests with screenshots:\n"
+		"\"<seconds>=<key>,<key>...;...\" (seconds since the game started); the keys:\n"
+		"open, close, up, down, left, right, enter, escape, pageup, pagedown, home,\n"
+		"end, or move:<x>:<y>, click:<x>:<y>, wheel:<steps> (x and y: 0 to 1 of the\n"
+		"window); empty for none." },
 	{ "debug.update_answer", _config_string, "\"\"", "HALO_UPDATE_ANSWER", _environment_value, _platform_desktop,
 		"The answer to the new version question, for automated tests: \"yes\",\n"
 		"\"no\" or \"never\" (do not ask again, confirmed); empty asks." },
@@ -642,6 +766,119 @@ static void config_report_unknown_keys(toml_datum_t table)
 	}
 }
 
+/* the command line's short names for settings */
+static const struct
+{
+	const char *alias;
+	const char *name;
+	const char *value;
+} config_aliases[] = {
+	{ "gi", "display.ray_tracing_gi", NULL },
+	{ "rt", "display.ray_tracing", NULL },
+	{ "map", "game.map", NULL },
+	{ "fps", "display.show_fps", NULL },
+	{ "windowed", "display.fullscreen", "false" },
+	{ "no_vsync", "display.vsync", "false" },
+	{ "mute", "audio.enabled", "false" },
+};
+
+/* a setting by the command line's name for it: its whole name, an alias,
+or the last part of one name alone ("vsync": display.vsync); -1 if none */
+static long config_argument_index(const char *name, const char **value)
+{
+	size_t index, length = strlen(name);
+	long found = -1;
+
+	for (index = 0; index < sizeof(config_aliases) / sizeof(config_aliases[0]); index++)
+	{
+		if (!strcmp(name, config_aliases[index].alias))
+		{
+			if (config_aliases[index].value)
+				*value = config_aliases[index].value;
+			return config_setting_index(config_aliases[index].name);
+		}
+	}
+	if ((found = config_setting_index(name)) >= 0)
+		return found;
+	for (index = 0; index < NUMBER_OF_CONFIG_SETTINGS; index++)
+	{
+		const char *setting = config_settings[index].name, *dot = strrchr(setting, '.');
+
+		if (dot && strlen(dot + 1) == length && !strcmp(dot + 1, name))
+		{
+			if (found >= 0)
+				return -2;
+			found = (long)index;
+		}
+	}
+	return found;
+}
+
+/* the command line's settings (HALO_SETTINGS, from the host: a line each,
+"name=value", "name" - true - or "no-name" - false), over the file's and the
+environment's; "help" lists them all */
+static void config_apply_arguments(const char *text)
+{
+	while (text && *text)
+	{
+		char line[512], name[256];
+		const char *end = strchr(text, '\n'), *value;
+		size_t length = end ? (size_t)(end - text) : strlen(text), index;
+		char *equals;
+		long setting;
+
+		if (length >= sizeof(line))
+			length = sizeof(line) - 1;
+		memcpy(line, text, length);
+		line[length] = 0;
+		text = end ? end + 1 : text + length;
+		if (!line[0])
+			continue;
+		if (!strcmp(line, "help"))
+		{
+			for (index = 0; index < NUMBER_OF_CONFIG_SETTINGS; index++)
+				fprintf(stderr, "--%s (%s, %s)\n    %s\n", config_settings[index].name,
+					config_settings[index].default_value, config_settings[index].environment,
+					config_settings[index].comment);
+			fprintf(stderr, "short names: the last part of a name (--vsync=false), and --gi, --rt, --map, --fps, "
+				"--windowed, --no-vsync, --mute\n");
+			exit(0);
+		}
+		equals = strchr(line, '=');
+		value = equals ? equals + 1 : "true";
+		if (equals)
+			*equals = 0;
+		snprintf(name, sizeof(name), "%s", line);
+		for (index = 0; name[index]; index++)
+			if (name[index] == '-')
+				name[index] = '_';
+		setting = config_argument_index(name, &value);
+		if (setting < 0 && !equals && !strncmp(name, "no_", 3))
+		{
+			value = "false";
+			setting = config_argument_index(name + 3, &value);
+		}
+		if (setting == -2)
+		{
+			platform_log("settings: --%s is more than one setting's name; give it whole", line);
+			continue;
+		}
+		if (setting < 0)
+		{
+			platform_log("settings: no setting --%s (--help lists them)", line);
+			continue;
+		}
+		if (config_settings[setting].type == _config_string)
+		{
+			free(config_values[setting].string);
+			config_values[setting].string = strdup(value);
+		}
+		else
+			config_set_from_text(&config_values[setting], config_settings[setting].type, value);
+		platform_log("settings: --%s: %s = %s", line, config_settings[setting].name, value);
+	}
+}
+
 static void config_load(void)
 {
 	char path[1024];
@@ -723,6 +960,7 @@ static void config_load(void)
 			break;
 		}
 	}
+	config_apply_arguments(getenv("HALO_SETTINGS"));
 }
 
 static const struct config_value *config_value(const char *name, enum config_type type)
@@ -780,29 +1018,24 @@ static int config_line_section(const char *line, const char *end, char *section,
 	return 1;
 }
 
-/* sets a boolean setting, for now and in config.toml: its line there is
-changed (or added), the rest of the file kept as it is */
-int config_write_boolean(const char *name, int value)
+/* sets a setting's line in config.toml to "key = text", keeping the rest
+of the file as it is: the line changed in place, or added at the end of its
+section (or in a new section at the end); under config_lock */
+static int config_write_line(const char *name, const char *text_value)
 {
 	const char *dot = strchr(name, '.');
-	long index = config_setting_index(name);
-	char section[64], key[64], wanted[80], current[64] = "", line_text[96], path[1024];
+	char section[64], key[64], current[64] = "", line_text[600], path[1024];
 	struct config_text out = { 0 };
 	size_t size = 0;
 	char *text;
 	const char *line;
 	int written = 0, in_section = 0, succeeded;
 
-	if (index < 0 || config_settings[index].type != _config_boolean || !dot || (size_t)(dot - name) >= sizeof(section))
+	if (!dot || (size_t)(dot - name) >= sizeof(section))
 		return 0;
-	/* (the file read first, as the other settings are) */
-	config_boolean(name);
-	pthread_mutex_lock(&config_lock);
-	config_values[index].boolean = value != 0;
 	snprintf(section, sizeof(section), "%.*s", (int)(dot - name), name);
 	snprintf(key, sizeof(key), "%s", dot + 1);
-	snprintf(line_text, sizeof(line_text), "%s = %s\n", key, value ? "true" : "false");
-	snprintf(wanted, sizeof(wanted), "%s", section);
+	snprintf(line_text, sizeof(line_text), "%s = %s\n", key, text_value);
 	config_path(path, sizeof(path));
 	text = config_read_file(path, &size);
 	for (line = text ? text : ""; *line;)
@@ -818,7 +1051,7 @@ int config_write_boolean(const char *name, int value)
 				config_append(&out, line_text);
 				written = 1;
 			}
-			in_section = !strcmp(current, wanted);
+			in_section = !strcmp(current, section);
 		}
 		else if (in_section && !written && config_line_key(line, end, key))
 		{
@@ -852,10 +1085,145 @@ int config_write_boolean(const char *name, int value)
 		config_append(&out, line_text);
 	}
 	succeeded = out.buffer && config_write_file(path, out.buffer);
-	pthread_mutex_unlock(&config_lock);
 	free(out.buffer);
 	free(text);
+	if (!succeeded)
+		platform_log("settings: cannot write %s to %s", name, path);
 	return succeeded;
+}
+
+/* the setting's index, if it is one of this type, with the file read */
+static long config_writable(const char *name, enum config_type type)
+{
+	long index = config_setting_index(name);
+
+	if (index < 0 || config_settings[index].type != type)
+	{
+		platform_log("settings: no %s setting %s to write", type == _config_string ? "string" : "such", name);
+		return -1;
+	}
+	/* (the file read first, as the other settings are) */
+	config_value(name, type);
+	return index;
+}
+
+/* sets a boolean setting, for now and in config.toml: its line there is
+changed (or added), the rest of the file kept as it is */
+int config_write_boolean(const char *name, int value)
+{
+	long index = config_writable(name, _config_boolean);
+	int succeeded;
+
+	if (index < 0)
+		return 0;
+	pthread_mutex_lock(&config_lock);
+	config_values[index].boolean = value != 0;
+	succeeded = config_write_line(name, value ? "true" : "false");
+	pthread_mutex_unlock(&config_lock);
+	return succeeded;
+}
+
+int config_write_integer(const char *name, long value)
+{
+	long index = config_writable(name, _config_integer);
+	char text[32];
+	int succeeded;
+
+	if (index < 0)
+		return 0;
+	snprintf(text, sizeof(text), "%ld", value);
+	pthread_mutex_lock(&config_lock);
+	config_values[index].integer = value;
+	succeeded = config_write_line(name, text);
+	pthread_mutex_unlock(&config_lock);
+	return succeeded;
+}
+
+int config_write_real(const char *name, double value)
+{
+	long index = config_writable(name, _config_real);
+	char text[48];
+	int succeeded;
+
+	if (index < 0)
+		return 0;
+	/* (TOML's floats need their point: 1.00, not 1) */
+	snprintf(text, sizeof(text), "%.2f", value);
+	pthread_mutex_lock(&config_lock);
+	config_values[index].real = value;
+	succeeded = config_write_line(name, text);
+	pthread_mutex_unlock(&config_lock);
+	return succeeded;
+}
+
+/* a number setting's value for now only, config.toml left as it is (a
+slider being dragged: the settings overlay) */
+void config_set_real(const char *name, double value)
+{
+	long index = config_writable(name, _config_real);
+
+	if (index < 0)
+		return;
+	pthread_mutex_lock(&config_lock);
+	config_values[index].real = value;
+	pthread_mutex_unlock(&config_lock);
+}
+
+int config_write_string(const char *name, const char *value)
+{
+	long index = config_writable(name, _config_string);
+	char text[520];
+	size_t length = 0;
+	int succeeded;
+
+	if (index < 0)
+		return 0;
+	/* a TOML basic string: its quotes and backslashes escaped, no control
+	characters */
+	text[length++] = '"';
+	for (; *value && length + 3 < sizeof(text); value++)
+	{
+		if ((unsigned char)*value < 0x20)
+			continue;
+		if (*value == '"' || *value == '\\')
+			text[length++] = '\\';
+		text[length++] = *value;
+	}
+	text[length++] = '"';
+	text[length] = 0;
+	pthread_mutex_lock(&config_lock);
+	/* (the old text is not freed: config_string's callers on other threads
+	may still be reading it, and a setting changes by hand a few times a
+	run) */
+	{
+		char *copy = malloc(length);
+		const char *from;
+		size_t used = 0;
+
+		/* (the value itself, unescaped) */
+		for (from = text + 1; copy && from < text + length - 1; from++)
+		{
+			if (*from == '\\')
+				from++;
+			copy[used++] = *from;
+		}
+		if (copy)
+		{
+			copy[used] = 0;
+			config_values[index].string = copy;
+		}
+	}
+	succeeded = config_write_line(name, text);
+	pthread_mutex_unlock(&config_lock);
+	return succeeded;
+}
+
+/* the setting's comment in the table (a line break between its lines) */
+const char *config_comment(const char *name)
+{
+	long index = config_setting_index(name);
+
+	return index >= 0 ? config_settings[index].comment : "";
 }
 
 /* ---------- public code */
@@ -880,4 +1248,108 @@ const char *config_string(const char *name)
 	const char *string = config_value(name, _config_string)->string;
 
 	return string ? string : "";
+}
+
+/* a map's console command: "map_name levels\\<name>\\<name>" for a campaign
+level (a letter and two digits), "levels\\test\\<name>\\<name>" for a
+multiplayer map, or the path as given; 0 for none */
+int halo_map_command(const char *map, char *command, unsigned long size)
+{
+	size_t length = strlen(map);
+
+	if (!length || length > 120)
+		return 0;
+	if (strchr(map, '\\') || strchr(map, '/'))
+		snprintf(command, size, "map_name %s", map);
+	else if (length == 3 && map[0] >= 'a' && map[0] <= 'd' && map[1] >= '0' && map[1] <= '9' && map[2] >= '0' &&
+		map[2] <= '9')
+		snprintf(command, size, "map_name levels\\%s\\%s", map, map);
+	else
+		snprintf(command, size, "map_name levels\\test\\%s\\%s", map, map);
+	for (length = 0; command[length]; length++)
+		if (command[length] == '/')
+			command[length] = '\\';
+	return 1;
+}
+
+/* game.map as a console command, or NULL for none */
+const char *halo_startup_map_command(void)
+{
+	static char command[256];
+
+	if (!halo_map_command(config_string("game.map"), command, sizeof(command)))
+		return NULL;
+	platform_log("game.map: %s", command);
+	return command;
+}
+
+/* a console command for the game to run on its next update (the settings
+overlay's map list: settings_overlay.c), before debug.commands' */
+static char queued_command[256];
+
+void halo_queue_command(const char *command)
+{
+	pthread_mutex_lock(&config_lock);
+	snprintf(queued_command, sizeof(queued_command), "%s", command);
+	pthread_mutex_unlock(&config_lock);
+}
+
+/* debug.commands: the next command whose time has come, once each, or NULL
+(and halo_queue_command's first) */
+const char *halo_timed_command_next(void)
+{
+	static int loaded;
+	static int count, next;
+	static struct { double at; char command[200]; } commands[32];
+	static char current[256];
+	double now;
+
+	pthread_mutex_lock(&config_lock);
+	if (queued_command[0])
+	{
+		snprintf(current, sizeof(current), "%s", queued_command);
+		queued_command[0] = 0;
+		pthread_mutex_unlock(&config_lock);
+		platform_log("commands: %s", current);
+		return current;
+	}
+	pthread_mutex_unlock(&config_lock);
+	if (!loaded)
+	{
+		const char *text = config_string("debug.commands");
+
+		loaded = 1;
+		while (*text && count < 32)
+		{
+			char *end;
+			double at = strtod(text, &end);
+			size_t length = 0;
+
+			if (end == text || *end != '=')
+				break;
+			end++;
+			while (end[length] && end[length] != ';' && length < sizeof(commands[0].command) - 1)
+				length++;
+			commands[count].at = at;
+			memcpy(commands[count].command, end, length);
+			commands[count].command[length] = 0;
+			count++;
+			text = end + length;
+			while (*text && *text != ';')
+				text++;
+			if (*text == ';')
+				text++;
+		}
+		if (count)
+			platform_log("commands: %d timed", count);
+	}
+	if (next >= count)
+		return NULL;
+	now = (double)SDL_GetTicks() / 1000.0;
+	if (now < commands[next].at)
+		return NULL;
+	strcpy(current, commands[next].command);
+	next++;
+	platform_log("commands: %s", current);
+	return current;
 }

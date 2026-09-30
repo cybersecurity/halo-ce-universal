@@ -115,6 +115,7 @@ to 4.
 | \` | | open the developer console |
 | F12 | | release or capture the mouse |
 | F11 | | change between fullscreen and window |
+| F10 | | open or close the settings overlay (refer to port/macos/README.md) |
 
 One movement of the mouse wheel changes the weapon one time. A second
 movement after a short pause changes it again.

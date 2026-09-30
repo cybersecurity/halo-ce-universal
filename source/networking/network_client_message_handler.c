@@ -755,6 +755,25 @@ static boolean network_game_client_handle_message_server_game_advertise(
 		{
 			if (transport_is_nonce(&advertisement, TRANSPORT_NONCE_LENGTH))
 			{
+				/* the host is where its advertisement came from. The host's
+				XNADDR names its address on its own network, which a machine
+				on another one (on the internet, through a forwarded port)
+				cannot reach; the sender's address is the one
+				that answered. (127.0.0.1 is this machine's own game:
+				port/linux/src/xnet.c) */
+				if (source_address->address_length == IPV4_ADDRESS_LENGTH &&
+					source_address->address.ipv4_address != 0 &&
+					source_address->address.ipv4_address != 0x7F000001)
+				{
+					unsigned long ip = source_address->address.ipv4_address;
+					unsigned char network_order[4];
+
+					network_order[0] = (unsigned char)(ip >> 24);
+					network_order[1] = (unsigned char)(ip >> 16);
+					network_order[2] = (unsigned char)(ip >> 8);
+					network_order[3] = (unsigned char)ip;
+					csmemcpy(&advertisement.xnaddr.ina, network_order, sizeof(network_order));
+				}
 				network_game_client_new_advertised_game(client, &advertisement);
 			}
 		}

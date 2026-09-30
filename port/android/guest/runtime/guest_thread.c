@@ -43,6 +43,8 @@ enum
 	_thread_exited,
 };
 
+/* (musl's pthread_impl.h has its own, 128 KB: the game's threads need more) */
+#undef DEFAULT_STACK_SIZE
 #define DEFAULT_STACK_SIZE (1024 * 1024)
 
 static struct guest_thread main_thread;

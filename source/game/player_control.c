@@ -1280,8 +1280,11 @@ static void get_local_player_input_blob(
 						input->facing_delta.yaw = facing_scale * look_delta.yaw;
 						input->facing_delta.pitch = facing_scale * look_delta.pitch;
 					}
+					/* direct mouse aim (port/linux/src/xinput_sdl.c); while the
+					flying camera has the controls (camera/director.c) its
+					motion is left to turn the camera */
+					if (!director_inhibited_facing(local_player_index))
 					{
-						/* direct mouse aim (port/linux/src/xinput_sdl.c) */
 						extern int halo_linux_mouse_look(short gamepad_index, real *yaw, real *pitch);
 						real mouse_yaw;
 						real mouse_pitch;

@@ -503,6 +503,15 @@ static void audio_start(void)
 	}
 }
 
+/* audio.enabled and audio.volume while playing (the settings overlay,
+settings_overlay.c): off is silence; returns whether there is sound to change
+(a game started without it opens no device until it starts again) */
+int halo_audio_settings(int enabled, float volume)
+{
+	master_volume = enabled ? (volume < 0.0f ? 0.0f : volume > 1.0f ? 1.0f : volume) : 0.0f;
+	return audio_stream != NULL;
+}
+
 /* ---------- completion */
 
 static void packet_release(struct voice_packet *entry)
