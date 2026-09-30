@@ -10,7 +10,17 @@ byte-for-byte identical to what the matching MSVC build compiles.
 #ifndef __HALO_LINUX_PREFIX_H
 #define __HALO_LINUX_PREFIX_H
 
-#if !defined(__i386__) && !defined(HALO_ANDROID)
+/* The Android and macOS ports run the game as an ILP32 guest (32-bit
+pointers in 64-bit code: arm64_32 on Android, x32 on macOS) inside a 64-bit
+host process, and draw with OpenGL ES (port/android/README.md,
+port/macos/README.md). HALO_ANDROID itself marks what only the Android app
+does. */
+#if defined(HALO_ANDROID) || defined(HALO_MACOS)
+#define HALO_GUEST 1
+#define HALO_GLES 1
+#endif
+
+#if !defined(__i386__) && !defined(HALO_GUEST)
 #error the Linux port targets 32-bit x86: game data structures assume 32-bit pointers
 #endif
 

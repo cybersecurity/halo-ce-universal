@@ -254,6 +254,84 @@ void test_input_hold_action(int hold)
 	test_input_holding_action = hold;
 }
 
+/* debug.test_input "script:<from>-<to>=<action>,...": the player drives
+as scripted, for tests with screenshots (debug.screenshot_every). The times
+are seconds since the game started; <to> may be left out for a tap (a
+tenth of a second). The actions: forward, back, left, right (walking),
+turnleft, turnright, up, down (looking), fire, grenade, jump, crouch, zoom,
+action, flashlight, reload, switch (weapons), start. */
+static struct
+{
+	double from, to;
+	char action[16];
+} test_script[64];
+static int test_script_count = -1;
+
+static void test_script_load(const char *script)
+{
+	test_script_count = 0;
+	while (*script && test_script_count < (int)(sizeof(test_script) / sizeof(test_script[0])))
+	{
+		char *end;
+		double from = strtod(script, &end), to;
+		int length = 0;
+
+		if (end == script)
+			break;
+		to = from + 0.1;
+		if (*end == '-')
+			to = strtod(end + 1, &end);
+		if (*end != '=')
+			break;
+		end++;
+		while (end[length] && end[length] != ',' && length < 15)
+			length++;
+		test_script[test_script_count].from = from;
+		test_script[test_script_count].to = to;
+		memcpy(test_script[test_script_count].action, end, (size_t)length);
+		test_script[test_script_count].action[length] = 0;
+		test_script_count++;
+		script = end + length;
+		while (*script && *script != ',')
+			script++;
+		if (*script == ',')
+			script++;
+	}
+	platform_log("test input: %d scripted actions", test_script_count);
+}
+
+static void test_script_gamepad(XINPUT_GAMEPAD *pad)
+{
+	double t = (double)SDL_GetTicks() / 1000.0;
+	int index;
+
+	for (index = 0; index < test_script_count; index++)
+	{
+		const char *action = test_script[index].action;
+
+		if (t < test_script[index].from || t >= test_script[index].to)
+			continue;
+		if (!strcmp(action, "forward")) pad->sThumbLY = 32000;
+		else if (!strcmp(action, "back")) pad->sThumbLY = -32000;
+		else if (!strcmp(action, "left")) pad->sThumbLX = -32000;
+		else if (!strcmp(action, "right")) pad->sThumbLX = 32000;
+		else if (!strcmp(action, "turnleft")) pad->sThumbRX = -16000;
+		else if (!strcmp(action, "turnright")) pad->sThumbRX = 16000;
+		else if (!strcmp(action, "up")) pad->sThumbRY = 16000;
+		else if (!strcmp(action, "down")) pad->sThumbRY = -16000;
+		else if (!strcmp(action, "fire")) pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 255;
+		else if (!strcmp(action, "grenade")) pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = 255;
+		else if (!strcmp(action, "jump")) pad->bAnalogButtons[XINPUT_GAMEPAD_A] = 255;
+		else if (!strcmp(action, "action")) pad->bAnalogButtons[XINPUT_GAMEPAD_X] = 255;
+		else if (!strcmp(action, "reload")) pad->bAnalogButtons[XINPUT_GAMEPAD_B] = 255;
+		else if (!strcmp(action, "switch")) pad->bAnalogButtons[XINPUT_GAMEPAD_Y] = 255;
+		else if (!strcmp(action, "flashlight")) pad->bAnalogButtons[XINPUT_GAMEPAD_WHITE] = 255;
+		else if (!strcmp(action, "crouch")) pad->wButtons |= XINPUT_GAMEPAD_LEFT_THUMB;
+		else if (!strcmp(action, "zoom")) pad->wButtons |= XINPUT_GAMEPAD_RIGHT_THUMB;
+		else if (!strcmp(action, "start")) pad->wButtons |= XINPUT_GAMEPAD_START;
+	}
+}
+
 static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 {
 	static int checked;
@@ -275,7 +353,11 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 			seed = atoi(setting + 5);
 			looking = 1;
 		}
+		else if (!strncmp(setting, "script:", 7))
+			test_script_load(setting + 7);
 	}
+	if (test_script_count > 0)
+		test_script_gamepad(pad);
 	if (seed < 0)
 		return;
 	if (test_input_holding_action)

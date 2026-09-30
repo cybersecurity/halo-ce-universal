@@ -472,11 +472,11 @@ struct object_type_definition *object_type_definitions[NUMBER_OF_OBJECT_TYPES] =
 
 struct object_type_definition *first_object_type_definition;
 /* VC7 otherwise emits this tentative definition as a common symbol. */
-#ifndef HALO_ANDROID /* Mach-O section names differ; the default is .bss anyway */
+#if !(defined(__aarch64__) && defined(__ILP32__)) /* Mach-O section names differ; the default is .bss anyway */
 #pragma bss_seg(".bss")
 #endif
 static word processed_bsp_flags;
-#ifndef HALO_ANDROID
+#if !(defined(__aarch64__) && defined(__ILP32__))
 #pragma bss_seg()
 #endif
 

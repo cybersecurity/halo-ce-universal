@@ -37,7 +37,10 @@ BOOL platform_sdl_initialize(void);
 BOOL platform_video_initialize(unsigned long width, unsigned long height);
 #ifndef HALO_ANDROID
 BOOL platform_screen_mode(long *width, long *height);
+BOOL platform_output_size(long *width, long *height);
 #endif
+/* F8: the next of the resolutions (d3d8_gl.c, display.resolution) */
+const char *halo_screen_resolution_next(void);
 void platform_video_drawable_size(int *width, int *height);
 void platform_video_swap(void);
 /* frames between the 30 Hz ticks at the display's refresh rate, unless

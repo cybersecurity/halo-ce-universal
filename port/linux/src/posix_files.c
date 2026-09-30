@@ -14,6 +14,13 @@ the host ABI and _FILE_OFFSET_BITS=64.
 #include <sys/types.h>
 #include <unistd.h>
 
+#ifdef __APPLE__
+/* the macOS port's host (port/macos): Darwin spells the POSIX 2008 names
+differently */
+#define st_atim st_atimespec
+#define st_mtim st_mtimespec
+#define st_ctim st_ctimespec
+#endif
 #include "posix.h"
 
 static void split64(unsigned long long value, posix_ulong *low, posix_ulong *high)

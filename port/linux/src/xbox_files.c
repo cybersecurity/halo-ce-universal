@@ -9,7 +9,8 @@ directory when it has maps/, else assets/ in the current directory or two
 levels above the executable (the repository root for build/linux/halo).
 Every other drive letter X:\ is the subdirectory X/ of the save root (z:\ holds the persistent cache and saves,
 u:\ user data, t:\ title data): paths.saves, else
-$XDG_DATA_HOME/halo-linux or ~/.local/share/halo-linux. Path components are
+$XDG_DATA_HOME/halo-linux or ~/.local/share/halo-linux (on macOS
+~/Library/Application Support/Halo). Path components are
 matched case-insensitively, like the Xbox's FATX volumes.
 */
 
@@ -162,6 +163,12 @@ const char *platform_save_root(void)
 		application data folder */
 		else if (getenv("APPDATA") && *getenv("APPDATA"))
 			snprintf(root, sizeof(root), "%s/halo", getenv("APPDATA"));
+#endif
+#ifdef HALO_MACOS
+		/* the macOS port (port/macos) keeps them where Mac applications
+		keep their data */
+		else if (home && *home)
+			snprintf(root, sizeof(root), "%s/Library/Application Support/Halo", home);
 #endif
 		else if (data_home && *data_home)
 			snprintf(root, sizeof(root), "%s/halo-linux", data_home);

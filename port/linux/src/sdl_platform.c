@@ -17,6 +17,7 @@ and the debug keyboard that the game's console reads.
 #include "xiso.h"
 
 #include <SDL3/SDL.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,10 +49,40 @@ void updater_start(void);
 void updater_poll(SDL_Window *window);
 #endif
 
+/* the game's console (source/interface/terminal.c): a line on the screen
+that fades */
+void terminal_printf(const void *color, const char *format, ...);
+/* the game's log, debug.txt (source/cseries/errors.c); not error(), which
+shows the game's error screen */
+void write_to_error_file(char *string, unsigned char date);
+
+/* the game's frames-a-second counter (source/main/main.c) */
+extern unsigned char display_framerate;
+
+/* what the port's keys did: on the screen and in the log */
+static void notice(const char *format, ...)
+{
+	char text[256];
+	va_list arguments;
+
+	va_start(arguments, format);
+	vsnprintf(text, sizeof(text), format, arguments);
+	va_end(arguments);
+	platform_log("%s", text);
+	{
+		char line[sizeof(text) + 2];
+
+		snprintf(line, sizeof(line), "%s\r\n", text);
+		write_to_error_file(line, TRUE);
+	}
+	terminal_printf(NULL, "%s", text);
+}
+
 BOOL platform_sdl_initialize(void)
 {
 	if (platform_sdl_started)
 		return TRUE;
+	display_framerate = config_boolean("display.show_fps") ? 1 : 0;
 	/* a copy of the game started to open an invite link hands it to the
 	one already running, and goes */
 	if (p2p_hand_off_invite())
@@ -343,7 +374,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	if (scale < 1)
 		scale = 1;
 
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
@@ -384,7 +415,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		return FALSE;
 	}
 	platform_gl_context = SDL_GL_CreateContext(platform_window);
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 	/* ES 3.2 where the driver has it, otherwise the renderer makes do with
 	3.0 plus extensions */
 	if (!platform_gl_context)
@@ -410,6 +441,38 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 #endif
 	return TRUE;
 }
+
+#ifndef HALO_ANDROID
+/* the pixels the picture goes to: the display's in fullscreen, else the
+window's (as display.window_scale makes it, before there is one) */
+BOOL platform_output_size(long *width, long *height)
+{
+	if (platform_screen_mode(width, height))
+		return TRUE;
+	if (platform_window)
+	{
+		int w = 0, h = 0;
+
+		SDL_GetWindowSizeInPixels(platform_window, &w, &h);
+		if (w > 0 && h > 0)
+		{
+			*width = w;
+			*height = h;
+			return TRUE;
+		}
+		return FALSE;
+	}
+	{
+		long scale = config_integer("display.window_scale");
+
+		if (scale < 1)
+			scale = 1;
+		*width = 640 * scale;
+		*height = 480 * scale;
+		return TRUE;
+	}
+}
+#endif
 
 void platform_video_drawable_size(int *width, int *height)
 {
@@ -670,6 +733,11 @@ static void platform_show_pending_message(void)
 
 /* ---------- events */
 
+#ifdef HALO_MACOS
+/* whether Command is held, from the key events (Command-W's close) */
+static BOOL platform_command_held;
+#endif
+
 void platform_pump_events(void)
 {
 	/* debug.exit_after (seconds) ends the game that long after the window
@@ -701,35 +769,102 @@ void platform_pump_events(void)
 	{
 		switch (event.type)
 		{
+#ifdef HALO_MACOS
+		/* the window's close button quits at once; Command-W (the menu's
+		Close, with Command held for the port's keys and W moving you
+		forward) does nothing */
+		case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+			if (platform_command_held)
+			{
+				notice("Command-W does not close the game: press Command-Q twice to quit");
+				break;
+			}
+			pthread_mutex_unlock(&input_lock);
+			platform_log("window closed");
+			exit(EXIT_SUCCESS);
+#endif
 		case SDL_EVENT_QUIT:
+#ifdef HALO_MACOS
+			/* Command-Q quits on a second press within two seconds: Q is the
+			flashlight, and Command is held for the port's keys */
+			{
+				static Uint64 first_quit;
+				Uint64 now = SDL_GetTicks();
+
+				if (!first_quit || now - first_quit > 2000)
+				{
+					first_quit = now;
+					notice("press Command-Q again to quit");
+					break;
+				}
+			}
+#endif
 			pthread_mutex_unlock(&input_lock);
 			platform_log("window closed");
 			exit(EXIT_SUCCESS);
 		case SDL_EVENT_KEY_DOWN:
 		case SDL_EVENT_KEY_UP:
-			if (event.key.scancode < SDL_SCANCODE_COUNT)
+		{
+			/* the port's keys: F7 to F12, or on macOS, whose own keys F11 and
+			the media keys are, Command with a letter (the letter then does
+			nothing in the game) */
+			SDL_Scancode action = event.key.scancode;
+
+#ifdef HALO_MACOS
+			platform_command_held = event.key.scancode == SDL_SCANCODE_LGUI ||
+				event.key.scancode == SDL_SCANCODE_RGUI ? event.key.down : (event.key.mod & SDL_KMOD_GUI) != 0;
+			if (event.key.mod & SDL_KMOD_GUI)
 			{
-				input_state.keys[event.key.scancode] = event.key.down;
-				if (event.key.down)
-					keys_pressed[event.key.scancode] = 1;
+				switch (event.key.scancode)
+				{
+				case SDL_SCANCODE_F: action = SDL_SCANCODE_F11; break;
+				case SDL_SCANCODE_R: action = SDL_SCANCODE_F8; break;
+				case SDL_SCANCODE_G: action = SDL_SCANCODE_F12; break;
+				case SDL_SCANCODE_P: action = SDL_SCANCODE_F7; break;
+				default: break;
+				}
 			}
-			queue_keystroke(&event.key);
+			if (action == event.key.scancode)
+#endif
+			{
+				if (event.key.scancode < SDL_SCANCODE_COUNT)
+				{
+					input_state.keys[event.key.scancode] = event.key.down;
+					if (event.key.down)
+						keys_pressed[event.key.scancode] = 1;
+				}
+				queue_keystroke(&event.key);
+			}
 			/* F12 releases or recaptures the mouse */
-			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F12)
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F12)
 			{
 				input_state.mouse_released = !input_state.mouse_released;
 				platform_mouse_capture(!input_state.mouse_released && !input_state.ui_pointer);
+				notice("mouse %s", input_state.mouse_released ? "released" : "captured");
 			}
+			/* F7 shows or hides the game's frames-a-second counter (its own
+			display_framerate: source/main/main.c) */
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F7)
+			{
+				display_framerate = !display_framerate;
+				notice("frame rate counter: %s", display_framerate ? "on" : "off");
+			}
+			/* F8 steps through the resolutions (d3d8_gl.c) */
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F8)
+				notice("resolution: %s", halo_screen_resolution_next());
 #ifndef HALO_ANDROID
 			/* F11 switches between fullscreen and the window (SDL keeps the
 			window's size and place while fullscreen) */
-			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F11)
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F11)
 			{
-				SDL_SetWindowFullscreen(platform_window,
-					(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) ? false : true);
+				bool fullscreen = !(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN);
+
+				SDL_SetWindowFullscreen(platform_window, fullscreen);
+				notice("%s", fullscreen ? "fullscreen" : "window");
 			}
 #endif
 			break;
+		}
 		case SDL_EVENT_MOUSE_MOTION:
 #ifndef HALO_ANDROID
 			/* in the menus the mouse moves the pointer, not the view */

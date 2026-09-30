@@ -63,11 +63,25 @@ struct config_setting
 	const char *comment;
 };
 
+/* a default the macOS port turns off */
+#ifdef HALO_MACOS
+#define HALO_CONFIG_MACOS_FALSE "false"
+#else
+#define HALO_CONFIG_MACOS_FALSE "true"
+#endif
+
 static const struct config_setting config_settings[] =
 {
 	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
-		"Start fullscreen, drawing at the display's resolution and shape; false\n"
-		"starts in a window, which draws the Xbox's 640x480. F11 switches." },
+		"Start fullscreen, in the display's shape; false starts in a window, in\n"
+		"the window's shape. display.resolution sets the pixels. F11 switches." },
+	{ "display.resolution", _config_string, "\"native\"", "HALO_RESOLUTION", _environment_value, _platform_desktop,
+		"The picture's pixels: \"native\" (the display's in fullscreen, the window's\n"
+		"in a window), \"720p\", \"1080p\", \"1440p\", \"2160p\", \"<width>x<height>\",\n"
+		"or \"xbox\" for the Xbox's 640x480. F8 steps through them while playing." },
+	{ "display.render_scale", _config_real, "1.0", "HALO_RENDER_SCALE", _environment_value, _platform_desktop,
+		"Multiplies the resolution: below 1.0 draws fewer pixels (faster),\n"
+		"above 1.0 more (supersampling, smoother edges); up to 4.0." },
 	{ "display.window_scale", _config_integer, "2", "HALO_WINDOW_SCALE", _environment_value, _platform_desktop,
 		"The window's size as a multiple of 640x480 (it can be resized)." },
 	{ "display.screen_width", _config_integer, "0", "HALO_SCREEN_WIDTH", _environment_value, _platform_android,
@@ -82,6 +96,10 @@ static const struct config_setting config_settings[] =
 		"In first person, point the view where the player aims now instead of\n"
 		"where the last tick left it: the view turns the frame the mouse moves,\n"
 		"not up to two ticks (66 ms) later." },
+
+	{ "display.show_fps", _config_boolean, "false", "HALO_SHOW_FPS", _environment_value, _platform_desktop,
+		"Show the game's frames-a-second counter (F7, or Command-P on a Mac,\n"
+		"shows or hides it)." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },
@@ -98,6 +116,10 @@ static const struct config_setting config_settings[] =
 		"right stick to move decides. The bullets' autoaim (bent toward the\n"
 		"target) stays either way." },
 
+	{ "game.map", _config_string, "\"\"", "HALO_MAP", _environment_value, _platform_all,
+		"A map to start at start-up, after init.txt: a campaign level's name\n"
+		"(\"a10\", \"b30\"), a multiplayer map's (\"bloodgulch\"), or a scenario\n"
+		"path (\"levels\\\\b30\\\\b30\"); empty for the menu." },
 	{ "game.language", _config_string, "\"\"", "HALO_LANGUAGE", _environment_value, _platform_all,
 		"The language the game asks the Xbox for: \"ja\", \"de\", \"fr\", \"es\" or \"it\";\n"
 		"empty for English. The game data decides what is translated." },
@@ -108,7 +130,8 @@ static const struct config_setting config_settings[] =
 		"single quotes: 'C:\\Games\\Halo'." },
 	{ "paths.saves", _config_string, "\"\"", "HALO_SAVE_ROOT", _environment_value, _platform_desktop,
 		"Where saved games and profiles go; empty for the usual place\n"
-		"(~/.local/share/halo-linux, or %APPDATA%\\halo on Windows)." },
+		"(~/.local/share/halo-linux, %APPDATA%\\halo on Windows,\n"
+		"~/Library/Application Support/Halo on macOS)." },
 
 	{ "network.address", _config_string, "\"\"", "HALO_NET_ADDRESS", _environment_value, _platform_all,
 		"This machine's IPv4 address for system link, for a machine on several\n"
@@ -122,14 +145,19 @@ static const struct config_setting config_settings[] =
 		"clipboard) that lets whoever has it join over the internet; opening a\n"
 		"link (or copying one before switching to the game) joins. Only people\n"
 		"with the invite can join. Off keeps system link to the local network." },
-	{ "network.join_from_clipboard", _config_boolean, "true", "HALO_NET_JOIN_FROM_CLIPBOARD", _environment_value,
+	/* off on macOS: a link that happens to be on the clipboard should not
+	join a stranger's game (port/macos/README.md) */
+	{ "network.join_from_clipboard", _config_boolean, HALO_CONFIG_MACOS_FALSE, "HALO_NET_JOIN_FROM_CLIPBOARD",
+		_environment_value,
 		_platform_all,
 		"Join the game of an invite link found on the clipboard when the game\n"
 		"comes to the front." },
 	{ "network.tunnel_port", _config_integer, "0", "HALO_NET_TUNNEL_PORT", _environment_value, _platform_all,
 		"The UDP port internet play uses; 0 picks one. A fixed one can be\n"
 		"forwarded on the router, for networks whose NAT stops connections." },
-	{ "network.allow_upnp", _config_boolean, "true", "HALO_NET_ALLOW_UPNP", _environment_value, _platform_all,
+	/* off on macOS: the local network needs no forwarded port */
+	{ "network.allow_upnp", _config_boolean, HALO_CONFIG_MACOS_FALSE, "HALO_NET_ALLOW_UPNP", _environment_value,
+		_platform_all,
 		"Let internet play ask the router (UPnP) to forward its port, for\n"
 		"networks whose NAT stops connections: when a player joins this\n"
 		"machine's game, and when joining a game takes too long. False never\n"
@@ -180,10 +208,17 @@ static const struct config_setting config_settings[] =
 		"machines of twice it), to test the netcode as over the internet; 0 none." },
 	{ "debug.network_loss", _config_real, "0.0", "HALO_NETWORK_LOSS", _environment_value, _platform_all,
 		"Percent of datagrams received that are dropped, for the same; 0 none." },
+	{ "debug.commands", _config_string, "\"\"", "HALO_COMMANDS", _environment_value, _platform_all,
+		"Console commands at times, for tests: \"<seconds>=<command>;...\" (seconds\n"
+		"since the game started), such as \"47=cheat_all_weapons;50=cheat_spawn_warthog\";\n"
+		"empty for none." },
 	{ "debug.test_input", _config_string, "\"\"", "HALO_TEST_INPUT", _environment_value, _platform_all,
 		"\"bot:<seed>\" plays controller 1 with a scripted pattern (automated\n"
 		"network tests); \"look:<seed>\" stands still, only turning and looking\n"
-		"up and down; empty for none." },
+		"up and down; \"script:<from>-<to>=<action>,...\" plays the actions in\n"
+		"those seconds (forward, back, left, right, turnleft, turnright, up, down,\n"
+		"fire, grenade, jump, crouch, zoom, action, flashlight, reload, switch, start);\n"
+		"empty for none." },
 	{ "debug.update_answer", _config_string, "\"\"", "HALO_UPDATE_ANSWER", _environment_value, _platform_desktop,
 		"The answer to the new version question, for automated tests: \"yes\",\n"
 		"\"no\" or \"never\" (do not ask again, confirmed); empty asks." },
@@ -880,4 +915,78 @@ const char *config_string(const char *name)
 	const char *string = config_value(name, _config_string)->string;
 
 	return string ? string : "";
+}
+
+/* game.map as a console command: "map_name levels\\<name>\\<name>" for a
+campaign level (a letter and two digits), "levels\\test\\<name>\\<name>" for
+a multiplayer map, or the path as given; NULL for none */
+const char *halo_startup_map_command(void)
+{
+	static char command[256];
+	const char *map = config_string("game.map");
+	size_t length = strlen(map);
+
+	if (!length || length > 120)
+		return NULL;
+	if (strchr(map, '\\') || strchr(map, '/'))
+		snprintf(command, sizeof(command), "map_name %s", map);
+	else if (length == 3 && map[0] >= 'a' && map[0] <= 'd' && map[1] >= '0' && map[1] <= '9' && map[2] >= '0' &&
+		map[2] <= '9')
+		snprintf(command, sizeof(command), "map_name levels\\%s\\%s", map, map);
+	else
+		snprintf(command, sizeof(command), "map_name levels\\test\\%s\\%s", map, map);
+	for (length = 0; command[length]; length++)
+		if (command[length] == '/')
+			command[length] = '\\';
+	platform_log("game.map: %s", command);
+	return command;
+}
+
+/* debug.commands: the next command whose time has come, once each, or NULL */
+const char *halo_timed_command_next(void)
+{
+	static int loaded;
+	static int count, next;
+	static struct { double at; char command[200]; } commands[32];
+	static char current[200];
+	double now;
+
+	if (!loaded)
+	{
+		const char *text = config_string("debug.commands");
+
+		loaded = 1;
+		while (*text && count < 32)
+		{
+			char *end;
+			double at = strtod(text, &end);
+			size_t length = 0;
+
+			if (end == text || *end != '=')
+				break;
+			end++;
+			while (end[length] && end[length] != ';' && length < sizeof(commands[0].command) - 1)
+				length++;
+			commands[count].at = at;
+			memcpy(commands[count].command, end, length);
+			commands[count].command[length] = 0;
+			count++;
+			text = end + length;
+			while (*text && *text != ';')
+				text++;
+			if (*text == ';')
+				text++;
+		}
+		if (count)
+			platform_log("commands: %d timed", count);
+	}
+	if (next >= count)
+		return NULL;
+	now = (double)SDL_GetTicks() / 1000.0;
+	if (now < commands[next].at)
+		return NULL;
+	strcpy(current, commands[next].command);
+	next++;
+	platform_log("commands: %s", current);
+	return current;
 }

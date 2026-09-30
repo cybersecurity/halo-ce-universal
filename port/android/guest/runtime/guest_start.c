@@ -29,7 +29,12 @@ void __guest_thread_initialize_main(void);
 
 extern char **__environ;
 
+#ifdef __ELF__
+/* the macOS port's x32 guest is compiled for ELF directly */
+__attribute__((section(".guest_header"), used))
+#else
 __attribute__((section("__TEXT,__guest_header"), used))
+#endif
 const struct halo_guest_header __guest_header =
 {
 	HALO_GUEST_MAGIC,
