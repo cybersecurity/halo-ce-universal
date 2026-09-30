@@ -300,6 +300,18 @@ boolean network_game_distributed_client(
 	return game_connection() == _game_connection_network_client;
 }
 
+int config_boolean(char const *name);
+
+boolean network_game_solo_game(
+	void)
+{
+	static short solo = NONE;
+
+	if (solo == NONE)
+		solo = config_boolean("debug.solo_game") ? TRUE : FALSE;
+	return solo;
+}
+
 boolean network_game_is_active(
 	void)
 {

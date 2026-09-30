@@ -77,6 +77,15 @@ boolean create_global_network_game_server(
 decides nothing the host does */
 boolean network_game_distributed_client(
 	void);
+/**
+ * @brief Whether debug.solo_game is on (port/linux/src/port_config.c): a
+ * game may start with one player, alone on this machine, so that a
+ * multiplayer map can be tried without a second player or machine. Read
+ * once and kept.
+ * @return TRUE if a multiplayer game may start with one player
+ */
+boolean network_game_solo_game(
+	void);
 
 /* ---------- globals */
 
