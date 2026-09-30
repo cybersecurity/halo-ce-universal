@@ -224,3 +224,8 @@ static void crash_reports_install(void)
 {
 	SetUnhandledExceptionFilter(crash_filter);
 }
+
+/* page protection sees each write at once: nothing to do per frame */
+void memory_watch_begin_frame(void)
+{
+}

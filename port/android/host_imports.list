@@ -13,6 +13,7 @@ host_memory_watch_generation
 host_memory_watch_serial
 host_memory_watch_prepare_write
 host_memory_watch_forget
+host_memory_watch_begin_frame
 host_sdl_init
 host_sdl_set_hint
 host_sdl_get_error

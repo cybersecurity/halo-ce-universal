@@ -115,6 +115,7 @@ These settings are only for Android:
 | --- | --- |
 | `display.screen_width` | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox. |
 | `debug.sample_seconds` | Refer to "Find problems". |
+| `debug.memory_watch` | `true` (the default): the app notices the game's writes to textures and vertices by page protection. `false`: it compares page contents once a frame instead, which is slower. Refer to "Limits". |
 
 ## Internet play
 
@@ -303,6 +304,8 @@ assembly of the port is necessary:
   at this interval. This finds hangs on devices without root access.
 - Set `gl_debug = true` in `[debug]` of `config.toml`. The log then shows
   the OpenGL ES errors.
+- The log says which write tracking the app uses: "page protection"
+  (devices) or "page hashes" (the emulator, or `debug.memory_watch = false`).
 
 ## Limits
 
@@ -313,3 +316,10 @@ assembly of the port is necessary:
 - The game does not accept touch input. Use a controller or a keyboard.
 - Kernels with 16 KB pages (a developer option of Android 15) do not
   operate. The Xbox memory uses 4 KB pages.
+- The x86 Android emulator runs the app through its ARM translation. The
+  translation cannot deliver the page faults that the renderer uses to
+  notice changed textures and vertices. On the emulator the app compares
+  page contents once a frame instead ("write tracking: page hashes" in the
+  log). This is slower, and a write shows one frame later, so moving
+  geometry can glitch briefly. `debug.memory_watch = false` does the same
+  on a device.
