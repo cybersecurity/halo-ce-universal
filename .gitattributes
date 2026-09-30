@@ -1,0 +1,4 @@
+# Files that a Linux shell runs directly must keep LF line endings in a
+# Windows checkout (core.autocrlf): a CRLF shebang line does not start.
+*.sh text eol=lf
+port/android/gradlew text eol=lf
