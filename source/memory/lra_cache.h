@@ -29,17 +29,30 @@ enum
 /* ---------- types */
 
 typedef void (*lra_update_proc)(
+#ifdef HALO_64BIT
+	void **address,
+	void *new_address);
+#else
 	long *address,
 	long new_address);
+#endif
 
 typedef void (*lra_delete_proc)(
+#ifdef HALO_64BIT
+	void **address);
+#else
 	long *address);
+#endif
 
 /* ---------- structures */
 
 struct lra_block
 {
+#ifdef HALO_64BIT
+	void **address;
+#else
 	long *address;
+#endif
 	unsigned long signature;
 	long size;
 	struct lra_block *next;
@@ -83,7 +96,11 @@ void lra_unlock(
 void *lra_allocate(
 	struct lra_cache *cache,
 	long size,
+#ifdef HALO_64BIT
+	void **address);
+#else
 	long *address);
+#endif
 
 /* ---------- globals */
 

@@ -76,7 +76,12 @@ long hud_hires_override_find(unsigned long address, unsigned long width, unsigne
 	asset = hud_hires_asset_at(address, (long)width, (long)height);
 	if (asset < 0 || asset >= hud_hires_asset_count())
 		return -1;
+#ifdef HALO_64BIT
+	/* (an Xbox address: the texture's pixels in the contiguous memory) */
+	if (crc32(0L, (const Bytef *)xbox_pointer(address), (uInt)level0_size) != hud_hires_embedded[asset].crc)
+#else
 	if (crc32(0L, (const Bytef *)address, (uInt)level0_size) != hud_hires_embedded[asset].crc)
+#endif
 	{
 		if (!textures[asset].other_pixels_logged)
 		{

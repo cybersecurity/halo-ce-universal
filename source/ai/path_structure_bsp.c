@@ -95,7 +95,7 @@ boolean structure_test_ray2d(
 
 	bsp = TAG_BLOCK_GET_ELEMENT(&structure->collision_bsp, 0, struct collision_bsp);
 	breakable_surface_flags = breakable_surface_flags_get();
-	pathfinding_surfaces = structure->pathfinding_surfaces.address;
+	pathfinding_surfaces = xbox_pointer(structure->pathfinding_surfaces.address);
 
 	collision_surface_test_line2d(
 		bsp,
@@ -269,7 +269,7 @@ boolean structure_test_line2d(
 	struct path_collision_result *result)
 {
 	struct collision_bsp const *bsp = TAG_BLOCK_GET_ELEMENT(&structure->collision_bsp, 0, struct collision_bsp);
-	byte const *pathfinding_surfaces = structure->pathfinding_surfaces.address;
+	byte const *pathfinding_surfaces = xbox_pointer(structure->pathfinding_surfaces.address);
 	long const *breakable_surface_flags = (long const *)breakable_surface_flags_get();
 	long surface_index = p0_surface_index;
 	boolean recursed = FALSE;

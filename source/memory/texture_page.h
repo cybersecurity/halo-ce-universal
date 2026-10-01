@@ -48,9 +48,11 @@ struct texture_page
 
 typedef char texture_page_texture_size_assert[
 	sizeof(struct texture_page_texture) == 0xC ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char texture_page_size_assert[
 	sizeof(struct texture_page) == 0x1C ? 1 : -1];
 
+#endif
 /* ---------- prototypes/TEXTURE_PAGE.C */
 
 float texture_page_fraction_used(

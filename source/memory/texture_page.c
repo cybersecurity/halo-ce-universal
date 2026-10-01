@@ -236,7 +236,7 @@ void texture_page_textures_cancel(
 		"c:\\halo\\SOURCE\\memory\\texture_page.c",
 		138,
 		texture_page->contains_unsorted_textures);
-	texture = texture_page->textures->data;
+	texture = xbox_pointer(texture_page->textures->data);
 	for (absolute_index = 0; absolute_index < texture_page->textures->count; absolute_index++, texture++)
 	{
 		if (texture->identifier && !texture->sorted)
@@ -266,7 +266,7 @@ boolean texture_page_textures_end(
 	resort_succeeded = texture_page_resort(texture_page);
 	if (resort_succeeded)
 	{
-		texture = texture_page->textures->data;
+		texture = xbox_pointer(texture_page->textures->data);
 		for (absolute_index = 0; absolute_index < texture_page->textures->count; absolute_index++, texture++)
 		{
 			if (texture->identifier)
@@ -370,7 +370,7 @@ static boolean texture_page_resort(
 	texture_count = 0;
 	{
 		short absolute_index;
-		texture = texture_page->textures->data;
+		texture = xbox_pointer(texture_page->textures->data);
 
 		for (absolute_index = 0; absolute_index < texture_page->textures->count; absolute_index++, texture++)
 		{

@@ -67,6 +67,9 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "tag_files/tag_groups.h"
 #include "units/units.h"
+#ifdef HALO_64BIT
+#include "cseries/errors.h"
+#endif
 
 /* ---------- constants */
 
@@ -462,8 +465,8 @@ void cheat_all_vehicles(
 	if (globals->multiplayer_information.count)
 	{
 		cheat_objects(
-			TAG_BLOCK_GET_ELEMENT(&globals->multiplayer_information, 0,
-				struct game_globals_multiplayer_information)->vehicles.address,
+			xbox_pointer(TAG_BLOCK_GET_ELEMENT(&globals->multiplayer_information, 0,
+				struct game_globals_multiplayer_information)->vehicles.address),
 			(short)TAG_BLOCK_GET_ELEMENT(&globals->multiplayer_information, 0,
 				struct game_globals_multiplayer_information)->vehicles.count);
 	}

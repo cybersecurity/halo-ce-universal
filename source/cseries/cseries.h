@@ -15,6 +15,8 @@ CSERIES.H
 #include <string.h>
 #include <stdarg.h>
 
+#include "xbox_address.h"
+
 /* ---------- constants */
 
 #ifndef TRUE

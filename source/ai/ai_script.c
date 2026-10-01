@@ -588,8 +588,10 @@ struct ai_script_vehicle_candidate
 	byte pad[3];
 };
 
+#ifndef HALO_64BIT
 typedef char ai_script_actor_iterator_size_assert[
 	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
+#endif
 typedef char ai_script_actor_reference_iterator_size_assert[
 	sizeof(struct ai_script_actor_reference_iterator) == 0x18 ? 1 : -1];
 typedef char ai_script_actor_reference_iterator_actor_index_offset_assert[

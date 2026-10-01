@@ -293,7 +293,11 @@ static struct mutex_reference *get_mutex_from_pool(
 		in_use += sizeof(struct mutex_reference);
 		mutex_index++;
 	}
+#ifdef HALO_64BIT
+	while (POINTER_BITS(in_use)<POINTER_BITS(&thread_globals.mutex_references[MAXIMUM_MUTEX_REFERENCES].in_use));
+#else
 	while ((long)in_use<(long)&thread_globals.mutex_references[MAXIMUM_MUTEX_REFERENCES].in_use);
+#endif
 
 	return mutex_reference;
 }

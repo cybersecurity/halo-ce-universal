@@ -84,6 +84,7 @@ symbols in this file:
 #include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 #include "rasterizer/rasterizer_widgets.h"
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_transparent_geometry.h"
 #include "rasterizer/rasterizer_console_vars.h"
 
 /* ---------- constants */
@@ -109,8 +110,23 @@ struct bitmap_data;
 struct shader;
 struct vertex_buffer;
 
+#ifdef HALO_64BIT
+struct rasterizer_widget_window_parameters
+#else
 struct transparent_geometry_group
+#endif
 {
+#ifdef HALO_64BIT
+	byte reserved00[8];
+	real_point3d camera_position;
+	real_vector3d camera_forward;
+	byte reserved20[0x14];
+	rectangle2d viewport_bounds;
+	byte reserved3C[0x30];
+	real_matrix4x3 world_to_view;
+	byte reservedA0[0x100];
+	real projection_matrix[4][4];
+#else
 	unsigned long geometry_flags;
 	long object_index;
 	long source_object_index;
@@ -144,11 +160,19 @@ struct transparent_geometry_group
 	byte reserved9C;
 	boolean cortana_hack;
 	byte reserved9E[2];
+#endif
 };
 
+#ifdef HALO_64BIT
+typedef char rasterizer_widget_window_parameters_offset_assert[
+	offsetof(
+		struct rasterizer_widget_window_parameters,
+		projection_matrix) == 0x1A0 ? 1 : -1];
+#else
 typedef char transparent_geometry_group_size_assert[
 	sizeof(struct transparent_geometry_group) == 0xA0 ? 1 : -1];
 
+#endif
 
 /* ---------- prototypes */
 

@@ -108,6 +108,10 @@ symbols in this file:
 #include "tag_files/tag_files.h"
 
 #include <xtl.h>
+#ifdef HALO_64BIT
+#include "cache/cache_files.h"
+#include "cseries/cseries_windows.h"
+#endif
 
 /* ---------- constants */
 
@@ -161,12 +165,15 @@ typedef char verify_xbox_cache_sound_sound_offset[
 	offsetof(
 		struct xbox_cache_sound_datum,
 		sound) == 0x8 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_xbox_cache_sound_datum_size[
 	sizeof(struct xbox_cache_sound_datum) == 0xC ? 1 : -1];
+#endif
 typedef char verify_xbox_sound_cache_sounds_offset[
 	offsetof(
 		struct xbox_sound_cache_globals,
 		cache_sounds) == 0x100 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_xbox_sound_cache_base_address_offset[
 	offsetof(
 		struct xbox_sound_cache_globals,
@@ -182,6 +189,7 @@ typedef char verify_xbox_sound_cache_last_allocation_failure_time_offset[
 typedef char verify_xbox_sound_cache_globals_size[
 	sizeof(struct xbox_sound_cache_globals) == 0x110 ? 1 : -1];
 
+#endif
 /* ---------- prototypes */
 
 static long sound_cache_locked_block_proc(
@@ -516,7 +524,11 @@ static void sound_cache_start_loading_sound(
 		struct xbox_cache_sound_datum *cache_sound;
 
 		cache_address = xbox_sound_cache_globals.base_address +
+#ifdef HALO_64BIT
+			lruv_block_get_address(
+#else
 			(unsigned long)lruv_block_get_address(
+#endif
 				xbox_sound_cache_globals.cache,
 				cache_block_index);
 		new_cache_sound_index = datum_new_at_index(
@@ -530,7 +542,11 @@ static void sound_cache_start_loading_sound(
 			0x170,
 			new_cache_sound_index==cache_block_index);
 		sound->cache_block_index = cache_block_index;
+#ifdef HALO_64BIT
+		sound->cache_base_address = xbox_address(cache_address);
+#else
 		sound->cache_base_address = (unsigned long)cache_address;
+#endif
 		cache_sound->sound = sound;
 		cache_file_read(
 			sound->cache_tag_index,

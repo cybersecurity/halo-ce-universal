@@ -354,14 +354,26 @@ long byte_swap_codes_size(
 	byte_swap_code *codes)
 {
 	struct byte_swap_definition definition;
+#ifdef HALO_64BIT
+	int size;
+	int next_code;
+#endif
 
 	definition.name = name;
 	definition.size = 0;
 	definition.codes = codes;
 	definition.signature = BYTE_SWAP_DEFINITION_SIGNATURE;
+#ifdef HALO_64BIT
+	_byte_swap_data(&definition, NULL, codes, &size, &next_code);
+#else
 	_byte_swap_data(&definition, NULL, codes, (long *)&name, (long *)&codes);
+#endif
 
+#ifdef HALO_64BIT
+	return size;
+#else
 	return (long)name;
+#endif
 }
 
 void byte_swap_data(

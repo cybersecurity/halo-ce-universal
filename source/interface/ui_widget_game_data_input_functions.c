@@ -354,6 +354,10 @@ symbols in this file:
 #include "saved games/playlist_profile.h"
 #include "text/text_group.h"
 #include "text/unicode.h"
+#ifdef HALO_64BIT
+#include "cseries/errors.h"
+#include "interface/ui_widget_instance.h"
+#endif
 
 /* ---------- constants */
 
@@ -432,6 +436,7 @@ machines, and clang warns about the always-true char comparison */
 	(long)(machine)->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
 
 /* ---------- structures */
+#ifndef HALO_64BIT
 
 struct ui_widget_text_box_parameters
 {
@@ -493,6 +498,7 @@ struct widget_instance
 	union ui_widget_parameters parameters;
 	struct ui_widget_animation_data animation;
 };
+#endif
 
 struct network_advertised_game
 {

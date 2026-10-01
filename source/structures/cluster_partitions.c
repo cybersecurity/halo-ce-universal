@@ -141,8 +141,8 @@ void reference_list_copy(
 	match_assert("..\\objects\\reference_lists.h", 0x88, result->size==source->size);
 	match_assert("..\\objects\\reference_lists.h", 0x89, result->maximum_count==source->maximum_count);
 	absolute_index = 0;
-	result_reference = result->data;
-	source_reference = source->data;
+	result_reference = xbox_pointer(result->data);
+	source_reference = xbox_pointer(source->data);
 	while (absolute_index < result->maximum_count)
 	{
 		if (source_reference->identifier)

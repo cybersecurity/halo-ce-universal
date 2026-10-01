@@ -94,8 +94,10 @@ typedef char light_volume_frame_size_assert[
 	sizeof(struct light_volume_frame) == 0xB0 ? 1 : -1];
 typedef char light_volume_definition_size_assert[
 	sizeof(struct light_volume_definition) == 0x14C ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char light_volume_globals_size_assert[
 	sizeof(struct light_volume_globals) == 0xB4 ? 1 : -1];
+#endif
 typedef char light_volume_datum_definition_index_offset_assert[
 	offsetof(struct light_volume_datum, definition_index) == 0x4 ? 1 : -1];
 typedef char light_volume_globals_light_volume_data_offset_assert[

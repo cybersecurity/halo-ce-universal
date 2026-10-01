@@ -84,6 +84,7 @@ struct profile_section
 	__int64 peak_elapsed_timebase;
 };
 
+#ifndef HALO_64BIT
 typedef char profile_section_size_assert[
 	sizeof(struct profile_section) == 0x5F8 ? 1 : -1];
 typedef char profile_section_recent_call_count_offset_assert[
@@ -115,6 +116,7 @@ typedef char profile_section_reserved5EC_offset_assert[
 typedef char profile_section_peak_elapsed_timebase_offset_assert[
 	offsetof(struct profile_section, peak_elapsed_timebase) == 0x5F0 ? 1 : -1];
 
+#endif
 /* ---------- prototypes/PROFILE.C */
 
 void profile_initialize(

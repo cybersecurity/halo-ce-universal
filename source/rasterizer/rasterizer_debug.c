@@ -109,7 +109,11 @@ struct rasterizer_debug_primitive
 	boolean opaque;
 };
 
+#ifdef HALO_64BIT
+/* the Xbox packing only matched January's .data layout; native here */
+#else
 #pragma pack(push, 1)
+#endif
 struct rasterizer_debug_data
 {
 	boolean initialized;
@@ -123,10 +127,22 @@ struct rasterizer_debug_data
 	long primitive_count;
 	boolean geometry_buffer_full_warning;
 };
+#ifndef HALO_64BIT
 #pragma pack(pop)
+#endif
 
+#ifdef HALO_64BIT
+struct rasterizer_debug_window_parameters_prefix
+{
+	byte reserved00[8];
+	real_point3d camera_position;
+	real_vector3d camera_forward;
+};
+
+#else
 typedef char rasterizer_debug_data_size_assert[
 	sizeof(struct rasterizer_debug_data) == 0x21 ? 1 : -1];
+#endif
 typedef char rasterizer_debug_primitive_size_assert[
 	sizeof(struct rasterizer_debug_primitive) == 0x3C ? 1 : -1];
 

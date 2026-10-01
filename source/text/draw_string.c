@@ -508,7 +508,7 @@ static void bitmap_draw_character(
 {
 	short format = draw_character_software_globals.bitmap->format;
 	short coverage_scale = (short)(color >> 24);
-	byte *glyph_pixels = (byte *)font->pixels.address + character->pixels_offset;
+	byte *glyph_pixels = (byte *)xbox_pointer(font->pixels.address) + character->pixels_offset;
 	word destination_color;
 	short row;
 
@@ -527,7 +527,7 @@ static void bitmap_draw_character(
 		long row_pitch = bitmap_format_get_bits_per_pixel(
 			draw_character_software_globals.bitmap->format) *
 			draw_character_software_globals.bitmap->width / 8;
-		byte *destination_pixel = (byte *)draw_character_software_globals.bitmap->base_address +
+		byte *destination_pixel = (byte *)xbox_pointer(draw_character_software_globals.bitmap->base_address) +
 			(x0 << draw_character_software_globals.encoding_shift) +
 			y0 * row_pitch;
 		byte *source_pixel = &glyph_pixels[character->bitmap_width * y + x];

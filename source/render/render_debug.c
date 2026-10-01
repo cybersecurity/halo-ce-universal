@@ -168,6 +168,12 @@ symbols in this file:
 #include "units/bipeds.h"
 #include "units/vehicle_datum.h"
 #include "units/vehicles.h"
+#ifdef HALO_64BIT
+#include "ai/ai_debug.h"
+#include "physics/collision_debug.h"
+#include "objects/damage.h"
+#include "cutscene/recorded_animations.h"
+#endif
 
 /* ---------- constants */
 
@@ -265,14 +271,17 @@ struct render_debug_globals_definition
 	boolean string_overflow_reported;
 };
 
+#ifndef HALO_64BIT
 typedef char render_debug_cache_entry_size_check[
 	sizeof(struct render_debug_cache_entry) == 0x38 ? 1 : -1];
 typedef char render_debug_globals_size_check[
 	sizeof(struct render_debug_globals_definition) == 0x740C ? 1 : -1];
+#endif
 typedef char render_debug_globals_strings_offset_check[
 	offsetof(struct render_debug_globals_definition, strings) == 0x0000 ? 1 : -1];
 typedef char render_debug_globals_entries_offset_check[
 	offsetof(struct render_debug_globals_definition, entries) == 0x0400 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char render_debug_globals_game_time_offset_check[
 	offsetof(struct render_debug_globals_definition, game_time) == 0x7400 ? 1 : -1];
 typedef char render_debug_globals_entry_count_offset_check[
@@ -284,6 +293,7 @@ typedef char render_debug_globals_entry_overflow_offset_check[
 typedef char render_debug_globals_string_overflow_offset_check[
 	offsetof(struct render_debug_globals_definition, string_overflow_reported) == 0x740B ? 1 : -1];
 
+#endif
 /* ---------- prototypes */
 
 static char *render_debug_add_cache_string(

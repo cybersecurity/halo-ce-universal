@@ -656,7 +656,11 @@ char const *winsock_error_to_string(
 		error_string = "WSA_NOT_ENOUGH_MEMORY";
 		break;
 
+#ifdef HALO_64BIT
+	case 0: /* (int)WSA_INVALID_EVENT */
+#else
 	case (long)WSA_INVALID_EVENT:
+#endif
 		error_string = "WSA_INVALID_EVENT";
 		break;
 

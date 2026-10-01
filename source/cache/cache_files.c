@@ -152,31 +152,34 @@ struct cache_file_tag_instance
 	long group_tag;
 	long parent_group_tags[2];
 	long tag_index;
-	char *name;
-	void *base_address;
+	/* read from the cache file: Xbox addresses */
+	XPTR(char) name;
+	XPTR(void) base_address;
 	unsigned long unused[2];
 };
 
 struct cache_file_tag_header
 {
-	struct cache_file_tag_instance *tag_instances;
+	/* read from the cache file: Xbox addresses */
+	XPTR(struct cache_file_tag_instance) tag_instances;
 	long scenario_tag_index;
 	unsigned long checksum;
 	long tag_count;
 	long vertex_buffer_count;
-	void *vertex_buffers;
+	XPTR(void) vertex_buffers;
 	long index_buffer_count;
-	void *index_buffers;
+	XPTR(void) index_buffers;
 	unsigned long signature;
 };
 
 struct cache_file_structure_bsp_header
 {
-	void *base_address;
+	/* read from the cache file: Xbox addresses */
+	XPTR(void) base_address;
 	long vertex_buffer_count;
-	void *vertex_buffers;
+	XPTR(void) vertex_buffers;
 	long index_buffer_count;
-	void *index_buffers;
+	XPTR(void) index_buffers;
 	unsigned long signature;
 };
 
@@ -212,8 +215,10 @@ typedef char verify_cache_file_tag_instance_size[
 typedef char verify_cache_file_tag_header_count_offset[
 	offsetof(struct cache_file_tag_header, tag_count) == 0xC ? 1 : -1];
 
+#ifndef HALO_64BIT
 typedef char verify_cache_file_globals_size[
 	sizeof(struct cache_file_globals) == 0x80C ? 1 : -1];
+#endif
 typedef char verify_cache_file_header_size[
 	sizeof(struct cache_file_header) == 0x800 ? 1 : -1];
 
@@ -393,7 +398,7 @@ long tag_loaded(
 			absolute_index++)
 		{
 			if (group_tag == global_tag_instances[absolute_index].group_tag &&
-				!_stricmp(name, global_tag_instances[absolute_index].name))
+				!_stricmp(name, xbox_pointer(global_tag_instances[absolute_index].name)))
 			{
 				result = global_tag_instances[absolute_index].tag_index;
 				break;
@@ -417,22 +422,22 @@ void cache_files_disable_writes(
 {
 	XPhysicalProtect((void *)0x803A6000, 0x01600000, PAGE_READONLY);
 	XPhysicalProtect(
-		cache_file_globals.tag_header->vertex_buffers,
+		xbox_pointer(cache_file_globals.tag_header->vertex_buffers),
 		cache_file_globals.tag_header->vertex_buffer_count * 12,
 		PAGE_READWRITE);
 	XPhysicalProtect(
-		cache_file_globals.tag_header->index_buffers,
+		xbox_pointer(cache_file_globals.tag_header->index_buffers),
 		cache_file_globals.tag_header->index_buffer_count * 12,
 		PAGE_READWRITE);
 
 	if (cache_file_globals.structure_bsp_header)
 	{
 		XPhysicalProtect(
-			cache_file_globals.structure_bsp_header->vertex_buffers,
+			xbox_pointer(cache_file_globals.structure_bsp_header->vertex_buffers),
 			cache_file_globals.structure_bsp_header->vertex_buffer_count * 12,
 			PAGE_READWRITE);
 		XPhysicalProtect(
-			cache_file_globals.structure_bsp_header->index_buffers,
+			xbox_pointer(cache_file_globals.structure_bsp_header->index_buffers),
 			cache_file_globals.structure_bsp_header->index_buffer_count * 12,
 			PAGE_READWRITE);
 	}
@@ -796,7 +801,7 @@ long scenario_tags_load(
 					'a',
 					'g',
 					's'));
-			global_tag_instances = cache_file_globals.tag_header->tag_instances;
+			global_tag_instances = xbox_pointer(cache_file_globals.tag_header->tag_instances);
 			tags_header_register_vertex_and_index_buffers(cache_file_globals.tag_header);
 			cache_file_globals.tags_loaded = TRUE;
 			/* port: a PAL map played as the NTSC maps are (port/linux/game/pal_tags.c) */
@@ -836,7 +841,7 @@ boolean scenario_structure_bsp_load(
 			NONE,
 			reference->file_offset,
 			reference->file_size,
-			reference->base_address,
+			xbox_pointer(reference->base_address),
 			&read_complete,
 			TRUE);
 		while (!read_complete)
@@ -849,7 +854,7 @@ boolean scenario_structure_bsp_load(
 		}
 	}
 
-	cache_file_globals.structure_bsp_header = reference->base_address;
+	cache_file_globals.structure_bsp_header = xbox_pointer(reference->base_address);
 	match_assert(
 		"c:\\halo\\SOURCE\\cache\\cache_files.c",
 		0xE0,
@@ -884,7 +889,7 @@ void scenario_structure_bsp_unload(
 		"c:\\halo\\SOURCE\\cache\\cache_files.c",
 		257,
 		tag_instance->group_tag==STRUCTURE_BSP_TAG);
-	tag_instance->base_address = NULL;
+	tag_instance->base_address = XBOX_NULL;
 	cache_file_globals.structure_bsp_header = NULL;
 
 	return;
@@ -918,7 +923,7 @@ void *tag_get(
 		csprintf(temporary, "can't get() a tag with a base address!")
 	);
 	
-	return tag_instance->base_address;
+	return xbox_pointer(tag_instance->base_address);
 }
 
 /* whether the index is a loaded tag of the group (or a group it inherits
@@ -945,7 +950,7 @@ boolean tag_index_is_group(
 char *tag_get_name(
 	long tag_index)
 {
-	return cache_get_tag_instance(tag_index)->name;
+	return xbox_pointer(cache_get_tag_instance(tag_index)->name);
 }
 
 unsigned long tag_get_group_tag(

@@ -197,4 +197,9 @@ extern struct data_array *prop_data;
 
 /* ---------- public code */
 
+#ifdef HALO_64BIT
+void props_dispose_from_old_map(
+	void);
+
+#endif
 #endif // __PROPS_H

@@ -129,9 +129,11 @@ struct collision_bsp_definition_data
 	struct tag_block_definition vertex_block;
 };
 
+#ifndef HALO_64BIT
 typedef char collision_bsp_definition_data_size_assert[
 	sizeof(struct collision_bsp_definition_data) == 0x318 ? 1 : -1];
 
+#endif
 /* ---------- prototypes */
 
 /* ---------- globals */

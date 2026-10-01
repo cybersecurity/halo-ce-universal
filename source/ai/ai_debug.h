@@ -367,6 +367,7 @@ typedef char ai_debug_state_ballistic_lineoffire_valid_offset_assert[
 	offsetof(struct ai_debug_state, ballistic_lineoffire_valid) == 0x4C2F4 ? 1 : -1];
 typedef char ai_debug_state_ballistic_lineoffire_point_count_offset_assert[
 	offsetof(struct ai_debug_state, ballistic_lineoffire_point_count) == 0x4C4D4 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char ai_debug_state_field_859F4_offset_assert[
 	offsetof(struct ai_debug_state, field_859F4) == 0x859F4 ? 1 : -1];
 typedef char ai_debug_state_path_state_offset_assert[
@@ -390,6 +391,7 @@ typedef char ai_debug_actor_record_field_3C_offset_assert[
 typedef char ai_debug_state_field_7D380_offset_assert[
 	offsetof(struct ai_debug_state, evaluation_context_valid) == 0x7D380 ? 1 : -1];
 
+#endif
 struct actor_debug_info
 {
 	long last_render_id;

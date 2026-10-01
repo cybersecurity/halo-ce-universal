@@ -42,6 +42,10 @@ AI_DEBUG.C
 #include "units/biped_definitions.h"
 #include "units/units.h"
 #include "units/unit_definitions.h"
+#ifdef HALO_64BIT
+#include "main/console.h"
+#include "cseries/errors.h"
+#endif
 
 /* ---------- constants */
 
@@ -113,9 +117,11 @@ typedef char ai_debug_globals_enterable_vehicle_offset_assert[
 	offsetof(struct ai_globals, enterable_vehicles) == 0x3B8 ? 1 : -1];
 typedef char ai_debug_globals_size_assert[
 	sizeof(struct ai_globals) == 0x8DC ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char ai_debug_actor_iterator_size_assert[
 	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
 
+#endif
 
 /* ---------- prototypes */
 
@@ -4512,7 +4518,7 @@ char *ai_debug_describe_actor(
 		struct unit_datum *unit = unit_get(unit_index);
 
 		model_name = tag_name_strip_path(
-			unit_definition_get(unit->definition_index)->object.model.name);
+			xbox_pointer(unit_definition_get(unit->definition_index)->object.model.name));
 
 		if (unit->object.name_index!=NONE)
 		{

@@ -223,11 +223,13 @@ struct ctf_globals
 	long flag_swap_timer;
 	long next_flag_failure_time;
 };
+#ifndef HALO_64BIT
 
 typedef char verify_ctf_globals_scores_offset[
 	offsetof(struct ctf_globals, scores) == 0x10 ? 1 : -1];
 typedef char verify_ctf_globals_size[
 	sizeof(struct ctf_globals) == 0x30 ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 

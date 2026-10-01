@@ -42,8 +42,14 @@ struct bitmap_data
 	long pixels_size;
 	long tag_index;
 	long cache_block_index;
+#ifdef HALO_64BIT
+	/* tag data: Xbox addresses (a D3D texture header, the pixels) */
+	XPTR(IDirect3DBaseTexture8) hardware_format;
+	XPTR(void) base_address;
+#else
 	void *hardware_format;
 	void *base_address;
+#endif
 };
 
 struct bitmap_group_sprite

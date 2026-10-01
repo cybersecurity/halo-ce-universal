@@ -57,4 +57,9 @@ extern struct data_array *object_list_data;
 
 /* ---------- public code */
 
+#ifdef HALO_64BIT
+void object_list_gc(
+	void);
+
+#endif
 #endif // __OBJECT_LISTS_H

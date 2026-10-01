@@ -27,7 +27,11 @@ struct projectile_material_response_definition default_projectile_material_respo
 {
 	0,
 	_projectile_material_response_disappear,
+#ifdef HALO_64BIT
+	{ EFFECT_DEFINITION_TAG, 0, 0, NONE },
+#else
 	{ EFFECT_DEFINITION_TAG, "", 0, NONE },
+#endif
 	{ 0 },
 	_projectile_material_response_disappear,
 	0,
@@ -36,13 +40,21 @@ struct projectile_material_response_definition default_projectile_material_respo
 	0.0f,
 	0.0f,
 	0.0f,
+#ifdef HALO_64BIT
+	{ EFFECT_DEFINITION_TAG, 0, 0, NONE },
+#else
 	{ EFFECT_DEFINITION_TAG, "", 0, NONE },
+#endif
 	{ 0 },
 	_projectile_material_effect_scale_damage,
 	0,
 	0.0f,
 	0.0f,
+#ifdef HALO_64BIT
+	{ EFFECT_DEFINITION_TAG, 0, 0, NONE },
+#else
 	{ EFFECT_DEFINITION_TAG, "", 0, NONE },
+#endif
 	{ 0 },
 	0.0f,
 	0.0f,

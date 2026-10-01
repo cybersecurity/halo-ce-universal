@@ -210,14 +210,18 @@ typedef char path_input_start_point_offset_assert[
 	offsetof(struct path_input, start_point) == 0x14 ? 1 : -1];
 typedef char path_input_start_surface_index_offset_assert[
 	offsetof(struct path_input, start_surface_index) == 0x20 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char path_state_destination_valid_offset_assert[
 	offsetof(struct path_state, destination_valid) == 0x4C ? 1 : -1];
 typedef char path_state_destination_offset_assert[
 	offsetof(struct path_state, destination) == 0x50 ? 1 : -1];
+#endif
 typedef char path_state_debug_offset_assert[
 	offsetof(struct path_state, debug) == 0x48 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char path_state_structure_offset_assert[
 	offsetof(struct path_state, structure) == 0x64 ? 1 : -1];
+#endif
 typedef char path_destination_surface_index_offset_assert[
 	offsetof(struct path_destination, surface_index) == 0xC ? 1 : -1];
 typedef char path_destination_target_radius_offset_assert[
@@ -1202,7 +1206,7 @@ static short build_path_edges_for_surface(
 	long surface_index,
 	struct path_edge *edges)
 {
-	byte const *pathfinding_surfaces = structure->pathfinding_surfaces.address;
+	byte const *pathfinding_surfaces = xbox_pointer(structure->pathfinding_surfaces.address);
 	struct collision_bsp const *bsp = TAG_BLOCK_GET_ELEMENT(
 		&structure->collision_bsp,
 		0,

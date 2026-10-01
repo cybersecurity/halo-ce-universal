@@ -49,7 +49,7 @@ struct multiplayer_scenario_description_item *multiplayer_scenario_description_g
 			multiplayer_scenario_description_get(scenario_list_index);
 
 		match_assert("c:\\halo\\SOURCE\\scenario\\multiplayer_scenario_description.c", 66, scenario_list);
-		result = scenario_list->scenarios.address;
+		result = xbox_pointer(scenario_list->scenarios.address);
 		*count = (short)scenario_list->scenarios.count;
 	}
 	else

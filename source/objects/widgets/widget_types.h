@@ -70,9 +70,11 @@ struct widget_type_definition
 	widget_type_render_proc render_proc;
 };
 
+#ifndef HALO_64BIT
 typedef char widget_type_definition_size_assert[
 	sizeof(struct widget_type_definition) == 0x28 ? 1 : -1];
 
+#endif
 /* ---------- prototypes/EXAMPLE.C */
 
 /* ---------- globals */

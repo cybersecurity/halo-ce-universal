@@ -58,8 +58,10 @@ struct lruv_cache_block
 	long user_data;
 };
 
+#ifndef HALO_64BIT
 typedef char lruv_cache_size_assert[
 	sizeof(struct lruv_cache) == 0x44 ? 1 : -1];
+#endif
 typedef char lruv_cache_block_size_assert[
 	sizeof(struct lruv_cache_block) == 0x1C ? 1 : -1];
 
@@ -105,7 +107,12 @@ void lruv_block_touch(
 	struct lruv_cache *cache,
 	long block_index);
 
+#ifdef HALO_64BIT
+/* a byte offset into the cache's own memory */
+unsigned int lruv_block_get_address(
+#else
 void *lruv_block_get_address(
+#endif
 	struct lruv_cache *cache,
 	long block_index);
 

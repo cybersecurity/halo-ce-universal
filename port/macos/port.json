@@ -1,0 +1,48 @@
+{
+  "comment": "Native macOS build inputs; the game sources and the platform layer are the Linux build's (port/linux/port.json), compiled as 64-bit code (HALO_64BIT). libtiff is left out: its structures hold pointers the 64-bit build has no use for (bitmaps/tiff_file.c). See port/macos/README.md.",
+  "exclude_sources": [
+    "source/bitmaps/libtiff/tif_aux.c",
+    "source/bitmaps/libtiff/tif_ccittrle.c",
+    "source/bitmaps/libtiff/tif_close.c",
+    "source/bitmaps/libtiff/tif_compat.c",
+    "source/bitmaps/libtiff/tif_compress.c",
+    "source/bitmaps/libtiff/tif_dir.c",
+    "source/bitmaps/libtiff/tif_dirinfo.c",
+    "source/bitmaps/libtiff/tif_dirread.c",
+    "source/bitmaps/libtiff/tif_dirwrite.c",
+    "source/bitmaps/libtiff/tif_dumpmode.c",
+    "source/bitmaps/libtiff/tif_error.c",
+    "source/bitmaps/libtiff/tif_fax3.c",
+    "source/bitmaps/libtiff/tif_fax4.c",
+    "source/bitmaps/libtiff/tif_flush.c",
+    "source/bitmaps/libtiff/tif_getimage.c",
+    "source/bitmaps/libtiff/tif_jpeg.c",
+    "source/bitmaps/libtiff/tif_lzw.c",
+    "source/bitmaps/libtiff/tif_machdep.c",
+    "source/bitmaps/libtiff/tif_next.c",
+    "source/bitmaps/libtiff/tif_open.c",
+    "source/bitmaps/libtiff/tif_packbits.c",
+    "source/bitmaps/libtiff/tif_print.c",
+    "source/bitmaps/libtiff/tif_read.c",
+    "source/bitmaps/libtiff/tif_strip.c",
+    "source/bitmaps/libtiff/tif_swab.c",
+    "source/bitmaps/libtiff/tif_thunder.c",
+    "source/bitmaps/libtiff/tif_tile.c",
+    "source/bitmaps/libtiff/tif_version.c",
+    "source/bitmaps/libtiff/tif_warning.c",
+    "source/bitmaps/libtiff/tif_write.c",
+    "port/linux/src/bink_null.c"
+  ],
+  "libraries": [
+    "SDL3",
+    "m",
+    "pthread",
+    "avcodec",
+    "avformat",
+    "swscale",
+    "avutil"
+  ],
+  "frameworks": [
+    "OpenGL"
+  ]
+}

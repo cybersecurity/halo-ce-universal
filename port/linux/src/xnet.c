@@ -59,6 +59,14 @@ alone peers reach.
 #ifndef SO_TYPE
 #define SO_TYPE 0x1008
 #endif
+#ifdef HALO_64BIT
+
+_Static_assert(sizeof(XNADDR) == 12, "XNADDR must be 12 bytes for Halo CE network compatibility");
+_Static_assert(offsetof(XNADDR, bSizeOfStruct) == 0, "bSizeOfStruct offset must be 0");
+_Static_assert(offsetof(XNADDR, bFlags) == 1, "bFlags offset must be 1");
+_Static_assert(offsetof(XNADDR, abEnet) == 2, "abEnet offset must be 2");
+_Static_assert(offsetof(XNADDR, ina) == 8, "ina offset must be 8");
+#endif
 
 enum
 {
@@ -1056,11 +1064,36 @@ INT WSAAPI XNetXnAddrToInAddr(const XNADDR *address, const XNKID *key_identifier
 	unsigned long peer;
 
 	(void)key_identifier;
+#ifdef HALO_64BIT
+	if (!address || !result)
+		return -1;
+#endif
 	/* an internet play peer's XNADDR carries its identifier */
 	if (p2p_peer_address(address->abEnet, &peer))
+#ifdef HALO_64BIT
+	{
+		char peer_id[16];
+		char peer_addr[32];
+		unsigned long val = halo_ws_ntohl(peer);
+		snprintf(peer_id, sizeof(peer_id), "%02x%02x%02x%02x%02x%02x",
+			address->abEnet[0], address->abEnet[1], address->abEnet[2],
+			address->abEnet[3], address->abEnet[4], address->abEnet[5]);
+		snprintf(peer_addr, sizeof(peer_addr), "%lu.%lu.%lu.%lu",
+			(val >> 24) & 255, (val >> 16) & 255, (val >> 8) & 255, val & 255);
+		platform_log("Internet play: resolving peer identifier %s to virtual address %s", peer_id, peer_addr);
+#endif
 		result->s_addr = peer;
+#ifdef HALO_64BIT
+	}
+#endif
 	else
+#ifdef HALO_64BIT
+	{
+#endif
 		*result = address->ina;
+#ifdef HALO_64BIT
+	}
+#endif
 	return 0;
 }
 

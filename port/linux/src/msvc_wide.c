@@ -731,7 +731,11 @@ static int wide_format(struct wide_output *output, const wchar_t *format, va_lis
 
 			if (conversion == 'p')
 			{
+#ifdef HALO_64BIT
+				snprintf(narrow, sizeof(narrow), "%016llX", (unsigned long long)(uintptr_t)va_arg(arguments, void *));
+#else
 				snprintf(narrow, sizeof(narrow), "%08lX", (unsigned long)va_arg(arguments, void *));
+#endif
 			}
 			else if (conversion == 'e' || conversion == 'E' || conversion == 'f' ||
 				conversion == 'g' || conversion == 'G')

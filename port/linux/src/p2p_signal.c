@@ -247,8 +247,9 @@ static struct
 
 static int elapsed(unsigned long since, unsigned long time)
 {
-	/* (unsigned, as the clock wraps) */
-	return (unsigned int)(p2p_now() - since) >= (unsigned int)time;
+	/* 0 is "never", which is long ago (p2p.c's elapsed); unsigned, as the
+	clock wraps */
+	return !since || (unsigned int)(p2p_now() - since) >= (unsigned int)time;
 }
 
 static unsigned short network_short(unsigned short value)

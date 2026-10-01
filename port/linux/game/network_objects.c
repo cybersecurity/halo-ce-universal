@@ -496,7 +496,7 @@ long network_objects_new_object_index(
 		absolute_index < object_header_data->maximum_count; absolute_index++)
 	{
 		struct datum_header const *header = (struct datum_header const *)
-			((byte const *)object_header_data->data + absolute_index * object_header_data->size);
+			((byte const *)xbox_pointer(object_header_data->data) + absolute_index * object_header_data->size);
 
 		if (!header->identifier)
 		{
@@ -1881,7 +1881,7 @@ static void distributed_client_create(
 		objects_statistics.create_failures++;
 		return;
 	}
-	header = (struct datum_header const *)((byte const *)object_header_data->data +
+	header = (struct datum_header const *)((byte const *)xbox_pointer(object_header_data->data) +
 		absolute_index * object_header_data->size);
 	if (header->identifier)
 	{

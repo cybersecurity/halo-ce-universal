@@ -220,6 +220,7 @@ typedef char detail_object_palette_entry_size_assert[
 	sizeof(struct scenario_detail_object_collection_palette_entry) == 0x30 ? 1 : -1];
 typedef char structure_detail_object_data_size_assert[
 	sizeof(struct structure_detail_object_data) == 0x40 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char detail_object_cell_data_size_assert[
 	sizeof(struct detail_object_cell_data) == 0x18 ? 1 : -1];
 typedef char detail_object_layer_data_size_assert[
@@ -227,6 +228,7 @@ typedef char detail_object_layer_data_size_assert[
 typedef char detail_object_view_data_size_assert[
 	sizeof(struct detail_object_view_data) == 0x8 ? 1 : -1];
 
+#endif
 /* ---------- prototypes */
 
 /* ---------- globals */

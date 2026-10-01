@@ -2828,13 +2828,13 @@ static void unit_drop_grenades(
 	unit = unit_get(unit_index);
 	grenade_count = unit->unit.grenade_counts;
 	grenade_count_negative_base =
-		0u - (unsigned long)unit->unit.grenade_counts;
+		0u - (unsigned long)POINTER_BITS(unit->unit.grenade_counts);
 	grenade_type_count = NUMBER_OF_UNIT_GRENADE_TYPES;
 	do
 	{
 		grenade = TAG_BLOCK_GET_ELEMENT(
 			&scenario_get_game_globals()->grenades,
-			grenade_count_negative_base + (unsigned long)grenade_count,
+			grenade_count_negative_base + (unsigned long)POINTER_BITS(grenade_count),
 			struct game_globals_grenade);
 		while (*grenade_count > 0)
 		{
@@ -3436,7 +3436,7 @@ static void unit_animation_start_overlay_action(
 				else if (debug_unit_animations && unit->object.type==_object_type_biped && unit->unit.animation.aiming_screen_index==NONE)
 				{
 					console_warning("MISSING: %s '%s %s'",
-						tag_name_strip_path(unit_definition->object.animation_graph.name),
+						tag_name_strip_path(xbox_pointer(unit_definition->object.animation_graph.name)),
 						unit_seat->label,
 						weapon_class->label,
 						weapon_type->label,
@@ -6706,7 +6706,7 @@ void unit_damage_aftermath(
 			struct object_definition *owner_definition =
 				object_definition_get(owner_object->definition_index);
 			char const *separator = strrchr(
-				owner_definition->object.model.name,
+				xbox_pointer(owner_definition->object.model.name),
 				'\\');
 
 			if (separator)
@@ -10331,7 +10331,7 @@ static boolean unit_animation_set_state(
 			console_warning(
 				"MISSING: %s '%s %s %s'",
 				tag_name_strip_path(
-					unit_definition->object.animation_graph.name),
+					xbox_pointer(unit_definition->object.animation_graph.name)),
 				unit_seat->label,
 				seat_or_weapon_class_name,
 				weapon_animation_name);
@@ -10410,7 +10410,7 @@ static boolean unit_animation_set_state(
 				console_warning(
 					"MISSING: %s '%s %s %s'",
 					tag_name_strip_path(
-						unit_definition->object.animation_graph.name),
+						xbox_pointer(unit_definition->object.animation_graph.name)),
 					unit_seat->label,
 					weapon_class->label,
 					animation_list_get_string(
@@ -10454,7 +10454,7 @@ static boolean unit_animation_set_state(
 				console_warning(
 					"MISSING: %s '%s %s'",
 					tag_name_strip_path(
-						unit_definition->object.animation_graph.name),
+						xbox_pointer(unit_definition->object.animation_graph.name)),
 					unit_seat->label,
 					animation_list_get_string(
 						&unit_seat_animation_list,

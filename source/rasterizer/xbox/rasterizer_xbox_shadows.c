@@ -89,6 +89,9 @@ symbols in this file:
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 #include "rasterizer/xbox/rasterizer_xbox_draw_primitives.h"
+#ifdef HALO_64BIT
+#include "rasterizer/rasterizer_model_types.h"
+#endif
 
 /* ---------- constants */
 
@@ -153,6 +156,7 @@ typedef char verify_rasterizer_shadows_model_shadow_count_offset[
 	offsetof(
 		struct rasterizer_frame_statistics_globals,
 		model_shadow_count) == 0xF4 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_rasterizer_shadows_model_parameters_size[
 	sizeof(struct rasterizer_model_begin_parameters) == 0xCC ? 1 : -1];
 typedef char verify_rasterizer_shadows_model_base_map_scale_offset[
@@ -161,6 +165,7 @@ typedef char verify_rasterizer_shadows_model_base_map_scale_offset[
 typedef char verify_rasterizer_shadows_model_animation_offset[
 	offsetof(struct rasterizer_model_begin_parameters, animation) == 0x84
 		? 1 : -1];
+#endif
 typedef char verify_rasterizer_shadows_shader_model_flags_offset[
 	offsetof(struct shader_model_definition, flags) == 0x28 ? 1 : -1];
 typedef char verify_rasterizer_shadows_shader_model_map_scale_offset[

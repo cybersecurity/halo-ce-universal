@@ -101,6 +101,9 @@ symbols in this file:
 #include "text/text_group.h"
 #include "text/unicode.h"
 #include "units/units.h"
+#ifdef HALO_64BIT
+#include "rasterizer/rasterizer_model_types.h"
+#endif
 
 /* ---------- constants */
 
@@ -152,8 +155,10 @@ typedef char verify_model_vertex_uncompressed_size[
 typedef char verify_model_vertex_compressed_size[
 	sizeof(struct model_vertex_compressed) == 0x20 ? 1 : -1];
 
+#ifndef HALO_64BIT
 typedef char verify_rasterizer_model_begin_parameters_size[
 	sizeof(struct rasterizer_model_begin_parameters) == 0xCC ? 1 : -1];
+#endif
 
 /* January scenario flag layout consumed by the King map scan. */
 typedef char verify_scenario_netgame_flag_size[

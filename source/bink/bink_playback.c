@@ -303,14 +303,17 @@ typedef void (__stdcall *rad_memory_free_proc)(
 typedef void *(__stdcall *bink_sound_system_open_proc)(
 	unsigned long param);
 
+#ifndef HALO_64BIT
 typedef char bink_playback_globals_size_assert[
 	sizeof(struct bink_playback_globals) == 0xD8 ? 1 : -1];
+#endif
 typedef char bink_playback_globals_flags_offset_assert[
 	offsetof(struct bink_playback_globals, flags) == 4 ? 1 : -1];
 typedef char bink_playback_globals_bink_offset_assert[
 	offsetof(struct bink_playback_globals, bink) == 8 ? 1 : -1];
 typedef char bink_playback_globals_needs_decode_offset_assert[
 	offsetof(struct bink_playback_globals, needs_decode) == 1 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char bink_playback_globals_texture_offset_assert[
 	offsetof(struct bink_playback_globals, texture) == 0x20 ? 1 : -1];
 typedef char bink_playback_globals_rendered_frame_count_offset_assert[
@@ -319,6 +322,7 @@ typedef char bink_playback_globals_screen_geometry_offset_assert[
 	offsetof(struct bink_playback_globals, screen_geometry) == 0x40 ? 1 : -1];
 typedef char bink_playback_globals_memory_pool_base_offset_assert[
 	offsetof(struct bink_playback_globals, memory_pool_base) == 0xCC ? 1 : -1];
+#endif
 typedef char bink_summary_size_assert[
 	sizeof(BINKSUMMARY) == 0x7C ? 1 : -1];
 typedef char bink_summary_skipped_frames_offset_assert[
@@ -543,7 +547,7 @@ void bink_playback_start(
 			if (dsound)
 			{
 				bink_get_memory_available("begin BinkSoundUseDirectSound");
-				if (BinkSetSoundSystem(BinkOpenDirectSound, (unsigned long)dsound))
+				if (BinkSetSoundSystem(BinkOpenDirectSound, (unsigned long)POINTER_BITS(dsound)))
 				{
 					sound_initialized= TRUE;
 				}
@@ -585,7 +589,16 @@ void bink_playback_start(
 			bink_globals.surface_type= BINKSURFACE32;
 			bink_globals.bytes_per_pixel= sizeof(pixel32);
 			bink_globals.texture_locked= FALSE;
+#ifdef HALO_64BIT
+			/* in the Xbox address space, as the bink bitmap holds the texture's
+			address in 32 bits */
+			bink_globals.texture= (D3DTexture *)bink_alloc_permanent(sizeof(D3DTexture), 16);
+			XPhysicalProtect(bink_globals.texture, sizeof(D3DTexture), PAGE_READWRITE);
+			csmemset(bink_globals.texture, 0, sizeof(D3DTexture));
+#define bink_texture (*(D3DBaseTexture *)bink_globals.texture)
+#else
 			bink_globals.texture= (D3DTexture *)&bink_texture;
+#endif
 
 			bink_texture.Common= BINK_TEXTURE_COMMON;
 			bink_texture.Data= 0;
@@ -594,6 +607,9 @@ void bink_playback_start(
 				((bink_globals.height-1)<<D3DSIZE_HEIGHT_SHIFT)|(bink_globals.width-1);
 			bink_texture.Format= BINK_TEXTURE_FORMAT;
 			IDirect3DBaseTexture8_Register(&bink_texture, frame_buffer);
+#ifdef HALO_64BIT
+#undef bink_texture
+#endif
 
 			csmemset(&bink_globals.screen_geometry, 0, sizeof(bink_globals.screen_geometry));
 			bink_globals.screen_geometry.map_texture_scale[0].i= 1.f;
@@ -614,8 +630,13 @@ void bink_playback_start(
 			bink_bitmap.pixels_size= bitmap_format_get_bits_per_pixel(bink_bitmap.format)*bink_bitmap.height*bink_bitmap.width/8;
 			bink_bitmap.tag_index= NONE;
 			bink_bitmap.cache_block_index= NONE;
+#ifdef HALO_64BIT
+			bink_bitmap.hardware_format= xbox_address(bink_globals.texture);
+			bink_bitmap.base_address= (unsigned int)NONE;
+#else
 			bink_bitmap.hardware_format= bink_globals.texture;
 			bink_bitmap.base_address= (void *)NONE;
+#endif
 			bink_globals.screen_geometry.map[0]= &bink_bitmap;
 
 			bink_globals.flags= flags;
@@ -815,14 +836,14 @@ static void *bink_alloc_permanent(
 {
 	byte *address= bink_globals.memory_pool_base + (bink_globals.memory_pool_size-size_in_bytes);
 
-	if (alignment_in_bytes && ((unsigned long)address&(alignment_in_bytes-1)))
+	if (alignment_in_bytes && ((unsigned long)POINTER_BITS(address)&(alignment_in_bytes-1)))
 	{
 		match_assert(
 			"c:\\halo\\SOURCE\\bink\\bink_playback.c",
 			691,
 			alignment_in_bytes>0 && (alignment_in_bytes&(alignment_in_bytes-1))==0);
-		size_in_bytes+= (alignment_in_bytes-(unsigned long)address)&(alignment_in_bytes-1);
-		address-= (alignment_in_bytes-(unsigned long)address)&(alignment_in_bytes-1);
+		size_in_bytes+= (alignment_in_bytes-(unsigned long)POINTER_BITS(address))&(alignment_in_bytes-1);
+		address-= (alignment_in_bytes-(unsigned long)POINTER_BITS(address))&(alignment_in_bytes-1);
 	}
 
 	match_assert(

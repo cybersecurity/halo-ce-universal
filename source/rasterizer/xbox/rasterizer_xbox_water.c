@@ -113,6 +113,7 @@ enum
 
 /* ---------- structures */
 
+#ifndef HALO_64BIT
 struct transparent_geometry_group
 {
 	unsigned long geometry_flags;
@@ -123,6 +124,7 @@ struct transparent_geometry_group
 	real_plane3d plane;
 };
 
+#endif
 struct water_ripple
 {
 	byte reserved00[0x4];
@@ -184,8 +186,10 @@ typedef char verify_water_definition_ripple_maps_offset[
 	offsetof(struct shader_transparent_water_definition, ripple_maps) == 0xC8 ? 1 : -1];
 typedef char verify_water_definition_lod_bias_offset[
 	offsetof(struct shader_transparent_water_definition, ripple_mipmap_lod_bias) == 0xE0 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_water_geometry_group_plane_offset[
 	offsetof(struct transparent_geometry_group, plane) == 0x80 ? 1 : -1];
+#endif
 typedef char verify_water_definition_mipmap_levels_offset[
 	offsetof(struct shader_transparent_water_definition, ripple_mipmap_levels) == 0xD8 ? 1 : -1];
 typedef char verify_water_definition_ripples_offset[

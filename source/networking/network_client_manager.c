@@ -688,8 +688,10 @@ typedef char network_advertised_game_valid_offset_assert[
 	offsetof(struct network_advertised_game, valid) == 0xE1 ? 1 : -1];
 typedef char network_join_parameters_size_assert[
 	sizeof(struct network_join_parameters) == 0x22 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char data_iterator_datum_index_offset_assert[
 	offsetof(struct data_iterator, datum_index) == 8 ? 1 : -1];
+#endif
 typedef char network_advertised_game_size_assert[
 	sizeof(struct network_advertised_game) == 0xE4 ? 1 : -1];
 typedef char network_game_client_ping_address_offset_assert[
@@ -698,6 +700,9 @@ typedef char network_game_client_ping_sample_count_offset_assert[
 	offsetof(struct network_game_client, ping_sample_count) == 0x826 ? 1 : -1];
 typedef char network_game_client_pinging_offset_assert[
 	offsetof(struct network_game_client, pinging) == 0x82A ? 1 : -1];
+#ifdef HALO_64BIT
+
+#else
 typedef char network_game_client_connection_offset_assert[
 	offsetof(struct network_game_client, connection) == 0x82C ? 1 : -1];
 typedef char network_game_client_connect_process_offset_assert[
@@ -720,18 +725,21 @@ typedef char network_game_client_flags_offset_assert[
 	offsetof(struct network_game_client, flags) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x16 ? 1 : -1];
 typedef char network_game_client_last_precache_time_offset_assert[
 	offsetof(struct network_game_client, last_precache_time) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0xC ? 1 : -1];
+#endif
 typedef char message_client_broadcast_game_search_size_assert[
 	sizeof(struct message_client_broadcast_game_search) == 0xC ? 1 : -1];
 typedef char message_client_ping_size_assert[
 	sizeof(struct message_client_ping) == 8 ? 1 : -1];
 typedef char message_client_join_game_request_size_assert[
 	sizeof(struct message_client_join_game_request) == 0x70 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char network_game_client_seconds_to_game_start_offset_assert[
 	offsetof(struct network_game_client, seconds_to_game_start) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x10 ? 1 : -1];
 typedef char network_game_client_error_offset_assert[
 	offsetof(struct network_game_client, error) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x14 ? 1 : -1];
 typedef char network_game_client_connection_silent_offset_assert[
 	offsetof(struct network_game_client, connection_silent) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x18 ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 

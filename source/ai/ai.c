@@ -239,6 +239,9 @@ symbols in this file:
 #include "tag_files/tag_groups.h"
 
 #include <stddef.h>
+#ifdef HALO_64BIT
+#include "main/console.h"
+#endif
 
 #undef COLLISIONS_EXTERNAL_COLLISION_TEST_LINE
 #undef REAL_MATH_EXTERNAL_NORMALIZE3D
@@ -408,6 +411,7 @@ typedef char ai_unit_actor_index_offset_assert[
 	offsetof(struct unit_datum, unit.actor_index) == 0x1A4 ? 1 : -1];
 typedef char ai_actor_last_vehicle_exit_forced_offset_assert[
 	offsetof(struct actor_datum, emotions.last_vehicle_exit_forced) == 0x38C ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char ai_actor_iterator_size_assert[
 	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
 typedef char ai_actor_iterator_index_offset_assert[
@@ -416,6 +420,7 @@ typedef char ai_encounter_iterator_size_assert[
 	sizeof(struct encounter_iterator) == 0x18 ? 1 : -1];
 typedef char ai_encounter_iterator_index_offset_assert[
 	offsetof(struct encounter_iterator, index) == 0x10 ? 1 : -1];
+#endif
 typedef char ai_encounter_actor_iterator_size_assert[
 	sizeof(struct encounter_actor_iterator) == 0xC ? 1 : -1];
 typedef char ai_encounter_actor_iterator_index_offset_assert[

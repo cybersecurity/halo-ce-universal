@@ -36,9 +36,11 @@ struct widget_instance_prefix
 	char const *name;
 	short local_player_index;
 };
+#ifndef HALO_64BIT
 
 typedef char widget_instance_local_player_index_offset[
 	offsetof(struct widget_instance_prefix, local_player_index) == 8 ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 

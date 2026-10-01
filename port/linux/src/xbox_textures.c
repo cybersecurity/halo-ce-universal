@@ -771,7 +771,11 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 		xgpu_texture_describe(format_word, size_word, &entry->description);
 		entry->target = entry->description.cube_map ? GL_TEXTURE_CUBE_MAP :
 			entry->description.depth > 1 ? GL_TEXTURE_3D : GL_TEXTURE_2D;
+#ifdef HALO_64BIT
+		entry->address = (unsigned int)data | PLATFORM_CONTIGUOUS_BASE; /* an Xbox address */
+#else
 		entry->address = (unsigned long)PLATFORM_PHYSICAL_TO_VIRTUAL(data);
+#endif
 		entry->size = xgpu_texture_face_size(&entry->description) * (entry->description.cube_map ? 6 : 1);
 		entry->generation = 0;
 		entry->override = -1;
@@ -802,13 +806,23 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 			if (entry->override >= 0 && !hud_hires_override_texture(entry->override, &levels))
 				entry->override = -1;
 		}
+#ifdef HALO_64BIT
+		if (entry->override < 0 && platform_is_contiguous(xbox_pointer(entry->address)) &&
+			platform_is_contiguous(xbox_pointer(entry->address + entry->size - 1)))
+#else
 		if (entry->override < 0 && platform_is_contiguous((void *)entry->address) &&
 			platform_is_contiguous((void *)(entry->address + entry->size - 1)))
+#endif
 		{
 			if (config_boolean("debug.texture_log"))
 			{
+#ifdef HALO_64BIT
+				const unsigned char *bytes = xbox_pointer(entry->address);
+				unsigned int index, ones = 0, zeros = 0;
+#else
 				const unsigned char *bytes = (const unsigned char *)entry->address;
 				unsigned long index, ones = 0, zeros = 0;
+#endif
 
 				for (index = 0; index < entry->size; index++)
 				{
@@ -820,7 +834,7 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 					entry->description.height, entry->size, entry->generation,
 					ones * 100 / entry->size, zeros * 100 / entry->size);
 			}
-			upload(entry->texture, entry->target, &entry->description, (const unsigned char *)entry->address, palette);
+			upload(entry->texture, entry->target, &entry->description, (const unsigned char *)xbox_pointer(entry->address), palette);
 		}
 	}
 	entry->last_used_frame = texture_frame;

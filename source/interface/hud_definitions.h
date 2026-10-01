@@ -10,6 +10,9 @@ header included in hcex build.
 
 /* ---------- headers */
 
+#ifdef HALO_64BIT
+#include "cseries/cseries.h"
+#endif
 #include "math/real_math.h"
 #include "tag_files/tag_groups.h"
 

@@ -24,6 +24,9 @@ matched case-insensitively, like the Xbox's FATX volumes.
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 
 /* ---------- paths */
 
@@ -42,6 +45,10 @@ static BOOL has_maps(const char *directory)
 	return directory_exists(directory) &&
 		posix_find_entry_case_insensitive(directory, "maps", on_disk, sizeof(on_disk));
 }
+
+#ifdef HALO_64BIT
+char platform_log_path[MAX_PATH];
+#endif
 
 static void trim_separators(char *path)
 {
@@ -69,7 +76,12 @@ const char *platform_data_root(void)
 		{
 			char executable[MAX_PATH];
 			char executable_directory[MAX_PATH] = "";
+#ifdef __APPLE__
+			uint32_t ex_size = sizeof(executable);
+			ssize_t length = _NSGetExecutablePath(executable, &ex_size) == 0 ? (ssize_t)strlen(executable) : -1;
+#else
 			ssize_t length = readlink("/proc/self/exe", executable, sizeof(executable) - 1);
+#endif
 
 			if (length > 0)
 			{
@@ -99,6 +111,22 @@ const char *platform_data_root(void)
 				int level;
 
 				executable[length] = '\0';
+#ifdef __APPLE__
+				/* ... and <repository>/build/macos/Halo.app/Contents/MacOS/halo:
+				the nearest assets folder up to five levels up */
+				for (level = 0; level < 6 && (slash = strrchr(executable, '/')); level++)
+				{
+					char test_assets[MAX_PATH];
+
+					*slash = '\0';
+					snprintf(test_assets, sizeof(test_assets), "%s/assets", executable);
+					if (has_maps(test_assets))
+					{
+						snprintf(root, sizeof(root), "%s", test_assets);
+						break;
+					}
+				}
+#else
 				for (level = 0; level < 3 && (slash = strrchr(executable, '/')); level++)
 					*slash = '\0';
 				if (level == 3 && strlen(executable) + sizeof("/assets") <= sizeof(executable))
@@ -107,6 +135,7 @@ const char *platform_data_root(void)
 					if (has_maps(executable))
 						snprintf(root, sizeof(root), "%s", executable);
 				}
+#endif
 			}
 #ifndef HALO_ANDROID
 			if (!has_maps(root) && executable_directory[0] && platform_offer_game_data(executable_directory) &&
@@ -120,6 +149,10 @@ const char *platform_data_root(void)
 		}
 		trim_separators(root);
 		platform_log("data root: %s (the game's log: debug.txt there)", root);
+#ifdef HALO_64BIT
+		/* the platform layer's log goes to the game's (xbox_kernel.c) */
+		snprintf(platform_log_path, sizeof(platform_log_path), "%s/debug.txt", root);
+#endif
 	}
 	return root;
 }
@@ -388,7 +421,12 @@ static BOOL read_at(struct platform_file *file, LPVOID buffer, DWORD count, LPDW
 		if (result == 0)
 			break;
 		if (bounce)
+#ifdef HALO_64BIT
+			/* (read-only guest pages, which a host page holds with others) */
+			platform_contiguous_write((char *)buffer + total, staging, (size_t)result);
+#else
 			memcpy((char *)buffer + total, staging, (size_t)result);
+#endif
 		total += (DWORD)result;
 	}
 	free(staging);

@@ -170,6 +170,7 @@ struct player_profile_runtime_globals
 	struct thread_reference *thread;
 	boolean initialized;
 };
+#ifndef HALO_64BIT
 
 typedef char verify_player_profile_thread_offset[
 	offsetof(struct player_profile_runtime_globals, thread) == 0x64 ? 1 : -1];
@@ -177,6 +178,7 @@ typedef char verify_player_profile_initialized_offset[
 	offsetof(struct player_profile_runtime_globals, initialized) == 0x68 ? 1 : -1];
 typedef char verify_player_profile_globals_size[
 	sizeof(struct player_profile_runtime_globals) == 0x6C ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 

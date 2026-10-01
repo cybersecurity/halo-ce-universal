@@ -954,8 +954,10 @@ typedef char actor_emotion_definition_minimum_stand_offset_assert[
 	offsetof(struct actor_definition, defensive.defensive_crouch_min_stand_time) == 0x304 ? 1 : -1];
 typedef char actor_emotion_definition_minimum_crouch_offset_assert[
 	offsetof(struct actor_definition, defensive.defensive_crouch_min_crouch_time) == 0x308 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char actor_perception_debug_awareness_speed_offset_assert[
 	offsetof(struct actor_debug_info, perception_awareness_speed) == 0x6578 ? 1 : -1];
+#endif
 typedef char actor_perception_source_unit_sound_offset_assert[
 	offsetof(struct unit_definition, unit.constant_sound) == 0x182 ? 1 : -1];
 typedef char actor_perception_source_actor_target_offset_assert[
@@ -984,10 +986,12 @@ typedef char actor_perception_encounter_view_corpse_ignore_time_offset_assert[
 	offsetof(struct actor_perception_encounter_view, corpse_ignore_time) == 0x58 ? 1 : -1];
 typedef char actor_visibility_variant_modified_vision_range_offset_assert[
 	offsetof(struct actor_variant_definition, ranged_combat.modified_vision_range) == 0x150 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char actor_visibility_debug_info_size_assert[
 	sizeof(struct actor_debug_info) == 0x657C ? 1 : -1];
 typedef char actor_visibility_debug_info_last_time_offset_assert[
 	offsetof(struct actor_debug_info, vision_last_time) == 0x656C ? 1 : -1];
+#endif
 typedef char actor_orphan_prop_view_related_prop_index_offset_assert[
 	offsetof(struct actor_orphan_prop_view, related_prop_index) == 0xC ? 1 : -1];
 typedef char actor_orphan_prop_view_orphan_inspection_ticks_offset_assert[
@@ -2342,8 +2346,10 @@ struct actor_emotion_prop_view
 	boolean dangerous_vehicle_driver;
 };
 
+#ifndef HALO_64BIT
 typedef char actor_emotion_target_size_assert[
 	sizeof(struct actor_emotion_target) == 0x1C ? 1 : -1];
+#endif
 typedef char actor_emotion_actor_last_time_offset_assert[
 	offsetof(struct actor_emotion_actor_view, last_emotion_target_time) == 0x3A4 ? 1 : -1];
 typedef char actor_emotion_actor_ticks_offset_assert[

@@ -425,11 +425,13 @@ struct saved_game_files_globals
 	boolean memory_units_dirty;
 	boolean enumeration_in_progress;
 };
+#ifndef HALO_64BIT
 
 typedef char verify_saved_game_files_globals_memory_units_dirty_offset[
 	offsetof(struct saved_game_files_globals, memory_units_dirty) == 0x117 ? 1 : -1];
 typedef char verify_saved_game_files_globals_size[
 	sizeof(struct saved_game_files_globals) == 0x11C ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 

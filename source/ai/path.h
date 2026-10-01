@@ -215,6 +215,7 @@ struct obstacle_path
 
 typedef char obstacle_path_step_size_assert[
 	sizeof(struct obstacle_path_step) == 0x28 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char obstacle_path_size_assert[
 	sizeof(struct obstacle_path) == 0x1534 ? 1 : -1];
 typedef char obstacle_path_step_count_offset_assert[
@@ -226,6 +227,7 @@ typedef char obstacle_path_heap_count_offset_assert[
 typedef char obstacle_path_heap_offset_assert[
 	offsetof(struct obstacle_path, heap) == 0x1432 ? 1 : -1];
 
+#endif
 struct obstacles_test_pill_result
 {
 	real distance;
@@ -280,6 +282,7 @@ struct path_debug_storage
 	struct obstacles avoidance_obstacles[4];
 	struct obstacle_path avoidance_paths[4];
 };
+#ifndef HALO_64BIT
 
 typedef char path_state_node_count_offset_assert[
 	offsetof(struct path_state, node_count) == 0x80 ? 1 : -1];
@@ -296,6 +299,7 @@ typedef char path_debug_storage_raw_steps_offset_assert[
 	offsetof(struct path_debug_storage, raw_steps) == 0x14100 ? 1 : -1];
 typedef char path_debug_storage_avoided_steps_offset_assert[
 	offsetof(struct path_debug_storage, avoided_steps) == 0x14548 ? 1 : -1];
+#endif
 
 /* ---------- prototypes/PATH.C */
 

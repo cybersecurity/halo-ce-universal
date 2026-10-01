@@ -220,6 +220,7 @@ typedef char verify_xbox_texture_cache_textures_offset[
 	offsetof(
 		struct xbox_texture_cache_globals,
 		textures) == 0 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_xbox_texture_cache_base_address_offset[
 	offsetof(
 		struct xbox_texture_cache_globals,
@@ -234,6 +235,7 @@ typedef char verify_xbox_texture_cache_stolen_memory_offset[
 		stolen_memory) == 0xC ? 1 : -1];
 typedef char verify_xbox_texture_cache_globals_size[
 	sizeof(struct xbox_texture_cache_globals) == 0x10 ? 1 : -1];
+#endif
 typedef char verify_xbox_texture_cache_texture_loaded_offset[
 	offsetof(
 		struct xbox_texture_cache_texture,
@@ -246,12 +248,14 @@ typedef char verify_xbox_texture_cache_texture_bitmap_offset[
 	offsetof(
 		struct xbox_texture_cache_texture,
 		bitmap) == 0x8 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_xbox_texture_cache_texture_hardware_format_offset[
 	offsetof(
 		struct xbox_texture_cache_texture,
 		hardware_format) == 0xC ? 1 : -1];
 typedef char verify_xbox_texture_cache_texture_size[
 	sizeof(struct xbox_texture_cache_texture) == 0x20 ? 1 : -1];
+#endif
 /* ---------- prototypes */
 
 static boolean texture_cache_locked_block_proc(
@@ -373,14 +377,14 @@ void texture_cache_bitmap_new(
 		!TEST_FLAG(bitmap->flags, _bitmap_cached_bit));
 	SET_FLAG(bitmap->flags, _bitmap_cached_bit, TRUE);
 	bitmap->cache_block_index = NONE;
-	bitmap->base_address = NULL;
-	bitmap->hardware_format = NULL;
+	bitmap->base_address = XBOX_NULL;
+	bitmap->hardware_format = XBOX_NULL;
 	bitmap_group = bitmap_group_get(bitmap_tag_index);
 	bitmap->pixels_offset += bitmap_group->pixel_data.file_offset;
 	bitmap->pixels_size = bitmap_get_pixel_data_size(bitmap);
 	bitmap->tag_index = bitmap_tag_index;
-	bitmap->base_address = NULL;
-	bitmap->hardware_format = NULL;
+	bitmap->base_address = XBOX_NULL;
+	bitmap->hardware_format = XBOX_NULL;
 	bitmap->cache_block_index = NONE;
 
 	return;
@@ -402,7 +406,7 @@ void texture_cache_bitmap_delete(
 		}
 		SET_FLAG(bitmap->flags, _bitmap_cached_bit, FALSE);
 		bitmap->cache_block_index = NONE;
-		bitmap->base_address = NULL;
+		bitmap->base_address = XBOX_NULL;
 	}
 
 	return;
@@ -582,7 +586,7 @@ static void texture_cache_delete_block_proc(
 		0x187,
 		texture->bitmap->cache_block_index==block_index);
 	texture->bitmap->cache_block_index = NONE;
-	texture->bitmap->base_address = NULL;
+	texture->bitmap->base_address = XBOX_NULL;
 	datum_delete(
 		xbox_texture_cache_globals.textures,
 		block_index);
@@ -633,7 +637,7 @@ static void texture_cache_initialize_hardware_format(
 			D3DFORMAT_DMACHANNEL_A;
 		texture->Size = 0;
 	}
-	IDirect3DBaseTexture8_Register(texture, bitmap->base_address);
+	IDirect3DBaseTexture8_Register(texture, xbox_pointer(bitmap->base_address));
 
 	return;
 }
@@ -683,7 +687,12 @@ void texture_cache_new(
 	xbox_texture_cache_globals.textures = data_new(
 		"xbox texture",
 		XBOX_TEXTURE_CACHE_PAGE_COUNT,
+#ifdef HALO_64BIT
+		/* the entry holds a native bitmap pointer */
+		MAX(XBOX_TEXTURE_CACHE_ENTRY_SIZE, sizeof(struct xbox_texture_cache_texture)));
+#else
 		XBOX_TEXTURE_CACHE_ENTRY_SIZE);
+#endif
 	match_vassert(
 		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",
 		98,
@@ -743,7 +752,11 @@ static boolean texture_cache_start_loading_bitmap(
 		struct xbox_texture_cache_texture *texture;
 
 		base_address = xbox_texture_cache_globals.base_address +
+#ifdef HALO_64BIT
+			lruv_block_get_address(
+#else
 			(unsigned long)lruv_block_get_address(
+#endif
 				xbox_texture_cache_globals.cache,
 				cache_block_index);
 		new_texture_index = datum_new_at_index(
@@ -757,7 +770,7 @@ static boolean texture_cache_start_loading_bitmap(
 			431,
 			new_texture_index==cache_block_index);
 		bitmap->cache_block_index = cache_block_index;
-		bitmap->base_address = base_address;
+		bitmap->base_address = xbox_address(base_address);
 		texture->bitmap = bitmap;
 		texture_cache_initialize_hardware_format(bitmap, &texture->hardware_format);
 		texture->read_request_handle = cache_file_read(
@@ -967,7 +980,7 @@ void *_texture_cache_bitmap_get_hardware_format(
 	}
 	else
 	{
-		hardware_format = bitmap->hardware_format;
+		hardware_format = xbox_pointer(bitmap->hardware_format);
 	}
 
 	if (block && !hardware_format)

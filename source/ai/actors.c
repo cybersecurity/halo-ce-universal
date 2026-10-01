@@ -480,11 +480,13 @@ typedef char encounter_actor_iterator_size_assert[
 	sizeof(struct encounter_actor_iterator) == 0xC ? 1 : -1];
 typedef char encounter_actor_iterator_index_offset_assert[
 	offsetof(struct encounter_actor_iterator, index) == 0x4 ? 1 : -1];
+#ifndef HALO_64BIT
 
 typedef char actor_iterator_size_assert[
 	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
 typedef char actor_iterator_index_offset_assert[
 	offsetof(struct actor_iterator, index) == 0x14 ? 1 : -1];
+#endif
 
 struct actor_variant_change_colors
 {

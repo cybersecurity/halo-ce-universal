@@ -186,5 +186,10 @@ wchar_t *msvc_wasctime(const struct tm *time);
 void msvc_wperror(const wchar_t *string);
 wchar_t *msvc_wcserror(int error_number);
 FILE *msvc_wfopen(const wchar_t *path, const wchar_t *mode);
+#ifdef HALO_64BIT
+/* implemented in platform/src/msvc_wide.c under their MSVC names */
+FILE *_wfreopen(const wchar_t *path, const wchar_t *mode, FILE *stream);
+FILE *_wfdopen(int handle, const wchar_t *mode);
+#endif
 
 #endif

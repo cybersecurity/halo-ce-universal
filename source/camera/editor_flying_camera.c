@@ -99,6 +99,9 @@ symbols in this file:
 #include "render/render.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#ifdef HALO_64BIT
+#include "interface/terminal.h"
+#endif
 
 /* ---------- constants */
 

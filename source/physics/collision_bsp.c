@@ -137,9 +137,11 @@ struct collision_bsp_test_pill_new_context
 	long last_plane_designator;
 };
 
+#ifndef HALO_64BIT
 typedef char collision_bsp_test_pill_new_context_size_assert[
 	sizeof(struct collision_bsp_test_pill_new_context) == 0x2C ? 1 : -1];
 
+#endif
 struct test_pill_data
 {
 	struct collision_bsp const *bsp;
@@ -156,8 +158,10 @@ struct test_pill_data
 	real_vector2d vector2d;
 };
 
+#ifndef HALO_64BIT
 typedef char collision_bsp_test_pill_context_size_assert[
 	sizeof(struct test_pill_data) == 0x22C ? 1 : -1];
+#endif
 
 struct test_sphere_data
 {
@@ -175,6 +179,7 @@ struct test_sphere_data
 	byte pad2;
 	real_point2d center2d;
 };
+#ifndef HALO_64BIT
 
 typedef char collision_bsp_test_sphere_context_size_assert[
 	sizeof(struct test_sphere_data) == 0x228 ? 1 : -1];
@@ -184,6 +189,7 @@ typedef char collision_bsp_test_sphere_context_projection_axis_offset_assert[
 	offsetof(struct test_sphere_data, projection_axis) == 0x21C ? 1 : -1];
 typedef char collision_bsp_test_sphere_context_center2d_offset_assert[
 	offsetof(struct test_sphere_data, center2d) == 0x220 ? 1 : -1];
+#endif
 
 struct collision_leaf
 {
@@ -218,9 +224,11 @@ struct collision_bsp_test_vector_context
 	byte pad2[3];
 	long last_plane_index;
 };
+#ifndef HALO_64BIT
 
 typedef char collision_bsp_test_vector_context_size_assert[
 	sizeof(struct collision_bsp_test_vector_context) == 0x28 ? 1 : -1];
+#endif
 
 struct collision_bsp_usage_times
 {

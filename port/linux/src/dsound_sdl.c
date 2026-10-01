@@ -467,7 +467,7 @@ static void *silent_clock_thread(void *parameter)
 			next.tv_nsec -= 1000000000L;
 			next.tv_sec++;
 		}
-		clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &next, NULL);
+		platform_sleep_until(&next);
 	}
 	return NULL;
 }

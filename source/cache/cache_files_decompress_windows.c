@@ -374,6 +374,7 @@ typedef char verify_cache_file_header_size[
 	sizeof(struct cache_file_header) == 0x800 ? 1 : -1];
 typedef char verify_simple_decompressor_zlib_stream_offset[
 	offsetof(struct simple_decompressor_definition, zlib_stream) == 0x908 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_simple_decompressor_copy_stop_event_offset[
 	offsetof(struct simple_decompressor_definition, copy_stop_event) == 0x950 ? 1 : -1];
 typedef char verify_simple_decompressor_copy_complete_event_offset[
@@ -394,15 +395,18 @@ typedef char verify_simple_decompressor_overlapped_timers_offset[
 	offsetof(struct simple_decompressor_definition, overlapped_timer_starts) == 0xAC8 ? 1 : -1];
 typedef char verify_simple_decompressor_size[
 	sizeof(struct simple_decompressor_definition) == 0xB50 ? 1 : -1];
+#endif
 typedef char verify_decompressor_runtime_globals_times_offset[
 	offsetof(struct decompressor_runtime_globals, times) == 0x100 ? 1 : -1];
 typedef char verify_decompressor_runtime_globals_timer_starts_offset[
 	offsetof(struct decompressor_runtime_globals, timer_starts) == 0x128 ? 1 : -1];
 typedef char verify_decompressor_runtime_globals_self_offset[
 	offsetof(struct decompressor_runtime_globals, self) == 0x170 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_decompressor_runtime_globals_size[
 	sizeof(struct decompressor_runtime_globals) == 0xCC0 ? 1 : -1];
 
+#endif
 /* ---------- prototypes */
 
 static void cache_copy_print_timing(
@@ -1173,7 +1177,11 @@ static void cache_copy_issue_read(
 		!BIT_VECTOR_TEST_FLAG(self->overlapped_in_use_flags, overlapped_index));
 	BIT_VECTOR_SET_FLAG(self->overlapped_in_use_flags, overlapped_index, TRUE);
 
+#ifdef HALO_64BIT
+	overlapped->hEvent = (HANDLE)(__INTPTR_TYPE__)overlapped_index;
+#else
 	overlapped->hEvent = (HANDLE)overlapped_index;
+#endif
 	overlapped->Offset = offset;
 	overlapped->OffsetHigh = 0;
 
@@ -1230,7 +1238,11 @@ static void cache_copy_issue_write(
 		!BIT_VECTOR_TEST_FLAG(self->overlapped_in_use_flags, overlapped_index));
 	BIT_VECTOR_SET_FLAG(self->overlapped_in_use_flags, overlapped_index, TRUE);
 
+#ifdef HALO_64BIT
+	overlapped->hEvent = (HANDLE)(__INTPTR_TYPE__)overlapped_index;
+#else
 	overlapped->hEvent = (HANDLE)overlapped_index;
+#endif
 	overlapped->Offset = offset;
 	overlapped->OffsetHigh = 0;
 

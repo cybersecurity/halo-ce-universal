@@ -82,9 +82,11 @@ struct lru_cache
 	long block_count;
 	unsigned long signature;
 };
+#ifndef HALO_64BIT
 
 typedef char lru_cache_size_assert[sizeof(struct lru_cache) == 0x48 ? 1 : -1];
 typedef char lru_cache_block_size_assert[sizeof(struct lru_cache_block) == 0x10 ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 

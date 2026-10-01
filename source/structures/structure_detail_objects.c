@@ -165,6 +165,7 @@ typedef char detail_object_cell_coordinate_size[
 	sizeof(struct detail_object_cell_coordinate) == 0x8 ? 1 : -1];
 typedef char detail_object_cell_definition_size[
 	sizeof(struct detail_object_cell_definition) == 0x20 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char detail_object_cell_data_size[
 	sizeof(struct detail_object_cell_data) == 0x18 ? 1 : -1];
 typedef char detail_object_layer_data_size[
@@ -175,6 +176,7 @@ typedef char detail_object_runtime_data_size[
 	sizeof(struct detail_object_runtime_data) == 0x5210 ? 1 : -1];
 typedef char detail_object_global_runtime_data_size[
 	sizeof(struct detail_object_global_runtime_data) == 0xA430 ? 1 : -1];
+#endif
 typedef char structure_detail_object_data_size[
 	sizeof(struct structure_detail_object_data) == 0x40 ? 1 : -1];
 typedef char detail_object_size[

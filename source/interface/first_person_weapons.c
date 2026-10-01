@@ -124,6 +124,9 @@ symbols in this file:
 #include "sound/game_sound.h"
 #include "sound/sound_manager.h"
 #include "units/units.h"
+#ifdef HALO_64BIT
+#include "rasterizer/rasterizer_model_types.h"
+#endif
 
 /* ---------- constants */
 
@@ -230,8 +233,10 @@ struct animation_graph_node
 typedef char verify_animation_graph_node_size[
 	sizeof(struct animation_graph_node) == 0x40 ? 1 : -1];
 
+#ifndef HALO_64BIT
 typedef char verify_render_model_effect_size[
 	sizeof(struct render_model_effect) == 0x28 ? 1 : -1];
+#endif
 
 struct first_person_weapon
 {

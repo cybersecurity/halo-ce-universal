@@ -14,7 +14,9 @@ header included in hcex build.
 
 /* ---------- structures */
 
+#ifndef HALO_64BIT
 struct hud_globals_definition;
+#endif
 struct tag_block;
 union real_argb_color;
 union real_point3d;

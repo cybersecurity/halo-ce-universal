@@ -169,6 +169,9 @@ symbols in this file:
 #include "units/vehicles.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#ifdef HALO_64BIT
+#include "cseries/sort.h"
+#endif
 
 /* ---------- constants */
 
@@ -252,8 +255,10 @@ typedef char actor_firing_position_definition_size_assert[
 	sizeof(struct firing_position_definition) == 0x18 ? 1 : -1];
 typedef char actor_firing_position_evaluation_context_size_assert[
 	sizeof(struct firing_position_evaluation_context) == 0x670 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char actor_firing_position_size_assert[
 	sizeof(struct firing_position) == 0x3C ? 1 : -1];
+#endif
 typedef char actor_firing_position_context_rejected_offset_assert[
 	offsetof(struct firing_position_evaluation_context, allow_rejected_positions) == 0x14 ? 1 : -1];
 typedef char actor_firing_position_context_avoid_count_offset_assert[
@@ -264,10 +269,12 @@ typedef char actor_firing_position_context_target_offset_assert[
 	offsetof(struct firing_position_evaluation_context, has_target) == 0x5FC ? 1 : -1];
 typedef char actor_firing_position_context_bound_offset_assert[
 	offsetof(struct firing_position_evaluation_context, post_evaluation_bound) == 0x660 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char actor_firing_position_valid_offset_assert[
 	offsetof(struct firing_position, valid) == 0x30 ? 1 : -1];
 typedef char actor_firing_position_evaluation_offset_assert[
 	offsetof(struct firing_position, evaluation) == 0x38 ? 1 : -1];
+#endif
 typedef char actor_firing_position_scenario_encounters_offset_assert[
 	offsetof(struct scenario, ai_encounters) == 0x42C ? 1 : -1];
 typedef char actor_firing_position_encounter_squads_offset_assert[

@@ -30,7 +30,7 @@ unsigned long *structure_bsp_get_cluster_pvs(
 
 	// Get pointer to bitvector starting at the cluster index
 	return (unsigned long *)(
-		(byte *)structure_bsp->cluster_data.address +
+		(byte *)xbox_pointer(structure_bsp->cluster_data.address) +
 		sizeof(unsigned long) * cluster_index *
 		BIT_VECTOR_SIZE_IN_LONGS(structure_bsp->clusters.count));
 }
@@ -146,7 +146,7 @@ byte *structure_bsp_get_cluster_encoded_sound_data(
 	match_assert("c:\\halo\\SOURCE\\structures\\structure_bsp_definitions.c", 1202, row_index<column_index);
 	match_assert("c:\\halo\\SOURCE\\structures\\structure_bsp_definitions.c", 1203, offset>=0 && offset<structure_bsp->sound_cluster_data.size);
 
-	return &((byte *)structure_bsp->sound_cluster_data.address)[offset];
+	return &((byte *)xbox_pointer(structure_bsp->sound_cluster_data.address))[offset];
 }
 
 byte structure_bsp_get_cluster_encoded_sound_distance(

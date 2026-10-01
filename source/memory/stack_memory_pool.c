@@ -234,6 +234,12 @@ static struct stack_memory_pool_block *stack_memory_pool_resize_block(
 void stack_memory_pool_reset(
 	struct stack_memory_pool *pool)
 {
+#ifdef HALO_64BIT
+	char const *saved_name;
+	byte *saved_base_address;
+	int saved_size;
+	int saved_maximum_block_count;
+#else
 	unsigned long *pool_data = (unsigned long *)pool;
 	unsigned long saved_name;
 	unsigned long saved_base_address;
@@ -241,6 +247,7 @@ void stack_memory_pool_reset(
 	unsigned long saved_maximum_block_count;
 	unsigned long *blocks;
 	unsigned long blocks_address;
+#endif
 
 	if (!pool)
 	{
@@ -248,21 +255,43 @@ void stack_memory_pool_reset(
 		system_exit(-1);
 	}
 
+#ifdef HALO_64BIT
+	/* clear everything but the pool's identity and storage */
+	saved_name = pool->name;
+	saved_base_address = pool->base_address;
+	saved_maximum_block_count = pool->maximum_block_count;
+	saved_size = pool->size;
+#else
 	saved_name = pool_data[0];
 	saved_base_address = pool_data[1];
 	saved_maximum_block_count = pool_data[3];
 	blocks = pool_data + 13;
 	blocks_address = (unsigned long)blocks;
 	saved_size = pool_data[2];
+#endif
 
+#ifdef HALO_64BIT
+	csmemset(pool->blocks, 0, saved_maximum_block_count * sizeof(pool->blocks[0]));
+	csmemset(pool, 0, offsetof(struct stack_memory_pool, blocks));
+#else
 	csmemset(blocks, 0, saved_maximum_block_count * sizeof(*blocks));
 	csmemset(pool, 0, 0x34);
+#endif
 
+#ifdef HALO_64BIT
+	pool->name = saved_name;
+	pool->base_address = saved_base_address;
+	pool->maximum_block_count = saved_maximum_block_count;
+	pool->size = saved_size;
+	/* as January does: the first slot holds the slot array's own address */
+	pool->blocks[0] = (struct stack_memory_pool_block *)pool->blocks;
+#else
 	pool_data[0] = saved_name;
 	pool_data[1] = saved_base_address;
 	pool_data[3] = saved_maximum_block_count;
 	pool_data[2] = saved_size;
 	csmemcpy(blocks, &blocks_address, sizeof(blocks_address));
+#endif
 
 	return;
 }
@@ -367,7 +396,12 @@ void dispose_pointer(
 	unsigned long block_size;
 
 	match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x197, p);
+#ifdef HALO_64BIT
+	/* January spelled the header size 0x1C (32-bit pointers) */
+	block = (struct stack_memory_pool_block *)((byte *)p-offsetof(struct stack_memory_pool_block, data));
+#else
 	block = (struct stack_memory_pool_block *)((byte *)p-0x1C);
+#endif
 	if (!stack_memory_pool_valid_block(pool, block))
 	{
 		display_assert(
@@ -559,7 +593,14 @@ void *pool_resize_pointer(
 	boolean locked;
 
 	if (pointer)
+#ifdef HALO_64BIT
+		/* January spelled this 0x18, and steps back sizeof(unsigned int)
+		more below: the header size, 0x1C with 32-bit pointers */
+		block = (struct stack_memory_pool_block *)((byte *)pointer-
+			(offsetof(struct stack_memory_pool_block, data) - sizeof(unsigned int)));
+#else
 		block = (struct stack_memory_pool_block *)((byte *)pointer-0x18);
+#endif
 	else
 		block = NULL;
 	old_block_size = 0;
@@ -658,7 +699,11 @@ static unsigned long stack_memory_pool_free_space_at_end_of_pool(
 
 	block = pool->last_block;
 	match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x22F, block);
+#ifdef HALO_64BIT
+	return pool->size-(block->size_and_flags&0x7FFFFFFF)+(unsigned long)((byte *)pool->base_address-(byte *)pool->last_block);
+#else
 	return pool->size-(block->size_and_flags&0x7FFFFFFF)+(unsigned long)pool->base_address-(unsigned long)pool->last_block;
+#endif
 }
 
 static long stack_memory_pool_find_first_unused_memory_block(
@@ -1001,7 +1046,11 @@ static struct stack_memory_pool_block *stack_memory_pool_allocate(
 		unsigned long free_space_at_end_of_pool;
 
 		size += sizeof(*block);
+#ifdef HALO_64BIT
+		while (size%sizeof(void *)) /* 4 on the Xbox; blocks hold pointers */
+#else
 		while (size%4)
+#endif
 			size++;
 		free_space_at_end_of_pool = stack_memory_pool_free_space_at_end_of_pool(pool);
 		if (free_space_at_end_of_pool < size)

@@ -238,8 +238,10 @@ typedef char player_control_pitch_minimum_offset_assert[
 	offsetof(struct player_control, pitch_minimum) == 0x38 ? 1 : -1];
 typedef char player_control_pitch_maximum_offset_assert[
 	offsetof(struct player_control, pitch_maximum) == 0x3C ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char player_control_unit_camera_info_size_assert[
 	sizeof(struct player_control_unit_camera_info) == 0x18 ? 1 : -1];
+#endif
 
 /* ---------- prototypes/PLAYER_CONTROL.C */
 

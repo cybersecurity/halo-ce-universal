@@ -3151,7 +3151,7 @@ static void evaluator( \
 	struct hs_arguments_string *arguments = (struct hs_arguments_string *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
-		function(arguments->value); \
+		function(xbox_pointer(arguments->value)); /* an Xbox address */ \
 		hs_return(thread_index, 0); \
 	} \
 	return; \
@@ -3166,7 +3166,7 @@ static void evaluator( \
 	struct hs_arguments_long_string *arguments = (struct hs_arguments_long_string *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
-		function(arguments->value0, arguments->value1); \
+		function(arguments->value0, xbox_pointer(arguments->value1)); \
 		hs_return(thread_index, 0); \
 	} \
 	return; \
@@ -3181,7 +3181,7 @@ static void evaluator( \
 	struct hs_arguments_long_long_string *arguments = (struct hs_arguments_long_long_string *)hs_macro_function_evaluate(function_index, thread_index, initialize); \
 	if (arguments) \
 	{ \
-		function(arguments->value0, arguments->value1, arguments->value2); \
+		function(arguments->value0, arguments->value1, xbox_pointer(arguments->value2)); \
 		hs_return(thread_index, 0); \
 	} \
 	return; \
@@ -3318,13 +3318,13 @@ struct hs_arguments_long_word
 
 struct hs_arguments_string
 {
-	char const *value;
+	XPTR(char const) value; /* script values are 32 bits: an Xbox address */
 };
 
 struct hs_arguments_long_string
 {
 	long value0;
-	char const *value1;
+	XPTR(char const) value1; /* script values are 32 bits: an Xbox address */
 };
 
 struct hs_arguments_long_long
@@ -3337,7 +3337,7 @@ struct hs_arguments_long_long_string
 {
 	long value0;
 	long value1;
-	char const *value2;
+	XPTR(char const) value2; /* script values are 32 bits: an Xbox address */
 };
 
 struct hs_arguments_short_word
@@ -3350,7 +3350,7 @@ struct hs_arguments_short_word
 struct hs_arguments_long_long_long
 {
 	long value0;
-	char const *value1;
+	XPTR(char const) value1; /* script values are 32 bits: an Xbox address */
 	long value2;
 };
 
@@ -3383,23 +3383,23 @@ struct hs_function_table_storage
 struct hs_arguments_long_string_string
 {
 	long value0;
-	char const *value1;
-	char const *value2;
+	XPTR(char const) value1; /* script values are 32 bits: an Xbox address */
+	XPTR(char const) value2; /* script values are 32 bits: an Xbox address */
 };
 
 struct hs_arguments_long_string_long_string
 {
 	long value0;
-	char const *value1;
+	XPTR(char const) value1; /* script values are 32 bits: an Xbox address */
 	long value2;
-	char const *value3;
+	XPTR(char const) value3; /* script values are 32 bits: an Xbox address */
 };
 
 struct hs_arguments_long_long_string_word
 {
 	long value0;
 	long value1;
-	char const *value2;
+	XPTR(char const) value2; /* script values are 32 bits: an Xbox address */
 	word value3;
 };
 
@@ -3407,7 +3407,7 @@ struct hs_arguments_long_long_long_boolean
 {
 	long value0;
 	long value1;
-	char const *value2;
+	XPTR(char const) value2; /* script values are 32 bits: an Xbox address */
 	boolean value3;
 };
 
@@ -3415,7 +3415,7 @@ struct hs_arguments_long_long_long_boolean_word
 {
 	long value0;
 	long value1;
-	char const *value2;
+	XPTR(char const) value2; /* script values are 32 bits: an Xbox address */
 	boolean value3;
 	byte pad3[3];
 	word value4;
@@ -12075,7 +12075,7 @@ boolean hs_scenario_merge(
 				csstrcpy(file->name, source_file->name);
 				if (tag_data_resize(&file->source, source_file->source.size))
 				{
-					csmemcpy(file->source.address, source_file->source.address, source_file->source.size);
+					csmemcpy(xbox_pointer(file->source.address), xbox_pointer(source_file->source.address), source_file->source.size);
 				}
 				else
 				{
@@ -12115,8 +12115,8 @@ static void hs_allocate(
 		data_make_valid(hs_syntax_data);
 		if (scenario)
 		{
-			match_free("c:\\halo\\SOURCE\\hs\\hs.c", 336, scenario->hs_syntax_data.address);
-			scenario->hs_syntax_data.address = hs_syntax_data;
+			match_free("c:\\halo\\SOURCE\\hs\\hs.c", 336, xbox_pointer(scenario->hs_syntax_data.address));
+			scenario->hs_syntax_data.address = xbox_address(hs_syntax_data);
 			scenario->hs_syntax_data.size =
 				sizeof(struct data_array)+MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO*sizeof(struct hs_syntax_node);
 			tag_data_resize(&scenario->hs_string_constants, 0x400);
@@ -12616,7 +12616,11 @@ static void hs_get_function_parameters_string(
 		for (parameter_index = 0; parameter_index<function->parameter_count; parameter_index++)
 		{
 			csstrcat(result, " <");
+#ifdef HALO_64BIT
+			csstrcat(result, hs_type_names[HS_FUNCTION_PARAMETER_TYPE(function, parameter_index)]);
+#else
 			csstrcat(result, hs_type_names[function->parameter_types[parameter_index]]);
+#endif
 			csstrcat(result, ">");
 		}
 	}
@@ -13057,8 +13061,8 @@ HS_EVALUATE_SHORT_FROM_LONG(ai_scripting_nonswarm_count_evaluate, ai_scripting_n
 HS_EVALUATE_SHORT_FROM_LONG(ai_scripting_status_evaluate, ai_scripting_status)
 HS_EVALUATE_SHORT_FROM_UNSIGNED_SHORT(ai_scripting_conversation_line_evaluate, ai_scripting_conversation_line)
 HS_EVALUATE_SHORT_FROM_UNSIGNED_SHORT(ai_scripting_conversation_status_evaluate, ai_scripting_conversation_status)
-HS_EVALUATE_RETURN_SHORT_FROM_ARGUMENTS(vehicle_scripting_load_magic_evaluate, struct hs_arguments_long_long_long, (vehicle_scripting_load_magic(arguments->value0, arguments->value1, arguments->value2)))
-HS_EVALUATE_RETURN_SHORT_FROM_ARGUMENTS(vehicle_scripting_unload_evaluate, struct hs_arguments_long_long, (vehicle_scripting_unload(arguments->value0, (char const *)arguments->value1)))
+HS_EVALUATE_RETURN_SHORT_FROM_ARGUMENTS(vehicle_scripting_load_magic_evaluate, struct hs_arguments_long_long_long, (vehicle_scripting_load_magic(arguments->value0, xbox_pointer(arguments->value1), arguments->value2)))
+HS_EVALUATE_RETURN_SHORT_FROM_ARGUMENTS(vehicle_scripting_unload_evaluate, struct hs_arguments_long_long, (vehicle_scripting_unload(arguments->value0, (char const *)xbox_pointer(arguments->value1))))
 HS_EVALUATE_LONG_FROM_LONG(unit_scripting_unit_riders_evaluate, unit_scripting_unit_riders)
 HS_EVALUATE_LONG_FROM_LONG(unit_scripting_unit_driver_evaluate, unit_scripting_unit_driver)
 HS_EVALUATE_LONG_FROM_LONG(unit_scripting_unit_gunner_evaluate, unit_scripting_unit_gunner)
@@ -13157,11 +13161,11 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 HS_EVALUATE_VOID_FROM_ARGUMENTS(
 	hs_object_set_permutation_evaluate,
 	struct hs_arguments_long_string_string,
-	hs_object_set_permutation(arguments->value0, arguments->value1, arguments->value2))
+	hs_object_set_permutation(arguments->value0, xbox_pointer(arguments->value1), xbox_pointer(arguments->value2)))
 HS_EVALUATE_VOID_FROM_ARGUMENTS(
 	hs_effect_new_from_object_marker_evaluate,
 	struct hs_arguments_long_long_string,
-	hs_effect_new_from_object_marker(arguments->value0, arguments->value1, arguments->value2))
+	hs_effect_new_from_object_marker(arguments->value0, arguments->value1, xbox_pointer(arguments->value2)))
 static void hs_objects_can_see_object_evaluate(
 	short function_index,
 	long thread_index,
@@ -13228,16 +13232,16 @@ static void objects_scripting_set_scale_evaluate(
 HS_EVALUATE_VOID_FROM_ARGUMENTS(
 	objects_scripting_attach_evaluate,
 	struct hs_arguments_long_string_long_string,
-	objects_scripting_attach(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
+	objects_scripting_attach(arguments->value0, xbox_pointer(arguments->value1), arguments->value2, xbox_pointer(arguments->value3)))
 HS_EVALUATE_VOID_LONG_BOOLEAN(object_beautify_evaluate, object_beautify)
 HS_EVALUATE_VOID_FROM_ARGUMENTS(
 	scenery_animation_start_evaluate,
 	struct hs_arguments_long_long_string,
-	scenery_animation_start(arguments->value0, arguments->value1, arguments->value2))
+	scenery_animation_start(arguments->value0, arguments->value1, xbox_pointer(arguments->value2)))
 HS_EVALUATE_VOID_FROM_ARGUMENTS(
 	scenery_animation_start_at_frame_evaluate,
 	struct hs_arguments_long_long_string_word,
-	scenery_animation_start_at_frame(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
+	scenery_animation_start_at_frame(arguments->value0, arguments->value1, xbox_pointer(arguments->value2), arguments->value3))
 static void unit_scripting_set_maximum_vitality_evaluate(
 	short function_index,
 	long thread_index,
@@ -13458,7 +13462,7 @@ static void debug_sound_classes_set_distances_evaluate(
 		double value1 = arguments->value1;
 		double value2 = arguments->value2;
 
-		debug_sound_classes_set_distances((char const *)arguments->value0, value1, value2);
+		debug_sound_classes_set_distances((char const *)xbox_pointer(arguments->value0), value1, value2);
 		hs_return(thread_index, 0);
 	}
 
@@ -13468,7 +13472,7 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	debug_sound_classes_set_wet_evaluate,
 	union hs_evaluation_argument,
 	1,
-	debug_sound_classes_set_wet((char const *)arguments[0].long_value, real_argument))
+	debug_sound_classes_set_wet((char const *)xbox_pointer(arguments[0].long_value), real_argument))
 static void sound_class_set_gain_evaluate(
 	short function_index,
 	long thread_index,
@@ -13481,7 +13485,7 @@ static void sound_class_set_gain_evaluate(
 	{
 		double value1 = arguments->value1;
 
-		sound_class_set_gain((char const *)arguments->value0, value1, arguments->value2);
+		sound_class_set_gain((char const *)xbox_pointer(arguments->value0), value1, arguments->value2);
 		hs_return(thread_index, 0);
 	}
 
@@ -13763,7 +13767,7 @@ HS_EVALUATE_VOID_LONG_BOOLEAN(ai_scripting_allow_dormant_evaluate, ai_scripting_
 HS_EVALUATE_VOID_FROM_ARGUMENTS(director_script_camera_evaluate, struct hs_arguments_boolean, (director_script_camera(arguments->value)))
 HS_EVALUATE_VOID_FROM_ARGUMENTS(scripted_camera_set_absolute_evaluate, struct hs_arguments_short_word, (scripted_camera_set_absolute(arguments->value0, arguments->value1)))
 HS_EVALUATE_VOID_FROM_ARGUMENTS(scripted_camera_set_evaluate, struct hs_arguments_word_word_long, (scripted_camera_set(arguments->value0, arguments->value1, arguments->value2)))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(scripted_camera_set_animation_evaluate, struct hs_arguments_long_string, (scripted_camera_set_animation(arguments->value0, arguments->value1)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(scripted_camera_set_animation_evaluate, struct hs_arguments_long_string, (scripted_camera_set_animation(arguments->value0, xbox_pointer(arguments->value1))))
 HS_EVALUATE_VOID_LONG(scripted_camera_set_first_person_evaluate, scripted_camera_set_first_person)
 HS_EVALUATE_VOID_LONG(scripted_camera_set_dead_evaluate, scripted_camera_set_dead)
 HS_EVALUATE_VOID_FROM_ARGUMENTS(game_time_set_speed_evaluate, struct hs_arguments_real, (game_time_set_speed(arguments->value)))
@@ -13877,12 +13881,12 @@ HS_EVALUATE_RETURN_BOOLEAN(recorded_animation_play_evaluate, struct hs_arguments
 HS_EVALUATE_RETURN_BOOLEAN(recorded_animation_play_and_delete_evaluate, struct hs_arguments_long_word, (recorded_animation_play_and_delete(arguments->value0, arguments->value1)))
 HS_EVALUATE_RETURN_BOOLEAN(recorded_animation_play_and_hover_evaluate, struct hs_arguments_long_word, (recorded_animation_play_and_hover(arguments->value0, arguments->value1)))
 HS_EVALUATE_RETURN_BOOLEAN(lights_enable_evaluate, struct hs_arguments_boolean, (lights_enable(arguments->value)))
-HS_EVALUATE_RETURN_BOOLEAN(unit_start_user_animation_evaluate, struct hs_arguments_long_long_long_boolean, (unit_start_user_animation(arguments->value0, arguments->value1, arguments->value2, arguments->value3)))
-HS_EVALUATE_RETURN_BOOLEAN(unit_scripting_start_user_animation_list_evaluate, struct hs_arguments_long_long_long_boolean, (unit_scripting_start_user_animation_list(arguments->value0, arguments->value1, arguments->value2, arguments->value3)))
-HS_EVALUATE_RETURN_BOOLEAN(unit_custom_animation_at_frame_evaluate, struct hs_arguments_long_long_long_boolean_word, (unit_custom_animation_at_frame(arguments->value0, arguments->value1, arguments->value2, arguments->value3, arguments->value4)))
+HS_EVALUATE_RETURN_BOOLEAN(unit_start_user_animation_evaluate, struct hs_arguments_long_long_long_boolean, (unit_start_user_animation(arguments->value0, arguments->value1, xbox_pointer(arguments->value2), arguments->value3)))
+HS_EVALUATE_RETURN_BOOLEAN(unit_scripting_start_user_animation_list_evaluate, struct hs_arguments_long_long_long_boolean, (unit_scripting_start_user_animation_list(arguments->value0, arguments->value1, xbox_pointer(arguments->value2), arguments->value3)))
+HS_EVALUATE_RETURN_BOOLEAN(unit_custom_animation_at_frame_evaluate, struct hs_arguments_long_long_long_boolean_word, (unit_custom_animation_at_frame(arguments->value0, arguments->value1, xbox_pointer(arguments->value2), arguments->value3, arguments->value4)))
 HS_EVALUATE_RETURN_BOOLEAN(unit_is_playing_custom_animation_evaluate, struct hs_arguments_long, (unit_is_playing_custom_animation(arguments->value)))
-HS_EVALUATE_RETURN_BOOLEAN(unit_scripting_vehicle_test_seat_list_evaluate, struct hs_arguments_long_long_long, (unit_scripting_vehicle_test_seat_list(arguments->value0, arguments->value1, arguments->value2)))
-HS_EVALUATE_RETURN_BOOLEAN(unit_scripting_vehicle_test_seat_evaluate, struct hs_arguments_long_long_long, (unit_scripting_vehicle_test_seat(arguments->value0, arguments->value1, arguments->value2)))
+HS_EVALUATE_RETURN_BOOLEAN(unit_scripting_vehicle_test_seat_list_evaluate, struct hs_arguments_long_long_long, (unit_scripting_vehicle_test_seat_list(arguments->value0, xbox_pointer(arguments->value1), arguments->value2)))
+HS_EVALUATE_RETURN_BOOLEAN(unit_scripting_vehicle_test_seat_evaluate, struct hs_arguments_long_long_long, (unit_scripting_vehicle_test_seat(arguments->value0, xbox_pointer(arguments->value1), arguments->value2)))
 HS_EVALUATE_RETURN_BOOLEAN(unit_scripting_has_weapon_evaluate, struct hs_arguments_long_long, (unit_scripting_has_weapon(arguments->value0, arguments->value1)))
 HS_EVALUATE_RETURN_BOOLEAN(unit_scripting_has_weapon_readied_evaluate, struct hs_arguments_long_long, (unit_scripting_has_weapon_readied(arguments->value0, arguments->value1)))
 HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(unit_solo_player_integrated_night_vision_is_active_evaluate, unit_solo_player_integrated_night_vision_is_active)
@@ -13962,8 +13966,13 @@ boolean hs_scenario_postprocess(
 	saved_syntax_data = hs_syntax_data;
 	hs_allocate();
 	recompile = scenario->hs_scripts.count == 0 && scenario->hs_source_files.count>0;
+#ifdef HALO_64BIT
+	hs_syntax_data = (struct data_array *)xbox_pointer(scenario->hs_syntax_data.address);
+	hs_syntax_data->data = xbox_address((char *)hs_syntax_data+sizeof(struct data_array));
+#else
 	hs_syntax_data = (struct data_array *)scenario->hs_syntax_data.address;
 	hs_syntax_data->data = (char *)hs_syntax_data+sizeof(struct data_array);
+#endif
 	if (!recompile && hs_compile_postprocess(&error_message, &error_source))
 	{
 		if (scenario->hs_string_constants.size<0x400)

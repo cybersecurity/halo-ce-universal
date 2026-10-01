@@ -89,7 +89,7 @@ enum
 
 #define structure_material_get_vertex(material, vertex_index) \
 	((struct environment_vertex_compressed const *) \
-		(material)->compressed_vertex_data.address + (vertex_index))
+		xbox_pointer((material)->compressed_vertex_data.address) + (vertex_index))
 
 /* ---------- structures */
 

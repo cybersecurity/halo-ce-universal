@@ -148,7 +148,7 @@ struct scenario_structure_bsp_reference
 {
 	long file_offset;
 	long file_size;
-	void *base_address;
+	XPTR(void) base_address; /* tag data: an Xbox address */
 	byte unusedC[4];
 	struct tag_reference structure_bsp;
 };

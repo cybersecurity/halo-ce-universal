@@ -579,7 +579,7 @@ boolean rasterizer_xbox_bitmap_rebuild_hardware_format(
 
 		match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_swizzle.c", 625, offset==size);
 
-		memcpy(bitmap->base_address, buffer, size);
+		memcpy(xbox_pointer(bitmap->base_address), buffer, size);
 		match_free("c:\\halo\\SOURCE\\rasterizer\\rasterizer_swizzle.c", 629, buffer);
 	}
 	else

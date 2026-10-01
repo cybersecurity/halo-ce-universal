@@ -166,9 +166,11 @@ struct rasterizer_dynamic_screen_geometry_parameters
 	boolean point_sampled;
 	byte pad8B;
 };
+#ifndef HALO_64BIT
 
 typedef char verify_rasterizer_dynamic_screen_geometry_parameters_size[
 	sizeof(struct rasterizer_dynamic_screen_geometry_parameters) == 0x8C ? 1 : -1];
+#endif
 
 struct rasterizer_globals_reserved04
 {
@@ -225,8 +227,10 @@ struct rasterizer_globals_definition
 	byte reserved62[0x6];
 };
 
+#ifndef HALO_64BIT
 typedef char verify_rasterizer_globals_size[
 	sizeof(struct rasterizer_globals_definition) == 0x68 ? 1 : -1];
+#endif
 typedef char verify_rasterizer_globals_initialized_offset[
 	offsetof(struct rasterizer_globals_definition, initialized) == 0x00 ? 1 : -1];
 typedef char verify_rasterizer_globals_lock_operation_offset[

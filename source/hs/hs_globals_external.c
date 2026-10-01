@@ -911,8 +911,10 @@ symbols in this file:
 
 /* ---------- structures */
 
+#ifndef HALO_64BIT /* (host-only: native pointers) */
 typedef char verify_hs_external_global_definition_size[
 	sizeof(struct hs_external_global_definition) == 0xC ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 

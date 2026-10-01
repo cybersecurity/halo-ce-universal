@@ -75,24 +75,30 @@ typedef boolean (*connected_geometry_group_predicate)(
 	struct connected_geometry_triangle *triangle,
 	long group_index);
 
+#ifndef HALO_64BIT
 typedef char connected_geometry_dynamic_array_size_assert[
 	sizeof(struct dynamic_array) == 0xC ? 1 : -1];
+#endif
 typedef char connected_geometry_point_size_assert[
 	sizeof(real_point3d) == 0xC ? 1 : -1];
 typedef char connected_geometry_plane_size_assert[
 	sizeof(real_plane3d) == 0x10 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char connected_geometry_edge_size_assert[
 	sizeof(struct connected_geometry_edge) == 0x1C ? 1 : -1];
 typedef char connected_geometry_edge_point_indices_offset_assert[
 	offsetof(struct connected_geometry_edge, point_indices) == 0xC ? 1 : -1];
+#endif
 typedef char connected_geometry_triangle_size_assert[
 	sizeof(struct connected_geometry_triangle) == 0x18 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char connected_geometry_size_assert[
 	sizeof(struct connected_geometry) == 0x24 ? 1 : -1];
 typedef char connected_geometry_edges_offset_assert[
 	offsetof(struct connected_geometry, edges) == 0xC ? 1 : -1];
 typedef char connected_geometry_triangles_offset_assert[
 	offsetof(struct connected_geometry, triangles) == 0x18 ? 1 : -1];
+#endif
 typedef char intermediate_geometry_triangle_size_assert[
 	sizeof(struct intermediate_geometry_triangle) == 0x34 ? 1 : -1];
 typedef char intermediate_geometry_triangle_vertex_indices_offset_assert[
@@ -101,11 +107,13 @@ typedef char intermediate_geometry_vertex_size_assert[
 	sizeof(struct intermediate_geometry_vertex) == 0x50 ? 1 : -1];
 typedef char intermediate_geometry_vertex_point_offset_assert[
 	offsetof(struct intermediate_geometry_vertex, point) == 0x8 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char intermediate_geometry_triangles_offset_assert[
 	offsetof(struct intermediate_geometry, triangles) == 0x134 ? 1 : -1];
 typedef char intermediate_geometry_vertices_offset_assert[
 	offsetof(struct intermediate_geometry, vertices) == 0x140 ? 1 : -1];
 
+#endif
 /* ---------- prototypes */
 
 /* ---------- globals */

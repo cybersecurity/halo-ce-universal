@@ -778,7 +778,7 @@ short scenario_get_structure_reference_index_from_tag_index(
 			structure_bsp_reference_index,
 			struct scenario_structure_bsp_reference);
 
-		if (!csstrcmp(structure_bsp_name, reference->structure_bsp.name))
+		if (!csstrcmp(structure_bsp_name, xbox_pointer(reference->structure_bsp.name)))
 		{
 			result = structure_bsp_reference_index;
 			break;

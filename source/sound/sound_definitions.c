@@ -89,7 +89,7 @@ byte *sound_permutation_get_mouth_aperture(
 		800,
 		tick_index>=0 && tick_index<permutation->mouth_data.size);
 
-	return (byte *)permutation->mouth_data.address + tick_index;
+	return (byte *)xbox_pointer(permutation->mouth_data.address) + tick_index;
 }
 
 short sound_definition_find_pitch_range_by_pitch(

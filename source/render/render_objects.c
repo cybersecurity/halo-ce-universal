@@ -190,10 +190,12 @@ struct render_object_globals
 	long rendered_object_indices[MAXIMUM_RENDERED_OBJECTS];
 };
 
+#ifndef HALO_64BIT
 typedef char render_model_effect_size_assert[
 	sizeof(struct render_model_effect) == 0x28 ? 1 : -1];
 typedef char object_render_data_size_assert[
 	sizeof(struct object_render_data) == 0x48 ? 1 : -1];
+#endif
 typedef char object_render_state_size_assert[
 	sizeof(struct object_render_state) == 0x100 ? 1 : -1];
 /* the native builds render up to MAXIMUM_RENDERED_OBJECTS (objects.h) */

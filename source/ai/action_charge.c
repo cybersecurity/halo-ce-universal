@@ -1007,8 +1007,8 @@ boolean action_charge_setup(
 						{
 							if (start_tick == 0)
 							{
-								char const *name = actor_variant_definition_get(
-									actor->meta.variant_definition_index)->actor_reference.name;
+								char const *name = xbox_pointer(actor_variant_definition_get(
+									actor->meta.variant_definition_index)->actor_reference.name);
 
 								if (name)
 								{

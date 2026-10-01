@@ -300,7 +300,11 @@ long memory_pool_get_free_size(
 long memory_pool_get_used_size(
 	struct memory_pool *pool)
 {
+#ifdef HALO_64BIT
+	return !pool->last_block ? 0 : (unsigned long)((byte *)pool->last_block + pool->last_block->size - (byte *)pool->base_address);
+#else
 	return !pool->last_block ? 0 : (unsigned long)pool->last_block + pool->last_block->size - (unsigned long)pool->base_address;
+#endif
 }
 
 long memory_pool_get_contiguous_free_size(

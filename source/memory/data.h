@@ -30,8 +30,17 @@ struct data_array
 	short count;
 	short actual_count;
 	short next_identifier;
-	void *data;
+	/* an Xbox address: a data array can be serialized in tag data (the
+	scenario's script syntax) and is used there in place */
+	XPTR(void) data;
 };
+#ifdef HALO_64BIT
+
+typedef char data_array_size_assert[
+	sizeof(struct data_array) == 0x38 ? 1 : -1];
+
+#define DATA_ARRAY_DATA(array) XBOX_POINTER(void, (array)->data)
+#endif
 
 struct datum_header
 {
@@ -46,9 +55,11 @@ struct data_iterator
 	long datum_index;
 	unsigned long signature;
 };
+#ifndef HALO_64BIT
 
 typedef char data_iterator_size_assert[
 	sizeof(struct data_iterator) == 0x10 ? 1 : -1];
+#endif
 
 /* ---------- prototypes/DATA.C */
 

@@ -80,6 +80,7 @@ struct rasterizer_cinematic_screen_effect_state
 	real script_values[4];
 	real near_clip_distance;
 };
+#ifndef HALO_64BIT
 
 typedef char rasterizer_cinematic_screen_effect_parameters_tint_offset_assert[
 	offsetof(struct rasterizer_cinematic_screen_effect_parameters, filter_desaturation_tint) == 0x14 ? 1 : -1];
@@ -103,6 +104,7 @@ typedef char rasterizer_cinematic_screen_effect_state_script_values_offset_asser
 	offsetof(struct rasterizer_cinematic_screen_effect_state, script_values) == 0x64 ? 1 : -1];
 typedef char rasterizer_cinematic_screen_effect_state_near_clip_distance_offset_assert[
 	offsetof(struct rasterizer_cinematic_screen_effect_state, near_clip_distance) == 0x74 ? 1 : -1];
+#endif
 
 /* ---------- globals */
 

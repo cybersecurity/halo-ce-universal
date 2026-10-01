@@ -585,6 +585,9 @@ symbols in this file:
 #include "text/unicode.h"
 #include "units/bipeds.h"
 #include "units/units.h"
+#ifdef HALO_64BIT
+#include "main/console.h"
+#endif
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -7344,7 +7347,7 @@ static long item_collection_get_total(
 	struct tag_block const *permutations)
 {
 	struct item_permutation_definition const *permutation =
-		(struct item_permutation_definition const *)permutations->address;
+		(struct item_permutation_definition const *)xbox_pointer(permutations->address);
 	long permutation_count = permutations->count;
 	long result = 0;
 	long permutation_index;
@@ -7372,7 +7375,7 @@ static long random_item(
 		0,
 		(short)item_collection_get_total(permutations));
 	struct item_permutation_definition const *permutation =
-		permutations->address;
+		xbox_pointer(permutations->address);
 	long permutation_index = 0;
 
 	while (permutation_index < permutation_count)

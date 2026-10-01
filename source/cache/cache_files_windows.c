@@ -216,26 +216,34 @@ enum
 
 struct cache_file_tag_instance;
 
+#ifdef HALO_64BIT
+/* cache files hold arrays of Direct3D resource headers */
+typedef char d3d_vertex_buffer_size_assert[sizeof(D3DVertexBuffer) == 0xC ? 1 : -1];
+typedef char d3d_index_buffer_size_assert[sizeof(D3DIndexBuffer) == 0xC ? 1 : -1];
+typedef char d3d_texture_size_assert[sizeof(D3DTexture) == 0x14 ? 1 : -1];
+
+/* read from the cache file: Xbox addresses (as in cache_files.c) */
+#endif
 struct cache_file_tag_header
 {
-	struct cache_file_tag_instance *tag_instances;
+	XPTR(struct cache_file_tag_instance) tag_instances;
 	long scenario_tag_index;
 	unsigned long checksum;
 	long tag_count;
 	long vertex_buffer_count;
-	D3DVertexBuffer *vertex_buffers;
+	XPTR(D3DVertexBuffer) vertex_buffers;
 	long index_buffer_count;
-	D3DIndexBuffer *index_buffers;
+	XPTR(D3DIndexBuffer) index_buffers;
 	unsigned long signature;
 };
 
 struct cache_file_structure_bsp_header
 {
-	void *base_address;
+	XPTR(void) base_address;
 	long vertex_buffer_count;
-	D3DVertexBuffer *vertex_buffers;
+	XPTR(D3DVertexBuffer) vertex_buffers;
 	long lightmap_vertex_buffer_count;
-	D3DVertexBuffer *lightmap_vertex_buffers;
+	XPTR(D3DVertexBuffer) lightmap_vertex_buffers;
 	unsigned long signature;
 };
 
@@ -298,6 +306,7 @@ struct cache_file_runtime_globals
 
 typedef char verify_cache_file_header_size[
 	sizeof(struct cache_file_header) == 0x800 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_cached_map_file_size[
 	sizeof(struct cached_map_file) == 0x80C ? 1 : -1];
 typedef char verify_cached_map_file_name_offset[
@@ -335,6 +344,7 @@ typedef char verify_cache_file_requests_offset[
 		struct cache_file_runtime_globals,
 		requests) == 0x3078 ? 1 : -1];
 
+#endif
 /* ---------- prototypes */
 
 static void cache_file_get_map_path(
@@ -431,7 +441,11 @@ void tags_header_register_vertex_and_index_buffers(
 
 	for (index = 0; index < header->vertex_buffer_count; index++)
 	{
+#ifdef HALO_64BIT
+		D3DVertexBuffer *vertex_buffer = &XBOX_POINTER(D3DVertexBuffer, header->vertex_buffers)[index];
+#else
 		D3DVertexBuffer *vertex_buffer = &header->vertex_buffers[index];
+#endif
 
 		vertex_buffer->Common = D3DCOMMON_TYPE_VERTEXBUFFER | 1;
 		IDirect3DVertexBuffer8_Register(vertex_buffer, NULL);
@@ -439,7 +453,11 @@ void tags_header_register_vertex_and_index_buffers(
 
 	for (index = 0; index < header->index_buffer_count; index++)
 	{
+#ifdef HALO_64BIT
+		D3DIndexBuffer *index_buffer = &XBOX_POINTER(D3DIndexBuffer, header->index_buffers)[index];
+#else
 		D3DIndexBuffer *index_buffer = &header->index_buffers[index];
+#endif
 
 		index_buffer->Common = D3DCOMMON_TYPE_INDEXBUFFER | 1;
 	}
@@ -454,7 +472,11 @@ void tags_header_deregister_vertex_and_index_buffers(
 
 	for (index = 0; index < header->vertex_buffer_count; index++)
 	{
+#ifdef HALO_64BIT
+		D3DVertexBuffer *vertex_buffer = &XBOX_POINTER(D3DVertexBuffer, header->vertex_buffers)[index];
+#else
 		D3DVertexBuffer *vertex_buffer = &header->vertex_buffers[index];
+#endif
 
 		IDirect3DVertexBuffer8_BlockUntilNotBusy(vertex_buffer);
 		match_assert(
@@ -465,7 +487,11 @@ void tags_header_deregister_vertex_and_index_buffers(
 
 	for (index = 0; index < header->index_buffer_count; index++)
 	{
+#ifdef HALO_64BIT
+		D3DIndexBuffer *index_buffer = &XBOX_POINTER(D3DIndexBuffer, header->index_buffers)[index];
+#else
 		D3DIndexBuffer *index_buffer = &header->index_buffers[index];
+#endif
 
 		IDirect3DIndexBuffer8_BlockUntilNotBusy(index_buffer);
 		match_assert(
@@ -484,7 +510,11 @@ void structure_bsp_header_register_vertex_buffers(
 
 	for (index = 0; index < header->vertex_buffer_count; index++)
 	{
+#ifdef HALO_64BIT
+		D3DVertexBuffer *vertex_buffer = &XBOX_POINTER(D3DVertexBuffer, header->vertex_buffers)[index];
+#else
 		D3DVertexBuffer *vertex_buffer = &header->vertex_buffers[index];
+#endif
 
 		vertex_buffer->Common = D3DCOMMON_TYPE_VERTEXBUFFER | 1;
 		IDirect3DVertexBuffer8_Register(vertex_buffer, NULL);
@@ -492,7 +522,11 @@ void structure_bsp_header_register_vertex_buffers(
 
 	for (index = 0; index < header->lightmap_vertex_buffer_count; index++)
 	{
+#ifdef HALO_64BIT
+		D3DVertexBuffer *vertex_buffer = &XBOX_POINTER(D3DVertexBuffer, header->lightmap_vertex_buffers)[index];
+#else
 		D3DVertexBuffer *vertex_buffer = &header->lightmap_vertex_buffers[index];
+#endif
 
 		vertex_buffer->Common = D3DCOMMON_TYPE_VERTEXBUFFER | 1;
 		IDirect3DVertexBuffer8_Register(vertex_buffer, NULL);
@@ -510,14 +544,22 @@ void structure_bsp_header_deregister_vertex_buffers(
 
 	for (index = 0; index < header->vertex_buffer_count; index++)
 	{
+#ifdef HALO_64BIT
+		D3DVertexBuffer *vertex_buffer = &XBOX_POINTER(D3DVertexBuffer, header->vertex_buffers)[index];
+#else
 		D3DVertexBuffer *vertex_buffer = &header->vertex_buffers[index];
+#endif
 
 		IDirect3DVertexBuffer8_BlockUntilNotBusy(vertex_buffer);
 	}
 
 	for (index = 0; index < header->lightmap_vertex_buffer_count; index++)
 	{
+#ifdef HALO_64BIT
+		D3DVertexBuffer *vertex_buffer = &XBOX_POINTER(D3DVertexBuffer, header->lightmap_vertex_buffers)[index];
+#else
 		D3DVertexBuffer *vertex_buffer = &header->lightmap_vertex_buffers[index];
+#endif
 
 		IDirect3DVertexBuffer8_BlockUntilNotBusy(vertex_buffer);
 	}
@@ -1017,9 +1059,16 @@ static void cache_files_open_cache_files(
 		map_file->file = file;
 		if (valid)
 		{
+#ifdef HALO_64BIT
+			char *cache_map_name;
+#else
 			char *cache_map_name = cached_map_file_get(map_file_index)->header.name;
+#endif
 
 			cached_map_file_read_header(map_file_index);
+#ifdef HALO_64BIT
+			cache_map_name = map_file->header.name;
+#endif
 			if (cache_file_read_header_from_dvd(cache_map_name, &dvd_header) &&
 				map_file->header.checksum == dvd_header.checksum &&
 				valid)

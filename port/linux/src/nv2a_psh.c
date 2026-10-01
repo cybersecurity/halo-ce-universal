@@ -325,7 +325,12 @@ static void dot_input(struct xgpu_text *text, const DWORD *state, int stage)
 	"precision highp samplerCube;\n"
 #else
 #define SAMPLE_BIAS ""
+#ifdef __APPLE__
+/* macOS stops at OpenGL 4.1 */
+#define SHADER_VERSION "#version 410 core\n"
+#else
 #define SHADER_VERSION "#version 450 core\n"
+#endif
 #endif
 
 static void sample(struct xgpu_text *text, const struct nv2a_pixel_shader_key *key, int stage, const char *coordinates)

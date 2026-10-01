@@ -325,8 +325,10 @@ typedef char verify_lens_flare_definition_far_fade_distance_offset[
 	offsetof(
 		struct lens_flare_definition,
 		far_fade_distance) == 0x1C ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_rasterizer_light_submit_parameters_size[
 	sizeof(struct rasterizer_light_submit_parameters) == 0x38 ? 1 : -1];
+#endif
 typedef char verify_rasterizer_lights_frame_statistics_dynamic_light_count_offset[
 	offsetof(
 		struct rasterizer_frame_statistics_globals,

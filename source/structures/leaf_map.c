@@ -142,6 +142,9 @@ symbols in this file:
 #include "math/geometry.h"
 #include "render/render_debug.h"
 #include "render/render_debug_geometry.h"
+#ifdef HALO_64BIT
+#include "render/render_debug.h"
+#endif
 
 /* ---------- constants */
 
@@ -436,7 +439,7 @@ boolean leaf_map_initialize_from_bsp(
 
 	profile_enter(leaf_map_initialize_section);
 
-	leaf_map->bsp = bsp;
+	leaf_map->bsp = xbox_address(bsp);
 
 	if (tag_block_resize(&leaf_map->leaves, leaf_count))
 	{
@@ -578,8 +581,13 @@ boolean leaf_map_leaf_spans_polygon(
 	for (face_index = 0; face_index < leaf->faces.count; face_index++)
 	{
 		struct map_leaf_face *face = TAG_BLOCK_GET_ELEMENT(&leaf->faces, face_index, struct map_leaf_face);
+#ifdef HALO_64BIT
+		struct bsp3d_node *node = TAG_BLOCK_GET_ELEMENT(&LEAF_MAP_BSP(leaf_map)->nodes, face->node_index, struct bsp3d_node);
+		real_plane3d *face_plane = TAG_BLOCK_GET_ELEMENT(&LEAF_MAP_BSP(leaf_map)->planes, node->plane_designator, real_plane3d);
+#else
 		struct bsp3d_node *node = TAG_BLOCK_GET_ELEMENT(&leaf_map->bsp->nodes, face->node_index, struct bsp3d_node);
 		real_plane3d *face_plane = TAG_BLOCK_GET_ELEMENT(&leaf_map->bsp->planes, node->plane_designator, real_plane3d);
+#endif
 		short face_projection = projection_from_vector3d(&face_plane->n);
 		boolean face_sign = projection_sign_from_vector3d(&face_plane->n, face_projection);
 		short vertex_index;
@@ -695,8 +703,13 @@ void leaf_map_get_leaf_bounds(
 		for (face_index = 0; face_index < leaf->faces.count; face_index++)
 		{
 			struct map_leaf_face *face = TAG_BLOCK_GET_ELEMENT(&leaf->faces, face_index, struct map_leaf_face);
+#ifdef HALO_64BIT
+			struct bsp3d_node *node = TAG_BLOCK_GET_ELEMENT(&LEAF_MAP_BSP(leaf_map)->nodes, face->node_index, struct bsp3d_node);
+			real_plane3d *plane = TAG_BLOCK_GET_ELEMENT(&LEAF_MAP_BSP(leaf_map)->planes, node->plane_designator, real_plane3d);
+#else
 			struct bsp3d_node *node = TAG_BLOCK_GET_ELEMENT(&leaf_map->bsp->nodes, face->node_index, struct bsp3d_node);
 			real_plane3d *plane = TAG_BLOCK_GET_ELEMENT(&leaf_map->bsp->planes, node->plane_designator, real_plane3d);
+#endif
 			short projection = projection_from_vector3d(&plane->n);
 			boolean sign = projection_sign_from_vector3d(&plane->n, projection);
 			real_point3d point;
@@ -783,10 +796,17 @@ void render_debug_leaf_faces(
 	real_point3d previous_vertex;
 	short face_index;
 
+#ifdef HALO_64BIT
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\leaf_map.c",
+		940,
+		XBOX_POINTER(const struct bsp3d, map->bsp));
+#else
 	match_assert(
 		"c:\\halo\\SOURCE\\structures\\leaf_map.c",
 		940,
 		map->bsp);
+#endif
 
 	for (face_index = 0; face_index < leaf->faces.count; face_index++)
 	{
@@ -882,7 +902,11 @@ static boolean find_like_crossing(
 	{
 		long traversal_node = node_stack_read(levels_up);
 		struct bsp3d_node *node = TAG_BLOCK_GET_ELEMENT(
+#ifdef HALO_64BIT
+			&LEAF_MAP_BSP(leaf_map)->nodes,
+#else
 			&leaf_map->bsp->nodes,
+#endif
 			index_from_node(traversal_node),
 			struct bsp3d_node);
 
@@ -997,7 +1021,11 @@ static void leaf_map_build_leaf_faces(
 	struct leaf_map *leaf_map,
 	long node_index)
 {
+#ifdef HALO_64BIT
+	struct bsp3d_node *node = TAG_BLOCK_GET_ELEMENT(&LEAF_MAP_BSP(leaf_map)->nodes, node_index, struct bsp3d_node);
+#else
 	struct bsp3d_node *node = TAG_BLOCK_GET_ELEMENT(&leaf_map->bsp->nodes, node_index, struct bsp3d_node);
+#endif
 	short child_index;
 
 	for (child_index = 0; child_index < 2; child_index++)
@@ -1047,8 +1075,13 @@ static void leaf_map_build_leaf_face_for_leaf_on_node(
 {
 	long node_index = index_from_node(node_designator);
 	real_plane3d *reference_plane = TAG_BLOCK_GET_ELEMENT(
+#ifdef HALO_64BIT
+		&LEAF_MAP_BSP(leaf_map)->planes,
+		TAG_BLOCK_GET_ELEMENT(&LEAF_MAP_BSP(leaf_map)->nodes, node_index, struct bsp3d_node)->plane_designator,
+#else
 		&leaf_map->bsp->planes,
 		TAG_BLOCK_GET_ELEMENT(&leaf_map->bsp->nodes, node_index, struct bsp3d_node)->plane_designator,
+#endif
 		real_plane3d);
 	struct leaf_map_polygon result = global_leaf_face_polygon;
 	short levels_up;
@@ -1070,9 +1103,17 @@ static void leaf_map_build_leaf_face_for_leaf_on_node(
 		if (traversal_node != node_designator)
 		{
 			plane = *TAG_BLOCK_GET_ELEMENT(
+#ifdef HALO_64BIT
+				&LEAF_MAP_BSP(leaf_map)->planes,
+#else
 				&leaf_map->bsp->planes,
+#endif
 				TAG_BLOCK_GET_ELEMENT(
+#ifdef HALO_64BIT
+					&LEAF_MAP_BSP(leaf_map)->nodes,
+#else
 					&leaf_map->bsp->nodes,
+#endif
 					index_from_node(traversal_node),
 					struct bsp3d_node)->plane_designator,
 				real_plane3d);
@@ -1127,7 +1168,7 @@ static void leaf_map_build_leaf_face_for_leaf_on_node(
 
 			if (tag_block_resize(&face->vertices, result.vertex_count))
 			{
-				csmemcpy(face->vertices.address, result.vertices, result.vertex_count * sizeof(real_point2d));
+				csmemcpy(xbox_pointer(face->vertices.address), result.vertices, result.vertex_count * sizeof(real_point2d));
 			}
 			else if (!leaf_map_globals.error)
 			{
@@ -1147,7 +1188,11 @@ static void leaf_map_build_portals(
 	struct leaf_map *leaf_map,
 	long node_index)
 {
+#ifdef HALO_64BIT
+	struct bsp3d_node *node = TAG_BLOCK_GET_ELEMENT(&LEAF_MAP_BSP(leaf_map)->nodes, node_index, struct bsp3d_node);
+#else
 	struct bsp3d_node *node = TAG_BLOCK_GET_ELEMENT(&leaf_map->bsp->nodes, node_index, struct bsp3d_node);
+#endif
 	short child_index;
 
 	for (child_index = 0; child_index < 2; child_index++)
@@ -1188,7 +1233,11 @@ static void leaf_map_build_portals_from_leaf(
 	long node_index,
 	short levels_up)
 {
+#ifdef HALO_64BIT
+	struct bsp3d_node *node = TAG_BLOCK_GET_ELEMENT(&LEAF_MAP_BSP(leaf_map)->nodes, node_index, struct bsp3d_node);
+#else
 	struct bsp3d_node *node = TAG_BLOCK_GET_ELEMENT(&leaf_map->bsp->nodes, node_index, struct bsp3d_node);
+#endif
 	long first_traversal_node = ancestor_node_index == NONE ? node_stack_read(levels_up) : NONE;
 	boolean side;
 	boolean plane_on_stack = find_like_crossing(leaf_map, node->plane_designator, &side);
@@ -1284,9 +1333,9 @@ static void leaf_map_build_portal_from_leaves(
 
 		vertex_count = convex_hull2d_intersect(
 			(word)face0->vertices.count,
-			face0->vertices.address,
+			xbox_pointer(face0->vertices.address),
 			(word)face1->vertices.count,
-			face1->vertices.address,
+			xbox_pointer(face1->vertices.address),
 			MAXIMUM_PORTAL_VERTICES,
 			vertices,
 			0.00048828125f);
@@ -1314,9 +1363,17 @@ static void leaf_map_build_portal_from_leaves(
 					portal_index,
 					struct leaf_portal);
 				real_plane3d *plane = TAG_BLOCK_GET_ELEMENT(
+#ifdef HALO_64BIT
+					&LEAF_MAP_BSP(leaf_map)->planes,
+#else
 					&leaf_map->bsp->planes,
+#endif
 					TAG_BLOCK_GET_ELEMENT(
+#ifdef HALO_64BIT
+						&LEAF_MAP_BSP(leaf_map)->nodes,
+#else
 						&leaf_map->bsp->nodes,
+#endif
 						node_index,
 						struct bsp3d_node)->plane_designator,
 					real_plane3d);
@@ -1325,7 +1382,11 @@ static void leaf_map_build_portal_from_leaves(
 				real area;
 
 				portal->plane_index = TAG_BLOCK_GET_ELEMENT(
+#ifdef HALO_64BIT
+					&LEAF_MAP_BSP(leaf_map)->nodes,
+#else
 					&leaf_map->bsp->nodes,
+#endif
 					node_index,
 					struct bsp3d_node)->plane_designator;
 
@@ -1387,8 +1448,13 @@ static void leaf_face_get_vertex3d(
 	short vertex_index,
 	real_point3d *result)
 {
+#ifdef HALO_64BIT
+	struct bsp3d_node *node = TAG_BLOCK_GET_ELEMENT(&LEAF_MAP_BSP(map)->nodes, face->node_index, struct bsp3d_node);
+	real_plane3d *plane = TAG_BLOCK_GET_ELEMENT(&LEAF_MAP_BSP(map)->planes, node->plane_designator, real_plane3d);
+#else
 	struct bsp3d_node *node = TAG_BLOCK_GET_ELEMENT(&map->bsp->nodes, face->node_index, struct bsp3d_node);
 	real_plane3d *plane = TAG_BLOCK_GET_ELEMENT(&map->bsp->planes, node->plane_designator, real_plane3d);
+#endif
 	short projection = projection_from_vector3d(&plane->n);
 	boolean sign = projection_sign_from_vector3d(&plane->n, projection);
 

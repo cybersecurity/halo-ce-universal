@@ -103,6 +103,9 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "game/game.h"
+#ifdef HALO_64BIT
+#include "cseries/cseries_windows.h" /* (declared: its result is not an int) */
+#endif
 #ifndef _X86_
 #define _X86_
 #endif
@@ -208,6 +211,7 @@ typedef char verify_raw_gamepad_state_size[
 	sizeof(struct raw_gamepad_state) == 0x8 ? 1 : -1];
 typedef char verify_input_gamepad_feedbacks_offset[
 	offsetof(struct input_globals, gamepad_feedbacks) == 0 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_input_raw_gamepad_states_offset[
 	offsetof(struct input_globals, raw_gamepad_states) == 0x118 ? 1 : -1];
 typedef char verify_input_suppressed_offset[
@@ -247,6 +251,7 @@ typedef char verify_input_buffered_keys_offset[
 typedef char verify_input_globals_size[
 	sizeof(struct input_globals) == 0x40C ? 1 : -1];
 
+#endif
 /* ---------- prototypes */
 
 static void input_update_analog_button_state(

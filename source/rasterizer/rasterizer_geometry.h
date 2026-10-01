@@ -39,8 +39,14 @@ struct vertex_buffer
 	word pad;
 	long count;
 	long offset;
+#ifdef HALO_64BIT
+	/* tag data: Xbox addresses */
+	XPTR(void) base_address;
+	XPTR(IDirect3DVertexBuffer8) hardware_format;
+#else
 	void *base_address;
 	void *hardware_format;
+#endif
 };
 
 enum
@@ -55,8 +61,14 @@ struct triangle_buffer
 	short type;
 	word pad;
 	long count;
+#ifdef HALO_64BIT
+	/* tag data: Xbox addresses */
+	XPTR(void) base_address;
+	XPTR(IDirect3DIndexBuffer8) hardware_format;
+#else
 	void *base_address;
 	void *hardware_format;
+#endif
 };
 
 /* ---------- prototypes/RASTERIZER_GEOMETRY.C */

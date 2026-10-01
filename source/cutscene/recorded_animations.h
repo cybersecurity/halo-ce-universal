@@ -52,4 +52,9 @@ void render_debug_recording(
 
 /* ---------- public code */
 
+#ifdef HALO_64BIT
+void render_debug_recording(
+	void);
+
+#endif
 #endif // __RECORDED_ANIMATIONS_H

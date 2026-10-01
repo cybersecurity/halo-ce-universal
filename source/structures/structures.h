@@ -131,4 +131,9 @@ void structure_decals_update(
 
 /* ---------- public code */
 
+#ifdef HALO_64BIT
+void render_debug_fog_planes(
+	void);
+
+#endif
 #endif // __STRUCTURES_H

@@ -373,11 +373,13 @@ struct bitmap_extract_cube_map_face
 	short source_y_row_delta;
 };
 
+#ifndef HALO_64BIT
 typedef char bitmap_extract_entry_size_assert[
 	sizeof(struct bitmap_extract_entry) == 0x10 ? 1 : -1];
 typedef char bitmap_extract_data_size_assert[
 	sizeof(struct bitmap_extract_data) == 0x2C ? 1 : -1];
 
+#endif
 /* ---------- prototypes */
 
 static void extract_initialize(
@@ -488,14 +490,14 @@ boolean bitmaps_extract(
 		if (extract_data.plate)
 		{
 			decompressed_plate_size = data_decompressed_size(
-				group->import_bitmap.address,
+				xbox_pointer(group->import_bitmap.address),
 				group->import_bitmap.size);
 			match_assert(
 				"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
 				0x104,
 				decompressed_plate_size==sizeof(pixel32)*group->import_width*group->import_height);
 			if (data_decompress(
-				group->import_bitmap.address,
+				xbox_pointer(group->import_bitmap.address),
 				group->import_bitmap.size,
 				bitmap_mipmap_address(extract_data.plate, 0),
 				&decompressed_plate_size,
@@ -573,27 +575,35 @@ boolean bitmaps_extract_from_plate(
 	compressed_color_plate_size = bitmap_get_pixel_data_size(plate);
 	group->import_width = plate->width;
 	group->import_height = plate->height;
+#ifdef HALO_64BIT
+	group->import_bitmap.address = xbox_address(match_malloc(
+#else
 	group->import_bitmap.address = match_malloc(
+#endif
 		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
 		0x8A,
+#ifdef HALO_64BIT
+		compressed_color_plate_size));
+#else
 		compressed_color_plate_size);
+#endif
 	if (group->import_bitmap.address)
 	{
 		if (data_compress(
 			bitmap_mipmap_address(plate, 0),
 			compressed_color_plate_size,
-			group->import_bitmap.address,
+			xbox_pointer(group->import_bitmap.address),
 			&compressed_color_plate_size,
 			compressed_color_plate_size))
 		{
 			compressed_color_plate = match_realloc(
 				"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
 				0x90,
-				group->import_bitmap.address,
+				xbox_pointer(group->import_bitmap.address),
 				compressed_color_plate_size);
 			if (compressed_color_plate)
 			{
-				group->import_bitmap.address = compressed_color_plate;
+				group->import_bitmap.address = xbox_address(compressed_color_plate);
 				group->import_bitmap.size = compressed_color_plate_size;
 				return bitmaps_extract(group, build_debug_plate);
 			}

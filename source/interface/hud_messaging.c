@@ -147,6 +147,9 @@ symbols in this file:
 #include "text/unicode.h"
 
 #include <stddef.h>
+#ifdef HALO_64BIT
+#include "memory/data.h"
+#endif
 
 /* ---------- constants */
 
@@ -396,6 +399,7 @@ typedef char hud_message_size_assert[
 	sizeof(struct hud_message_definition) == 0x8C ? 1 : -1];
 typedef char hud_state_message_text_info_size_assert[
 	sizeof(struct hud_state_message_text_info_definition) == 4 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char hud_state_message_info_size_assert[
 	sizeof(union hud_state_message_info_definition) == 4 ? 1 : -1];
 typedef char hud_state_message_runtime_size_assert[
@@ -408,8 +412,10 @@ typedef char hud_state_message_runtime_valid_offset_assert[
 	offsetof(struct hud_state_message_runtime_definition, valid) == 0x228 ? 1 : -1];
 typedef char hud_state_message_runtime_is_text_flags_offset_assert[
 	offsetof(struct hud_state_message_runtime_definition, is_text_flags) == 0x229 ? 1 : -1];
+#endif
 typedef char hud_messaging_datum_state_message_offset_assert[
 	offsetof(struct hud_messaging_datum_definition, state_message) == 0x230 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char hud_messaging_datum_leave_first_line_blank_offset_assert[
 	offsetof(struct hud_messaging_datum_definition, leave_first_line_blank) == 0x45E ? 1 : -1];
 typedef char hud_messaging_datum_custom_message_offset_assert[
@@ -432,6 +438,7 @@ typedef char hud_messaging_timer_flash_cutoff_offset_assert[
 	offsetof(struct hud_messaging_globals_definition, timer.flash_cutoff) == 0x119E ? 1 : -1];
 typedef char hud_messaging_timer_enabled_offset_assert[
 	offsetof(struct hud_messaging_globals_definition, timer.enabled) == 0x11A7 ? 1 : -1];
+#endif
 typedef char hud_messaging_parameters_size_assert[
 	sizeof(struct hud_messaging_parameters_definition) == 0x120 ? 1 : -1];
 typedef char hud_messaging_single_player_font_index_offset_assert[

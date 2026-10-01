@@ -216,6 +216,7 @@ struct observer_globals
 	real dtime;
 	struct observer local_players[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
 };
+#ifndef HALO_64BIT
 
 typedef char observer_last_command_offset_assert[
 	offsetof(struct observer, last_command) == 0x8 ? 1 : -1];
@@ -231,6 +232,7 @@ typedef char observer_size_assert[
 	sizeof(struct observer) == 0x29C ? 1 : -1];
 typedef char observer_globals_size_assert[
 	sizeof(struct observer_globals) == 0xA74 ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 

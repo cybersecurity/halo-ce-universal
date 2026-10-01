@@ -28,11 +28,13 @@ struct triangle_strip_iterator
 	char signature;
 };
 
+#ifndef HALO_64BIT
 typedef char triangle_strip_iterator_size_assert[(sizeof(struct triangle_strip_iterator) == 12) ? 1 : -1];
 typedef char triangle_strip_iterator_indices_offset_assert[(offsetof(struct triangle_strip_iterator, triangle_strip_vertex_indices) == 4) ? 1 : -1];
 typedef char triangle_strip_iterator_winding_offset_assert[(offsetof(struct triangle_strip_iterator, reverse_winding) == 8) ? 1 : -1];
 typedef char triangle_strip_iterator_signature_offset_assert[(offsetof(struct triangle_strip_iterator, signature) == 9) ? 1 : -1];
 
+#endif
 /* ---------- prototypes/TRIANGLE_STRIPS.C */
 
 void triangle_strip_iterator_new(

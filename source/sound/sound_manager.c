@@ -543,17 +543,22 @@ typedef char verify_sound_source_size[
 	sizeof(struct sound_source) == 0x40 ? 1 : -1];
 typedef char verify_sound_listener_size[
 	sizeof(struct sound_listener) == 0x44 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_sound_channel_datum_size[
 	sizeof(struct sound_channel_datum) == 0x18 ? 1 : -1];
+#endif
 typedef char verify_sound_channel_summary_size[
 	sizeof(struct sound_channel_summary) == 0x48 ? 1 : -1];
 typedef char verify_platform_sound_channel_properties_size[
 	sizeof(struct platform_sound_channel_properties) == 0x20 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_sound_datum_size[
 	sizeof(struct sound_datum) == 0xAC ? 1 : -1];
+#endif
 typedef char verify_looping_sound_datum_size[
 	sizeof(struct looping_sound_datum) == 0xE4 ? 1 : -1];
 
+#ifndef HALO_64BIT
 typedef char verify_sound_manager_globals_size[
 	sizeof(struct sound_manager_globals) == 0x178 ? 1 : -1];
 typedef char verify_sound_platform_definition_size[
@@ -562,12 +567,14 @@ typedef char verify_sound_platform_dispose_offset[
 	offsetof(struct sound_platform_definition, dispose) == 0x8 ? 1 : -1];
 typedef char verify_sound_platform_pause_offset[
 	offsetof(struct sound_platform_definition, set_pause) == 0x28 ? 1 : -1];
+#endif
 typedef char verify_sound_manager_paused_offset[
 	offsetof(struct sound_manager_globals, paused) == 0x2 ? 1 : -1];
 typedef char verify_sound_manager_dialog_time_offset[
 	offsetof(
 		struct sound_manager_globals,
 		game_time_when_no_scripted_dialog_will_be_playing) == 0x4 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_sound_manager_listeners_offset[
 	offsetof(struct sound_manager_globals, listeners) == 0x18 ? 1 : -1];
 typedef char verify_sound_manager_environment_offset[
@@ -575,6 +582,7 @@ typedef char verify_sound_manager_environment_offset[
 typedef char verify_sound_manager_channel_count_offset[
 	offsetof(struct sound_manager_globals, channel_count) == 0x174 ? 1 : -1];
 
+#endif
 /* ---------- prototypes */
 
 static void sound_update_time(

@@ -86,17 +86,27 @@ struct tag_block_definition
 struct tag_block
 {
 	long count;
-	void *address;
-	struct tag_block_definition *definition;
+	XPTR(void) address;
+	XPTR(struct tag_block_definition) definition;
 };
+#ifdef HALO_64BIT
+
+typedef char tag_block_size_assert[
+	sizeof(struct tag_block) == 0xC ? 1 : -1];
+#endif
 
 struct tag_reference
 {
 	unsigned long group_tag;
-	char *name;
+	XPTR(char) name;
 	long name_length;
 	long index;
 };
+#ifdef HALO_64BIT
+
+typedef char tag_reference_size_assert[
+	sizeof(struct tag_reference) == 0x10 ? 1 : -1];
+#endif
 
 struct tag_reference_definition
 {
@@ -105,17 +115,28 @@ struct tag_reference_definition
 	unsigned long *group_tags;
 };
 
+#ifndef HALO_64BIT
 typedef char tag_reference_definition_size_assert[
 	sizeof(struct tag_reference_definition) == 0xC ? 1 : -1];
 
+#endif
 struct tag_data
 {
 	long size;
 	unsigned long pad;
 	long file_offset;
-	void *address;
-	struct tag_data_definition *definition;
+	XPTR(void) address;
+	XPTR(struct tag_data_definition) definition;
 };
+#ifdef HALO_64BIT
+
+typedef char tag_data_size_assert[
+	sizeof(struct tag_data) == 0x14 ? 1 : -1];
+
+#define TAG_BLOCK_ADDRESS(block) XBOX_POINTER(void, (block)->address)
+#define TAG_DATA_ADDRESS(data) XBOX_POINTER(void, (data)->address)
+#define TAG_REFERENCE_NAME(reference) XBOX_POINTER(char, (reference)->name)
+#endif
 
 /* ---------- prototypes/TAG_GROUPS.C */
 

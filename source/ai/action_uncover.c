@@ -29,6 +29,9 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "math/real_math.h"
+#ifdef HALO_64BIT
+#include "cseries/errors.h"
+#endif
 
 /* ---------- macros */
 

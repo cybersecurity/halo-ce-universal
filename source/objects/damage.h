@@ -127,4 +127,9 @@ void object_cause_damage(
 
 /* ---------- public code */
 
+#ifdef HALO_64BIT
+void render_debug_object_damage(
+	void);
+
+#endif
 #endif // __DAMAGE_H

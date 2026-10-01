@@ -113,7 +113,7 @@ static boolean network_game_player_slot_held(
 {
 	return game_in_progress() && game_engine_running() &&
 		player_data && player_data->valid && slot < player_data->maximum_count &&
-		((struct datum_header *)((byte *)player_data->data + player_data->size * slot))->identifier != 0;
+		((struct datum_header *)((byte *)xbox_pointer(player_data->data) + player_data->size * slot))->identifier != 0;
 }
 
 enum

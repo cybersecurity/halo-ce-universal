@@ -27,7 +27,12 @@ enum
 
 /* ---------- types */
 
+#ifdef HALO_64BIT
+/* pointer-sized: a code table can embed a pointer to another definition */
+typedef __INTPTR_TYPE__ byte_swap_code;
+#else
 typedef long byte_swap_code;
+#endif
 
 struct byte_swap_definition
 {

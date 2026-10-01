@@ -74,6 +74,9 @@ symbols in this file:
 #include "memory/data.h"
 #include "objects/object_definitions.h"
 #include "physics/point_physics.h"
+#ifdef HALO_64BIT
+#include "game/game.h"
+#endif
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 

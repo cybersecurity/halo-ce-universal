@@ -235,9 +235,11 @@ typedef char shader_environment_reflection_flags_offset[
 	offsetof(struct shader_environment_definition, reflection_flags) == 0x2D0 ? 1 : -1];
 typedef char shader_texture_animation_size[
 	sizeof(struct shader_texture_animation) == 0x38 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char render_animation_size[
 	sizeof(struct render_animation) == 0x8 ? 1 : -1];
 
+#endif
 /* ---------- prototypes */
 
 /* ---------- globals */

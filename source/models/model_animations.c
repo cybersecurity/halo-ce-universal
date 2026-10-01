@@ -368,7 +368,7 @@ void animation_get_x_offsets(
 	short frame_index;
 	real x_offset = 0.f;
 	real key_x_offset = 0.f;
-	byte const *frame_info = animation->frame_info.address;
+	byte const *frame_info = xbox_pointer(animation->frame_info.address);
 
 	for (frame_index = 0; frame_index < animation->frame_count; frame_index++)
 	{

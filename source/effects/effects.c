@@ -367,11 +367,13 @@ struct effect_marker_list
 	real_vector3d const *forwards;
 };
 
+#ifndef HALO_64BIT
 typedef char effect_marker_list_size_assert[
 	sizeof(struct effect_marker_list) == 0x18 ? 1 : -1];
 typedef char effect_marker_list_names_offset_assert[
 	offsetof(struct effect_marker_list, names) == 0x0C ? 1 : -1];
 
+#endif
 
 struct effect_particles_definition
 {
@@ -436,12 +438,14 @@ typedef char effects_information_size_assert[
 	sizeof(struct effects_information) == 0x6 ? 1 : -1];
 typedef char effect_datum_location_offset_assert[
 	offsetof(struct effect_datum, location) == 0x10 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char effect_datum_object_index_offset_assert[
 	offsetof(struct effect_datum, object_index) == 0x3C ? 1 : -1];
 typedef char effect_datum_location_indices_offset_assert[
 	offsetof(struct effect_datum, location_datum_indices) == 0x5C ? 1 : -1];
 typedef char effect_datum_size_assert[
 	sizeof(struct effect_datum) == 0xFC ? 1 : -1];
+#endif
 typedef char effect_location_datum_matrix_offset_assert[
 	offsetof(struct effect_location_datum, matrix) == 0x08 ? 1 : -1];
 typedef char effect_location_datum_size_assert[

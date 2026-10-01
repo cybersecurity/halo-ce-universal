@@ -49,7 +49,11 @@ struct shader_effect_definition global_shader_effect_additive =
 	0,
 	0,
 	{ 0 },
+#ifdef HALO_64BIT
+	{ 'bitm', 0, 0, NONE },
+#else
 	{ 'bitm', "", 0, NONE },
+#endif
 	{ 0 }
 };
 
@@ -73,7 +77,11 @@ struct shader_effect_definition global_shader_effect_alpha_blended =
 	0,
 	0,
 	{ 0 },
+#ifdef HALO_64BIT
+	{ 'bitm', 0, 0, NONE },
+#else
 	{ 'bitm', "", 0, NONE },
+#endif
 	{ 0 }
 };
 

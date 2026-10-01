@@ -35,8 +35,10 @@ struct lightning_datum
 	long definition_index;
 };
 
+#ifndef HALO_64BIT
 typedef char lightning_globals_size_assert[
 	sizeof(struct lightning_globals) == 0x4 ? 1 : -1];
+#endif
 typedef char lightning_datum_size_assert[
 	sizeof(struct lightning_datum) == 0x8 ? 1 : -1];
 

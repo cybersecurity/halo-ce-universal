@@ -262,10 +262,12 @@ typedef char glow_datum_bitmap_dimension_offset_assert[
 	offsetof(struct glow_datum, bitmap_dimension) == 0x228 ? 1 : -1];
 typedef char glow_datum_number_of_particles_offset_assert[
 	offsetof(struct glow_datum, number_of_particles) == 0x24C ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char glow_datum_size_assert[
 	sizeof(struct glow_datum) == 0x25C ? 1 : -1];
 typedef char glow_particle_size_assert[
 	sizeof(struct glow_particle) == 0x64 ? 1 : -1];
+#endif
 typedef char glow_definition_flags_offset_assert[
 	offsetof(struct glow_definition, flags) == 0x28 ? 1 : -1];
 typedef char glow_definition_color_lower_bound_offset_assert[

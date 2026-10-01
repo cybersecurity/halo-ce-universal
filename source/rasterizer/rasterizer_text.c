@@ -744,7 +744,7 @@ cache_hardware_format_character(
 		hardware_character->x0 = hardware_character_cache.x0;
 		hardware_character->y0 = hardware_character_cache.y0;
 
-		source = (byte *)font->pixels.address + font_character->pixels_offset;
+		source = (byte *)xbox_pointer(font->pixels.address) + font_character->pixels_offset;
 
 		/* (port: the border clear, white with no alpha as the character's
 		own clear texels are) */

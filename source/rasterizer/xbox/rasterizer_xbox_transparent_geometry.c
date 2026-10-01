@@ -558,8 +558,16 @@ typedef char shader_transparent_meter_gradient_min_color_offset_assert[
 typedef char shader_transparent_meter_brightness_source_offset_assert[
 	offsetof(struct shader_transparent_meter_definition, meter_brightness_source) == 0xD8 ? 1 : -1];
 
+#ifdef HALO_64BIT
+struct rasterizer_transparent_geometry_hud_globals_prefix
+#else
 struct transparent_geometry_group
+#endif
 {
+#ifdef HALO_64BIT
+	byte reserved00[0x54];
+	long single_player_font_index;
+#else
 	unsigned long geometry_flags;
 	long object_index;
 	long source_object_index;
@@ -601,7 +609,9 @@ struct transparent_geometry_group
 	byte reserved9C;
 	boolean cortana_hack;
 	byte reserved9E[2];
+#endif
 };
+#ifndef HALO_64BIT
 
 typedef char transparent_geometry_group_size_assert[
 	sizeof(struct transparent_geometry_group) == 0xA0 ? 1 : -1];
@@ -624,6 +634,7 @@ typedef char transparent_geometry_group_sorted_index_offset_assert[
 typedef char transparent_geometry_group_active_camouflage_offset_assert[
 	offsetof(struct transparent_geometry_group,
 		active_camouflage_transparent_source_object_index) == 0x98 ? 1 : -1];
+#endif
 
 struct rasterizer_xbox_transparent_geometry_globals
 {
@@ -633,9 +644,11 @@ struct rasterizer_xbox_transparent_geometry_globals
 	byte reserved09[3];
 	unsigned long transparent_pixel_count;
 };
+#ifndef HALO_64BIT
 
 typedef char rasterizer_xbox_transparent_geometry_globals_size_assert[
 	sizeof(struct rasterizer_xbox_transparent_geometry_globals) == 16 ? 1 : -1];
+#endif
 
 /* ---------- globals */
 

@@ -62,8 +62,10 @@ struct stub_game_engine
 	long type;
 	stub_game_engine_callback callbacks[NUMBER_OF_STUB_GAME_ENGINE_CALLBACKS];
 };
+#ifndef HALO_64BIT
 
 typedef char verify_stub_game_engine_size[sizeof(struct stub_game_engine) == 0x88 ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 

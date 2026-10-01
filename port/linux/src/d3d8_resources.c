@@ -101,7 +101,13 @@ void WINAPI D3DResource_Register(D3DResource *resource, void *base)
 	/* D3DResource is opaque in C; every resource starts Common, Data, Lock */
 	DWORD *fields = (DWORD *)resource;
 
+#ifdef HALO_64BIT
+	/* Data is an offset from base, or with no base already an Xbox virtual
+	address; either way it becomes a physical address */
+	fields[1] = ((base ? xbox_address(base) : 0) + fields[1]) & ~PLATFORM_CONTIGUOUS_BASE;
+#else
 	fields[1] = PLATFORM_VIRTUAL_TO_PHYSICAL((unsigned long)base + fields[1]);
+#endif
 }
 
 ULONG WINAPI D3DResource_Release(D3DResource *resource)
@@ -118,10 +124,18 @@ ULONG WINAPI D3DResource_Release(D3DResource *resource)
 	if (!count && (fields[0] & D3DCOMMON_D3DCREATED))
 	{
 		if ((fields[0] & D3DCOMMON_TYPE_MASK) == D3DCOMMON_TYPE_INDEXBUFFER)
+#ifdef HALO_64BIT
+			platform_contiguous_free(xbox_pointer(fields[1]));
+#else
 			free((void *)fields[1]);
+#endif
 		else if (fields[1])
 			platform_contiguous_free(PLATFORM_PHYSICAL_TO_VIRTUAL(fields[1]));
+#ifdef HALO_64BIT
+		xbox_heap_free(resource);
+#else
 		free(resource);
+#endif
 	}
 	return count;
 }
@@ -142,7 +156,11 @@ void WINAPI D3DResource_BlockUntilNotBusy(D3DResource *resource)
 static HRESULT create_texture(unsigned long width, unsigned long height, unsigned long depth, unsigned long levels,
 	D3DFORMAT format, BOOL cube_map, D3DBaseTexture **result)
 {
+#ifdef HALO_64BIT
+	D3DBaseTexture *texture = xbox_heap_allocate(sizeof(*texture), TRUE);
+#else
 	D3DBaseTexture *texture = calloc(1, sizeof(*texture));
+#endif
 	struct xgpu_texture_description description;
 	unsigned long maximum_levels = floor_log2_unsigned(width > height ? width : height) + 1;
 	void *memory;
@@ -178,7 +196,11 @@ static HRESULT create_texture(unsigned long width, unsigned long height, unsigne
 	memory = allocate_resource_memory(xgpu_texture_face_size(&description) * (cube_map ? 6 : 1));
 	if (!memory)
 	{
+#ifdef HALO_64BIT
+		xbox_heap_free(texture);
+#else
 		free(texture);
+#endif
 		return E_OUTOFMEMORY;
 	}
 	texture->Data = PLATFORM_VIRTUAL_TO_PHYSICAL(memory);
@@ -298,8 +320,13 @@ HRESULT WINAPI D3DTexture_GetSurfaceLevel(D3DTexture *texture, UINT level, D3DSu
 {
 	D3DBaseTexture *base = (D3DBaseTexture *)texture;
 	struct xgpu_texture_description description;
+#ifdef HALO_64BIT
+	D3DSurface *surface = xbox_heap_allocate(sizeof(*surface), TRUE);
+	unsigned int width, height;
+#else
 	D3DSurface *surface = calloc(1, sizeof(*surface));
 	unsigned long width, height;
+#endif
 
 	if (!surface)
 		return E_OUTOFMEMORY;
@@ -333,7 +360,11 @@ void WINAPI D3DSurface_LockRect(D3DSurface *surface, D3DLOCKED_RECT *locked, CON
 
 HRESULT WINAPI D3DDevice_CreateVertexBuffer(UINT length, DWORD usage, DWORD fvf, D3DPOOL pool, D3DVertexBuffer **result)
 {
+#ifdef HALO_64BIT
+	D3DVertexBuffer *buffer = xbox_heap_allocate(sizeof(*buffer), TRUE);
+#else
 	D3DVertexBuffer *buffer = calloc(1, sizeof(*buffer));
+#endif
 	void *memory;
 
 	(void)usage;
@@ -344,7 +375,11 @@ HRESULT WINAPI D3DDevice_CreateVertexBuffer(UINT length, DWORD usage, DWORD fvf,
 	memory = allocate_resource_memory(length ? length : 1);
 	if (!memory)
 	{
+#ifdef HALO_64BIT
+		xbox_heap_free(buffer);
+#else
 		free(buffer);
+#endif
 		return E_OUTOFMEMORY;
 	}
 	buffer->Common = D3DCOMMON_TYPE_VERTEXBUFFER | D3DCOMMON_D3DCREATED | 1;
@@ -362,7 +397,11 @@ void WINAPI D3DVertexBuffer_Lock(D3DVertexBuffer *buffer, UINT offset, UINT size
 
 HRESULT WINAPI D3DDevice_CreateIndexBuffer(UINT length, DWORD usage, D3DFORMAT format, D3DPOOL pool, D3DIndexBuffer **result)
 {
+#ifdef HALO_64BIT
+	D3DIndexBuffer *buffer = xbox_heap_allocate(sizeof(*buffer), TRUE);
+#else
 	D3DIndexBuffer *buffer = calloc(1, sizeof(*buffer));
+#endif
 	void *memory;
 
 	(void)usage;
@@ -370,15 +409,28 @@ HRESULT WINAPI D3DDevice_CreateIndexBuffer(UINT length, DWORD usage, D3DFORMAT f
 	(void)pool;
 	if (!buffer)
 		return E_OUTOFMEMORY;
+#ifdef HALO_64BIT
+	/* index data stays in ordinary memory on the Xbox; Data is virtual */
+	memory = allocate_resource_memory(length ? length : 1);
+#else
 	/* index data stays in ordinary memory on the Xbox too; Data is virtual */
 	memory = calloc(1, length ? length : 1);
+#endif
 	if (!memory)
 	{
+#ifdef HALO_64BIT
+		xbox_heap_free(buffer);
+#else
 		free(buffer);
+#endif
 		return E_OUTOFMEMORY;
 	}
 	buffer->Common = D3DCOMMON_TYPE_INDEXBUFFER | D3DCOMMON_D3DCREATED | 1;
+#ifdef HALO_64BIT
+	buffer->Data = xbox_address(memory);
+#else
 	buffer->Data = (DWORD)memory;
+#endif
 	*result = buffer;
 	return S_OK;
 }
@@ -398,7 +450,11 @@ static unsigned long palette_entry_count(D3DPALETTESIZE size)
 
 HRESULT WINAPI D3DDevice_CreatePalette(D3DPALETTESIZE size, D3DPalette **result)
 {
+#ifdef HALO_64BIT
+	D3DPalette *palette = xbox_heap_allocate(sizeof(*palette), TRUE);
+#else
 	D3DPalette *palette = calloc(1, sizeof(*palette));
+#endif
 	void *memory;
 
 	if (!palette)
@@ -408,7 +464,11 @@ HRESULT WINAPI D3DDevice_CreatePalette(D3DPALETTESIZE size, D3DPalette **result)
 	(void)palette_entry_count(size);
 	if (!memory)
 	{
+#ifdef HALO_64BIT
+		xbox_heap_free(palette);
+#else
 		free(palette);
+#endif
 		return E_OUTOFMEMORY;
 	}
 	palette->Common = D3DCOMMON_TYPE_PALETTE | D3DCOMMON_D3DCREATED | 1 | ((DWORD)size << D3DPALETTE_COMMON_PALETTESIZE_SHIFT);

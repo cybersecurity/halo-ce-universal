@@ -380,8 +380,10 @@ typedef char actions_actor_debug_danger_offset_assert[
 	offsetof(struct actor_debug_info, danger_avoidance_time) == 0x168 ? 1 : -1];
 typedef char actions_actor_debug_dive_offset_assert[
 	offsetof(struct actor_debug_info, dive_decision_time) == 0x184 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char actions_actor_debug_info_size_assert[
 	sizeof(struct actor_debug_info) == 0x657C ? 1 : -1];
+#endif
 typedef char firing_position_evaluation_context_size_assert[
 	sizeof(struct firing_position_evaluation_context) == 0x670 ? 1 : -1];
 

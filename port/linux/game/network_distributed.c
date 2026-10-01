@@ -1044,7 +1044,7 @@ struct player_datum *distributed_player(
 
 	if (player_index < 0 || player_index >= player_data->maximum_count)
 		return NULL;
-	player = (struct player_datum *)((byte *)player_data->data + player_index * player_data->size);
+	player = (struct player_datum *)((byte *)xbox_pointer(player_data->data) + player_index * player_data->size);
 	return player->identifier ? player : NULL;
 }
 

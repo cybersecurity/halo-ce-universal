@@ -144,6 +144,8 @@ static const char shader_prologue[] =
 	/* the #version line comes first, from the context's capabilities */
 	"precision highp float;\n"
 	"precision highp int;\n"
+#elif defined(__APPLE__)
+	"#version 410 core\n"
 #else
 	"#version 450 core\n"
 #endif
@@ -355,9 +357,10 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		"\tvec3 ndc = (vec3(oPos.xy + vec2(0.5 + screen_offset, 0.5), oPos.z) - viewport_offset.xyz) / scale;\n"
 		"\tgl_Position = vec4(ndc * oPos.w, oPos.w);\n"
 #endif
-#ifdef HALO_ANDROID
+#ifdef HALO_GL_NO_CLIP_CONTROL
 		/* what glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE) does on desktop
-		GL: rows from the top, depth 0..1 */
+		GL 4.5: rows from the top, depth 0..1 (OpenGL ES and macOS's 4.1 have
+		no glClipControl) */
 		"\tgl_Position.y = -gl_Position.y;\n"
 		"\tgl_Position.z = 2.0 * gl_Position.z - gl_Position.w;\n"
 #endif

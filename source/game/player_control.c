@@ -1170,11 +1170,11 @@ static void get_local_player_input_blob(
 						constants->look_function.count>1);
 					look_delta.yaw = evaluate_piecewise_linear_function(
 						constants->look_function.count,
-						constants->look_function.address,
+						xbox_pointer(constants->look_function.address),
 						clamped_yaw) * yaw_spin_scale * look_yaw_rate;
 					look_delta.pitch = evaluate_piecewise_linear_function(
 						constants->look_function.count,
-						constants->look_function.address,
+						xbox_pointer(constants->look_function.address),
 						clamped_pitch) * pitch_spin_scale * look_pitch_rate;
 
 					if (player->unit_index != NONE && control->zoom_level != NONE)

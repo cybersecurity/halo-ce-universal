@@ -1394,18 +1394,18 @@ void vehicle_preprocess_node_orientations(
 		return;
 
 	if (animation->animations.count>0
-		&& ((short *)animation->animations.address)[0]!=NONE)
+		&& ((short *)xbox_pointer(animation->animations.address))[0]!=NONE)
 	{
 		aiming_screen_apply(TAG_BLOCK_GET_ELEMENT(&graph->animations,
-			((short *)animation->animations.address)[0], struct animation),
+			((short *)xbox_pointer(animation->animations.address))[0], struct animation),
 			&animation->steering_screen_bounds, vehicle->vehicle.turn, 0.0f, node_orientations);
 	}
 
 	if (animation->animations.count>1
-		&& ((short *)animation->animations.address)[1]!=NONE)
+		&& ((short *)xbox_pointer(animation->animations.address))[1]!=NONE)
 	{
 		overlay = TAG_BLOCK_GET_ELEMENT(&graph->animations,
-			((short *)animation->animations.address)[1], struct animation);
+			((short *)xbox_pointer(animation->animations.address))[1], struct animation);
 
 		value = (triple_product3d(&vehicle->object.up, &vehicle->object.forward,
 			&vehicle->object.translational_velocity)/definition->unknown2f8+1.0f)*0.5f;
@@ -1415,10 +1415,10 @@ void vehicle_preprocess_node_orientations(
 	}
 
 	if (animation->animations.count>2
-		&& ((short *)animation->animations.address)[2]!=NONE)
+		&& ((short *)xbox_pointer(animation->animations.address))[2]!=NONE)
 	{
 		overlay = TAG_BLOCK_GET_ELEMENT(&graph->animations,
-			((short *)animation->animations.address)[2], struct animation);
+			((short *)xbox_pointer(animation->animations.address))[2], struct animation);
 
 		if (vehicle->vehicle.speed<0.0f)
 			value = 0.5f-vehicle->vehicle.speed/definition->unknown2fc*0.5f;
@@ -1431,10 +1431,10 @@ void vehicle_preprocess_node_orientations(
 
 
 	if (animation->animations.count>3
-		&& ((short *)animation->animations.address)[3]!=NONE)
+		&& ((short *)xbox_pointer(animation->animations.address))[3]!=NONE)
 	{
 		overlay = TAG_BLOCK_GET_ELEMENT(&graph->animations,
-			((short *)animation->animations.address)[3], struct animation);
+			((short *)xbox_pointer(animation->animations.address))[3], struct animation);
 
 		value = vehicle_dot_product3d_test(&vehicle->object.translational_velocity, &vehicle->object.forward);
 		value = PIN(value, 0.0f, 1.0f)/(real)fabs(definition->unknown2f8);
@@ -1444,17 +1444,17 @@ void vehicle_preprocess_node_orientations(
 	}
 
 	if (animation->animations.count>4
-		&& ((short *)animation->animations.address)[4]!=NONE)
+		&& ((short *)xbox_pointer(animation->animations.address))[4]!=NONE)
 	{
 		TAG_BLOCK_GET_ELEMENT(&graph->animations,
-			((short *)animation->animations.address)[4], struct animation);
+			((short *)xbox_pointer(animation->animations.address))[4], struct animation);
 	}
 
 	if (animation->animations.count>5
-		&& ((short *)animation->animations.address)[5]!=NONE)
+		&& ((short *)xbox_pointer(animation->animations.address))[5]!=NONE)
 	{
 		overlay = TAG_BLOCK_GET_ELEMENT(&graph->animations,
-			((short *)animation->animations.address)[5], struct animation);
+			((short *)xbox_pointer(animation->animations.address))[5], struct animation);
 
 		if (definition->wheel_circumference>0.0f)
 			value = vehicle->vehicle.wheel/definition->wheel_circumference;

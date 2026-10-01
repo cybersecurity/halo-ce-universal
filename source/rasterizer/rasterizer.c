@@ -686,12 +686,12 @@ struct rasterizer_debug_options rasterizer_debug_options =
 	{ 0 }, /* pad8A[2] */
 };
 /* No PDB name survives for this target-owned BSS symbol. */
-#ifndef HALO_ANDROID /* Mach-O section names differ; the default is .bss anyway */
+#if !defined(HALO_ANDROID) && !defined(__APPLE__) /* Mach-O section names differ; the default is .bss anyway */
 #pragma bss_seg(".bss")
 #endif
 static long bss_004662ec;
 real_argb_color *global_rasterizer_model_ambient_reflection_tint;
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) && !defined(__APPLE__)
 #pragma bss_seg()
 #endif
 
@@ -1910,9 +1910,9 @@ void rasterizer_debug_model_vertices(
 			triangle_vertex_index < part->triangle_buffer.count + 2;
 			triangle_vertex_index++)
 		{
-			word model_vertex_index = ((word const *)part->triangles.address)[triangle_vertex_index];
+			word model_vertex_index = ((word const *)xbox_pointer(part->triangles.address))[triangle_vertex_index];
 			struct rasterizer_model_vertex_compressed const *vertex =
-				&((struct rasterizer_model_vertex_compressed const *)part->compressed_vertices.address)[model_vertex_index];
+				&((struct rasterizer_model_vertex_compressed const *)xbox_pointer(part->compressed_vertices.address))[model_vertex_index];
 			short node_index0;
 			short node_index1;
 			real node_weight0;

@@ -291,6 +291,7 @@ enum
 
 struct bitmap_data;
 
+#ifndef HALO_64BIT
 struct transparent_geometry_group
 {
 	unsigned long geometry_flags;
@@ -325,6 +326,7 @@ struct transparent_geometry_group
 	boolean cortana_hack;
 	byte reserved9E[2];
 };
+#endif
 
 struct rasterizer_environment_globals
 {
@@ -1128,7 +1130,12 @@ void _rasterizer_environment_lightmap_begin(
 			}
 			else
 			{
+#ifdef HALO_64BIT
+				/* the Xbox address, as January seeded with the pointer */
+				unsigned int seed = xbox_address(lightmap_bitmap);
+#else
 				unsigned long seed = (unsigned long)lightmap_bitmap;
+#endif
 				rasterizer_environment_globals.local_lightmap_ambient_color.red = real_seed_random(&seed);
 				rasterizer_environment_globals.local_lightmap_ambient_color.green = real_seed_random(&seed);
 				rasterizer_environment_globals.local_lightmap_ambient_color.blue = real_seed_random(&seed);
@@ -3148,7 +3155,11 @@ void _rasterizer_environment_transparent_geometry_submit(
 		group->effect_type = 0;
 		group->shader_permutation_index = shader_permutation_index;
 		group->dynamic_triangle_buffer_index = dynamic_triangle_buffer_index;
+#ifdef HALO_64BIT
+		group->triangle_buffer = NULL;
+#else
 		group->triangle_buffer_index = 0;
+#endif
 		group->first_triangle_index = first_triangle_index;
 		group->triangle_count = triangle_count;
 		group->dynamic_vertex_buffer_index = NONE;

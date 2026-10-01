@@ -472,14 +472,15 @@ struct object_type_definition *object_type_definitions[NUMBER_OF_OBJECT_TYPES] =
 
 struct object_type_definition *first_object_type_definition;
 /* VC7 otherwise emits this tentative definition as a common symbol. */
-#ifndef HALO_ANDROID /* Mach-O section names differ; the default is .bss anyway */
+#if !defined(HALO_ANDROID) && !defined(__APPLE__) /* Mach-O section names differ; the default is .bss anyway */
 #pragma bss_seg(".bss")
 #endif
 static word processed_bsp_flags;
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) && !defined(__APPLE__)
 #pragma bss_seg()
 #endif
 
+#ifndef HALO_64BIT /* the definitions hold function pointers */
 typedef char verify_object_type_definition_size[
 	sizeof(struct object_type_definition) == 0xA0 ? 1 : -1];
 
@@ -494,6 +495,7 @@ typedef char verify_object_type_definition_part_definitions_offset[
 
 typedef char verify_object_type_definition_next_offset[
 	offsetof(struct object_type_definition, next) == 0x9C ? 1 : -1];
+#endif
 
 /* ---------- public code */
 

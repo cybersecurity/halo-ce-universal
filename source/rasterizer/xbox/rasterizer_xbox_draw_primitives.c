@@ -317,12 +317,14 @@ struct dynamic_triangles_globals
 	byte pad300d[3];
 };
 
+#ifndef HALO_64BIT
 typedef char dynamic_vertex_group_size_assert[
 	sizeof(struct dynamic_vertex_group) == 0x14 ? 1 : -1];
 typedef char dynamic_vertex_buffer_size_assert[
 	sizeof(struct dynamic_vertex_buffer) == 0x10 ? 1 : -1];
 typedef char dynamic_triangle_buffer_size_assert[
 	sizeof(struct dynamic_triangle_buffer) == 0xC ? 1 : -1];
+#endif
 typedef char rasterizer_triangle_size_assert[
 	sizeof(struct rasterizer_triangle) == 0x6 ? 1 : -1];
 
@@ -1317,7 +1319,7 @@ void rasterizer_draw_dynamic_triangles_static_vertices(
 		if (IDirect3DDevice8_SetStreamSource(
 			global_d3d_device,
 			0,
-			(IDirect3DVertexBuffer8 *)vertex_buffer->hardware_format,
+			(IDirect3DVertexBuffer8 *)xbox_pointer(vertex_buffer->hardware_format),
 			vertex_size)>=0 && success)
 		{
 			success = TRUE;
@@ -1452,7 +1454,7 @@ void rasterizer_draw_dynamic_triangles_static_vertices2(
 		if (IDirect3DDevice8_SetStreamSource(
 			global_d3d_device,
 			0,
-			(IDirect3DVertexBuffer8 *)vertex_buffer0->hardware_format,
+			(IDirect3DVertexBuffer8 *)xbox_pointer(vertex_buffer0->hardware_format),
 			vertex_size0)>=0 && success)
 		{
 			success = TRUE;
@@ -1468,7 +1470,7 @@ void rasterizer_draw_dynamic_triangles_static_vertices2(
 		if (IDirect3DDevice8_SetStreamSource(
 			global_d3d_device,
 			1,
-			(IDirect3DVertexBuffer8 *)vertex_buffer1->hardware_format,
+			(IDirect3DVertexBuffer8 *)xbox_pointer(vertex_buffer1->hardware_format),
 			vertex_size1)>=0 && success)
 		{
 			success = TRUE;
@@ -1624,7 +1626,7 @@ void rasterizer_draw_static_triangles_dynamic_vertices(
 
 		if (IDirect3DDevice8_SetIndices(
 			global_d3d_device,
-			(IDirect3DIndexBuffer8 *)triangle_buffer->hardware_format,
+			(IDirect3DIndexBuffer8 *)xbox_pointer(triangle_buffer->hardware_format),
 			dynamic_vertex_buffer->vertex_start_index)>=0 && success)
 		{
 			success = TRUE;
@@ -1746,7 +1748,7 @@ void rasterizer_draw_static_triangles_static_vertices(
 		if (IDirect3DDevice8_SetStreamSource(
 			global_d3d_device,
 			0,
-			(IDirect3DVertexBuffer8 *)vertex_buffer->hardware_format,
+			(IDirect3DVertexBuffer8 *)xbox_pointer(vertex_buffer->hardware_format),
 			vertex_size)>=0 && success)
 		{
 			success = TRUE;
@@ -1761,7 +1763,7 @@ void rasterizer_draw_static_triangles_static_vertices(
 
 		if (IDirect3DDevice8_SetIndices(
 			global_d3d_device,
-			(IDirect3DIndexBuffer8 *)triangle_buffer->hardware_format,
+			(IDirect3DIndexBuffer8 *)xbox_pointer(triangle_buffer->hardware_format),
 			0)>=0 && success)
 		{
 			success = TRUE;

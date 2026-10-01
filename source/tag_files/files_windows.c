@@ -157,6 +157,11 @@ struct find_files_state
 static void file_error(
 	struct file_reference const *file,
 	const char *function_name);
+#ifdef HALO_64BIT
+
+typedef char file_reference_info_size_assert[
+	sizeof(struct file_reference_info) <= FILE_REFERENCE_SIZE ? 1 : -1];
+#endif
 
 /* ---------- globals */
 

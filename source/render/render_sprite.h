@@ -58,9 +58,11 @@ struct build_sprite_group
 	struct bitmap_data *bitmap;
 };
 
+#ifndef HALO_64BIT
 typedef char build_sprite_group_size_assert[
 	sizeof(struct build_sprite_group) == 0x10 ? 1 : -1];
 
+#endif
 struct build_sprite_data
 {
 	long bitmap_group_index;
@@ -75,9 +77,11 @@ struct build_sprite_data
 	word pad22;
 	struct build_sprite_group groups[8];
 };
+#ifndef HALO_64BIT
 
 typedef char build_sprite_data_size_assert[
 	sizeof(struct build_sprite_data) == 0xA4 ? 1 : -1];
+#endif
 
 /* ---------- prototypes/RENDER_SPRITE.C */
 

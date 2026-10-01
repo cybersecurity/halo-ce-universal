@@ -23,10 +23,14 @@ struct bsp3d;
 
 struct leaf_map
 {
-	const struct bsp3d *bsp;
+	XPTR(const struct bsp3d) bsp; /* tag data: an Xbox address */
 	struct tag_block leaves;
 	struct tag_block portals;
 };
+#ifdef HALO_64BIT
+
+#define LEAF_MAP_BSP(map) XBOX_POINTER(const struct bsp3d, (map)->bsp)
+#endif
 
 struct leaf_portal
 {

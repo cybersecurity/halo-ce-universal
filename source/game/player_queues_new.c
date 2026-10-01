@@ -216,12 +216,16 @@ typedef char update_server_queue_datum_size_assert[
 	sizeof(struct update_server_queue_datum) == 0x28 ? 1 : -1];
 typedef char update_client_queue_datum_size_assert[
 	sizeof(struct update_client_queue_datum) == 0x28 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char update_server_globals_size_assert[
 	sizeof(struct update_server_globals) == 0xC + MAXIMUM_SERVER_UPDATES * sizeof(struct update) ? 1 : -1];
+#endif
 typedef char update_server_globals_queues_offset_assert[
 	offsetof(struct update_server_globals, queues) == 0x8 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char update_client_globals_size_assert[
 	sizeof(struct update_client_globals) == 0x94 + MAXIMUM_CLIENT_UPDATES * sizeof(struct update) ? 1 : -1];
+#endif
 typedef char update_client_globals_saved_actions_offset_assert[
 	offsetof(struct update_client_globals, saved_action_collection) == 0xC ? 1 : -1];
 typedef char update_client_globals_current_local_player_offset_assert[
@@ -392,7 +396,7 @@ void update_server_next_update(
 		update);
 	update->update_number = update_number;
 	update->update.action_count = 0;
-	queue = (struct update_server_queue_datum *)update_server_globals.queues->data;
+	queue = (struct update_server_queue_datum *)xbox_pointer(update_server_globals.queues->data);
 	for (queue_index = 0; queue_index<update_server_globals.queues->count; ++queue_index, ++queue)
 	{
 		/* port: a slot no player holds (the distributed netcode's players keep
@@ -659,7 +663,7 @@ relayed */
 static boolean update_client_dequeue_distributed(
 	struct player_action *actions)
 {
-	struct update_client_queue_datum *queue = (struct update_client_queue_datum *)update_client_globals.queues->data;
+	struct update_client_queue_datum *queue = (struct update_client_queue_datum *)xbox_pointer(update_client_globals.queues->data);
 	short queue_index;
 
 	for (queue_index = 0; queue_index < update_client_globals.queues->count; ++queue_index, ++queue)
@@ -727,7 +731,7 @@ boolean update_client_dequeue(
 		return FALSE;
 	}
 
-	queue = (struct update_client_queue_datum *)update_client_globals.queues->data;
+	queue = (struct update_client_queue_datum *)xbox_pointer(update_client_globals.queues->data);
 	for (queue_index = 0; queue_index<update_client_globals.queues->count; ++queue_index, ++queue)
 	{
 		if (queue_index<update->update.action_count)
@@ -756,7 +760,7 @@ boolean update_client_dequeue(
 		}
 	}
 
-	queue = (struct update_client_queue_datum *)update_client_globals.queues->data;
+	queue = (struct update_client_queue_datum *)xbox_pointer(update_client_globals.queues->data);
 	for (queue_index = 0; queue_index<update_client_globals.queues->count; ++queue_index, ++queue)
 	{
 		actions[queue_index].control_flags = queue->control_flags & ~queue->latched_control_flags;

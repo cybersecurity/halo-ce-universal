@@ -106,28 +106,43 @@ const char *platform_save_root(void);
 
 /* ---------- contiguous ("physical") memory
 
-The Xbox maps physical memory at virtual 0x80000000 + P. The layer reserves
-that window at start-up and hands out page-granular blocks from it, so the
-physical/virtual arithmetic the game and Direct3D rely on keeps working. */
+The Xbox maps physical memory at virtual 0x80000000 + P. The layer commits
+that window of the Xbox address space (cseries/xbox_address.h) at start-up and
+hands out page-granular blocks from it, so the physical/virtual arithmetic
+the game and Direct3D rely on keeps working. PLATFORM_CONTIGUOUS_BASE is an
+Xbox address. */
 
-#define PLATFORM_CONTIGUOUS_BASE 0x80000000UL
-#define PLATFORM_CONTIGUOUS_SIZE 0x08000000UL /* a 128 MB development kit */
-#define PLATFORM_ANY_PHYSICAL_ADDRESS 0xffffffffUL
+#define PLATFORM_CONTIGUOUS_BASE 0x80000000U
+#define PLATFORM_CONTIGUOUS_SIZE 0x08000000U /* a 128 MB development kit */
+#define PLATFORM_ANY_PHYSICAL_ADDRESS 0xffffffffU
+
+/* the host's page size, which protection works in (4 KB or more) */
+extern unsigned int platform_host_page_size;
 
 /* returns NULL on failure; physical_address places the block exactly */
 void *platform_contiguous_alloc(unsigned long size, unsigned long alignment,
 	unsigned long physical_address, DWORD protect);
 void platform_contiguous_free(void *address);
 BOOL platform_is_contiguous(const void *address);
-#define PLATFORM_PHYSICAL_TO_VIRTUAL(physical) ((void *)((unsigned long)(physical) | PLATFORM_CONTIGUOUS_BASE))
-#define PLATFORM_VIRTUAL_TO_PHYSICAL(address) ((unsigned long)(address) & ~PLATFORM_CONTIGUOUS_BASE)
+/* write guest memory like DMA does, ignoring its page protection */
+void platform_contiguous_write(void *destination, const void *source, size_t size);
+#define PLATFORM_PHYSICAL_TO_VIRTUAL(physical) xbox_pointer((unsigned long)(physical) | PLATFORM_CONTIGUOUS_BASE)
+#define PLATFORM_VIRTUAL_TO_PHYSICAL(address) ((unsigned long)XBOX_ADDRESS(address) & ~PLATFORM_CONTIGUOUS_BASE)
+
+/* ---------- the game's heap (xbox_heap.c), in the Xbox address space */
+
+void *xbox_heap_allocate(size_t size, BOOL zero);
+void xbox_heap_free(void *pointer);
+size_t xbox_heap_capacity(void *pointer);
+BOOL xbox_heap_contains(const void *pointer);
 
 /* ---------- guest memory write tracking (memory_watch.c)
 
 Pages of the contiguous window that the renderer has cached (textures) are
 write-protected; the first write marks them written and unprotects them.
 Page generations let a cache entry tell whether any of its pages changed
-since it was built. */
+since it was built. Tracking works in host pages; ranges are given as Xbox
+addresses. */
 
 void memory_watch_initialize(void);
 void memory_watch_protect(unsigned long address, unsigned long size);
@@ -142,6 +157,33 @@ void memory_watch_prepare_write(void *address, unsigned long size);
 void memory_watch_forget(void *address, unsigned long size);
 
 /* ---------- time */
+
+/* sleep until a CLOCK_MONOTONIC deadline (clock_nanosleep with
+TIMER_ABSTIME, which macOS lacks) */
+static inline void platform_sleep_until(const struct timespec *deadline)
+{
+#ifndef __APPLE__
+	clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, deadline, NULL);
+#else
+	for (;;)
+	{
+		struct timespec now, remaining;
+
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		remaining.tv_sec = deadline->tv_sec - now.tv_sec;
+		remaining.tv_nsec = deadline->tv_nsec - now.tv_nsec;
+		if (remaining.tv_nsec < 0)
+		{
+			remaining.tv_nsec += 1000000000L;
+			remaining.tv_sec--;
+		}
+		if (remaining.tv_sec < 0)
+			return;
+		if (nanosleep(&remaining, NULL) == 0)
+			return;
+	}
+#endif
+}
 
 /* 100 ns intervals since 1601-01-01, as FILETIME uses */
 void platform_unix_time_to_filetime(unsigned long seconds, unsigned long nanoseconds, FILETIME *file_time);

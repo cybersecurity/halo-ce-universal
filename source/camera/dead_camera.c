@@ -190,7 +190,12 @@ void dead_camera_update(
 		}
 		else
 		{
+#ifdef HALO_64BIT
+			/* January used the command pointer here, a bug */
+			next_unit_index = NONE;
+#else
 			next_unit_index = (long)result;
+#endif
 		}
 		/* January preserves the command pointer as the fallback object index
 		 * when no player is found. This is a bug; a corrected build should

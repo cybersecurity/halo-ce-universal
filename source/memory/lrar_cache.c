@@ -91,9 +91,11 @@ struct lrar_cache
 	lrar_unlock_proc unlock_proc;
 	unsigned long signature;
 };
+#ifndef HALO_64BIT
 
 typedef char lrar_cache_size_assert[sizeof(struct lrar_cache) == 0x48 ? 1 : -1];
 typedef char lrar_cache_block_size_assert[sizeof(struct lrar_cache_block) == 0x10 ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 

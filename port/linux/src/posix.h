@@ -55,6 +55,10 @@ int posix_set_file_times(const char *path,
 	posix_ulong modification_seconds, posix_ulong modification_nanoseconds);
 
 /* 64-bit file positioning on a descriptor */
+/* names the code at an address (a symbol, or module+offset) without
+allocating, for crash backtraces */
+void posix_describe_address(void *address, char *buffer, posix_ulong size);
+
 int posix_seek(int descriptor, posix_long offset_low, posix_long offset_high, int whence,
 	posix_ulong *position_low, posix_ulong *position_high);
 int posix_truncate(int descriptor, posix_ulong size_low, posix_ulong size_high);

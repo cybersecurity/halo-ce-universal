@@ -2830,10 +2830,12 @@ typedef char verify_rasterizer_xbox_refresh_rate_offset[
 	offsetof(
 		struct rasterizer_globals_definition,
 		framerate_throttle_target) == 0x40 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_rasterizer_xbox_default_2d_hardware_format_offset[
 	offsetof(
 		struct rasterizer_globals_definition,
 		default_2d_hardware_format) == 0x54 ? 1 : -1];
+#endif
 
 boolean _rasterizer_initialize(
 	void)

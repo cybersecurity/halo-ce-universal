@@ -718,9 +718,11 @@ struct reply_usage
 
 typedef char dialogue_usage_size_assert[
 	sizeof(struct dialogue_usage) == 0x28 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char reply_usage_size_assert[
 	sizeof(struct reply_usage) == 0x24 ? 1 : -1];
 
+#endif
 typedef char ai_conversation_line_view_current_line_offset_assert[
 	offsetof(struct conversation_datum, line_index) == 0x48 ? 1 : -1];
 
@@ -851,11 +853,13 @@ typedef char ai_communication_actor_idle_combat_offset_assert[
 	offsetof(struct actor_datum, control.idle_vocalization_combat) == 0x6CC ? 1 : -1];
 typedef char ai_communication_actor_idle_timer_offset_assert[
 	offsetof(struct actor_datum, control.idle_vocalization_timer) == 0x6CE ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char ai_communication_actor_iterator_size_assert[
 	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
 typedef char ai_communication_actor_iterator_index_offset_assert[
 	offsetof(struct actor_iterator, index) == 0x14 ? 1 : -1];
 
+#endif
 /* ---------- prototypes */
 
 static boolean reply_filter_close(

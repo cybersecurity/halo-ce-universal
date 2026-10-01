@@ -198,7 +198,7 @@ enum ui_audio_feedback_sound
 #define virtual_keyboard_definition_get(index) \
 	((struct virtual_keyboard_definition *)tag_get(VIRTUAL_KEYBOARD_TAG, (index)))
 #define virtual_keyboard_key_get(definition, index) \
-	((struct virtual_keyboard_key *)(definition)->keys.address + (index))
+	((struct virtual_keyboard_key *)xbox_pointer((definition)->keys.address) + (index))
 
 /* ---------- structures */
 
@@ -263,8 +263,10 @@ struct virtual_keyboard_globals
 	wchar_t saved_text[MAXIMUM_VIRTUAL_KEYBOARD_SAVED_TEXT_LENGTH];
 };
 
+#ifndef HALO_64BIT
 typedef char verify_virtual_keyboard_globals_size[
 	sizeof(struct virtual_keyboard_globals) == 0x68 ? 1 : -1];
+#endif
 typedef char verify_virtual_keyboard_key_size[
 	sizeof(struct virtual_keyboard_key) == 0x50 ? 1 : -1];
 
@@ -742,7 +744,7 @@ static void virtual_keyboard_render_internal(
 
 	draw_string_set_draw_mode(virtual_keyboard_globals.keyboard->font_tag.index, NONE, 2, 0, &text_color);
 	{
-		struct virtual_keyboard_key *keys = virtual_keyboard_globals.keyboard->keys.address;
+		struct virtual_keyboard_key *keys = xbox_pointer(virtual_keyboard_globals.keyboard->keys.address);
 		wchar_t string[24] = {0};
 		long key_index;
 

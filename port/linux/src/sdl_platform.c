@@ -356,6 +356,14 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+#elif defined(__APPLE__)
+	/* macOS stops at OpenGL 4.1, whose core contexts must be forward
+	compatible; the renderer does without what it uses from later versions
+	(d3d8_gl.c) */
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
 #else
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
@@ -365,7 +373,15 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
 	if (config_boolean("debug.gl_debug"))
-		SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+	{
+		int flags = 0;
+
+#ifndef HALO_ANDROID
+		/* (the Android guest's SDL has no getter: port/android) */
+		SDL_GL_GetAttribute(SDL_GL_CONTEXT_FLAGS, &flags);
+#endif
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, flags | SDL_GL_CONTEXT_DEBUG_FLAG);
+	}
 #if !defined(HALO_ANDROID) && !defined(_WIN32)
 	/* Mesa's GL thread: the renderer makes thousands of GL calls a frame
 	and never waits for their results, so handing them to a thread of
@@ -392,6 +408,13 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		platform_log("SDL_CreateWindow failed: %s", SDL_GetError());
 		return FALSE;
 	}
+#ifdef __APPLE__
+	/* macOS opens a fullscreen window as an animated move to a Space of its
+	own, and the first swap waits for it; the game draws its first frames
+	before its event loop runs (rasterizer_preinitialize), so wait for the
+	window here */
+	SDL_SyncWindow(platform_window);
+#endif
 	platform_gl_context = SDL_GL_CreateContext(platform_window);
 #ifdef HALO_ANDROID
 	/* ES 3.2 where the driver has it, otherwise the renderer makes do with
@@ -410,7 +433,17 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	SDL_GL_MakeCurrent(platform_window, platform_gl_context);
 	if (!gl_functions_load())
 		return FALSE;
+#ifdef __APPLE__
+	{
+		/* port/macos/src/macos_video.c */
+		void macos_set_swap_interval(int interval);
+
+		version = SDL_GL_SetSwapInterval(0);
+		macos_set_swap_interval(config_boolean("display.vsync") ? 1 : 0);
+	}
+#else
 	version = SDL_GL_SetSwapInterval(config_boolean("display.vsync") ? 1 : 0);
+#endif
 	(void)version;
 	platform_event_thread = SDL_GetCurrentThreadID();
 	platform_log("OpenGL %s on %s", (const char *)glGetString(GL_VERSION), (const char *)glGetString(GL_RENDERER));
@@ -836,6 +869,19 @@ void platform_pump_events(void)
 		case SDL_EVENT_GAMEPAD_ADDED:
 			SDL_OpenGamepad(event.gdevice.which);
 			break;
+#ifdef __APPLE__
+		case SDL_EVENT_DROP_FILE:
+		case SDL_EVENT_DROP_TEXT:
+			/* macOS hands an opened halo:// link (an invite) to the running
+			application, which SDL reports as a dropped file; elsewhere it
+			arrives on the command line (p2p_hand_off_invite) */
+			if (event.drop.data && !strncmp(event.drop.data, "halo://", 7))
+			{
+				platform_log("Internet play: opened %s", event.drop.data);
+				p2p_join_invite(event.drop.data);
+			}
+			break;
+#endif
 		default:
 			break;
 		}

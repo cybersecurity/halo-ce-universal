@@ -131,12 +131,14 @@ typedef char sound_channel_sample_offset_offset_assert[
 	offsetof(struct sound_channel, sample_offset) == 0x64 ? 1 : -1];
 typedef char sound_channel_type_flags_offset_assert[
 	offsetof(struct sound_channel, type_flags) == 0x38 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char sound_channel_stream_offset_assert[
 	offsetof(struct sound_channel, stream) == 0x70 ? 1 : -1];
 
 typedef char sound_channel_size_assert[
 	sizeof(struct sound_channel) == 0x74 ? 1 : -1];
 
+#endif
 struct dsound_globals
 {
 	boolean initialized;
@@ -160,6 +162,7 @@ struct dsound_globals
 	byte reserved78c5[3];
 	real pause_gain;
 };
+#ifndef HALO_64BIT
 
 typedef char dsound_globals_type_first_channel_index_offset_assert[
 	offsetof(struct dsound_globals, type_first_channel_index) == 0x7808 ? 1 : -1];
@@ -169,6 +172,7 @@ typedef char dsound_globals_paused_offset_assert[
 	offsetof(struct dsound_globals, paused) == 0x78C4 ? 1 : -1];
 typedef char dsound_globals_pause_gain_offset_assert[
 	offsetof(struct dsound_globals, pause_gain) == 0x78C8 ? 1 : -1];
+#endif
 
 struct sound_platform_definition
 {
@@ -210,9 +214,11 @@ struct sound_platform_definition
 		boolean gain_only);
 	real direct_path_gain;
 };
+#ifndef HALO_64BIT
 
 typedef char sound_platform_definition_direct_path_gain_offset_assert[
 	offsetof(struct sound_platform_definition, direct_path_gain) == 0x38 ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 
@@ -2128,7 +2134,11 @@ static boolean dsound_initialize_channel(
 	stream_desc.lpwfxFormat= &wave_format.wfx;
 	stream_desc.dwFlags= 0;
 	stream_desc.lpfnCallback= dsound_channel_callback;
+#ifdef HALO_64BIT
+	stream_desc.lpvContext= (LPVOID)(__INTPTR_TYPE__)channel_index;
+#else
 	stream_desc.lpvContext= (LPVOID)channel_index;
+#endif
 
 	if (TEST_FLAG(type_flags, _sound_channel_3d_bit))
 	{
@@ -2219,7 +2229,11 @@ static void CALLBACK dsound_channel_callback(
 	void *packet_context,
 	unsigned long status)
 {
+#ifdef HALO_64BIT
+	short channel_index= (short)(__INTPTR_TYPE__)stream_context;
+#else
 	short channel_index= (short)stream_context;
+#endif
 
 	if (channel_index>=0 && channel_index<dsound_globals.actual_channel_count)
 	{
@@ -2383,12 +2397,21 @@ static void dsound_channel_set_properties(
 	boolean gain_only)
 {
 	struct sound_channel *channel= channel_get(channel_index);
+#ifdef HALO_64BIT
+	real prop_gain = PIN(properties->gain, 0.f, 1.f);
+	real gain= dsound_globals.pause_gain*prop_gain;
+#else
 	real gain= dsound_globals.pause_gain*properties->gain;
+#endif
 
 	match_assert(
 		"c:\\halo\\SOURCE\\sound\\sound_dsound_xbox.c",
 		980,
+#ifdef HALO_64BIT
+		prop_gain>=0.f && prop_gain<=1.f);
+#else
 		properties->gain>=0.f && properties->gain<=1.f);
+#endif
 	match_assert(
 		"c:\\halo\\SOURCE\\sound\\sound_dsound_xbox.c",
 		981,
@@ -2522,9 +2545,9 @@ static boolean dsound_channel_queue_packet(
 	{
 		if (channel->playing_permutation->cache_base_address)
 		{
-			if ((byte *)channel->playing_permutation->cache_base_address>=
+			if ((byte *)xbox_pointer(channel->playing_permutation->cache_base_address)>=
 					(byte *)physical_memory_get_sound_cache_base_address() &&
-				(byte *)channel->playing_permutation->cache_base_address+channel->playing_permutation->samples.size<=
+				(byte *)xbox_pointer(channel->playing_permutation->cache_base_address)+channel->playing_permutation->samples.size<=
 					(byte *)physical_memory_get_sound_cache_base_address()+SOUND_CACHE_SIZE)
 			{
 				struct sound_permutation *sound= channel->playing_permutation;
@@ -2534,7 +2557,7 @@ static boolean dsound_channel_queue_packet(
 
 				channel->packet_count++;
 
-				packet.pvBuffer= (byte *)sound->cache_base_address+channel->sample_offset;
+				packet.pvBuffer= (byte *)xbox_pointer(sound->cache_base_address)+channel->sample_offset;
 				packet.pdwCompletedSize= NULL;
 				packet.pdwStatus= NULL;
 				packet.prtTimestamp= 0;

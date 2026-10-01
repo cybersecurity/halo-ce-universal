@@ -212,6 +212,9 @@ symbols in this file:
 #include "bungie_net/network/transport_endpoint_winsock.h"
 #include "memory/circular_queue.h"
 #include "network_connection.h"
+#ifdef HALO_64BIT
+#include "networking/network_game_globals.h"
+#endif
 
 /* ---------- constants */
 

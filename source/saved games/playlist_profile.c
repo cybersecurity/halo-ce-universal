@@ -107,7 +107,12 @@ enum
 
 /* ---------- structures */
 
+#ifdef HALO_64BIT
+/* host-only: January packed it to match its .data layout, which would
+misalign the function pointers on a 64-bit host */
+#else
 #pragma pack(push, 1)
+#endif
 struct playlist_profile_data
 {
 	struct game_variant *(*default_variant_building_functions[
@@ -115,6 +120,7 @@ struct playlist_profile_data
 		struct game_variant *variant);
 	boolean first_time;
 };
+#ifndef HALO_64BIT
 #pragma pack(pop)
 
 typedef char verify_playlist_profile_building_functions_size[
@@ -124,6 +130,7 @@ typedef char verify_playlist_profile_first_time_offset[
 	offsetof(struct playlist_profile_data, first_time) == 0x68 ? 1 : -1];
 typedef char verify_playlist_profile_data_size[
 	sizeof(struct playlist_profile_data) == 0x69 ? 1 : -1];
+#endif
 
 struct playlist_profile_write_request
 {
@@ -144,6 +151,7 @@ struct playlist_profile_runtime_globals_prefix
 	boolean initialized;
 	byte pad;
 };
+#ifndef HALO_64BIT
 
 typedef char verify_playlist_profile_thread_offset[
 	offsetof(struct playlist_profile_runtime_globals_prefix, thread) == 0x6C ? 1 : -1];
@@ -157,6 +165,7 @@ typedef char verify_playlist_profile_initialized_offset[
 		initialized) == 0x72 ? 1 : -1];
 typedef char verify_playlist_profile_globals_size[
 	sizeof(struct playlist_profile_runtime_globals_prefix) == 0x74 ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 

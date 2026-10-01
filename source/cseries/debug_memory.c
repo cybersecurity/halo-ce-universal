@@ -130,9 +130,11 @@ struct debug_memory_globals
 	unsigned long trailing_signature;
 };
 
+#ifndef HALO_64BIT
 typedef char debug_memory_globals_size_must_be_0x20[
 	sizeof(struct debug_memory_globals) == 0x20 ? 1 : -1];
 
+#endif
 struct debug_memory_header
 {
 	unsigned long signature;
@@ -144,11 +146,13 @@ struct debug_memory_header
 	long allocation_id;
 	unsigned long checksum;
 };
+#ifndef HALO_64BIT
 
 typedef char debug_memory_header_size_must_be_0x20[
 	sizeof(struct debug_memory_header) == 0x20 ? 1 : -1];
 typedef char debug_memory_header_checksum_offset_must_be_0x1c[
 	offsetof(struct debug_memory_header, checksum) == 0x1C ? 1 : -1];
+#endif
 
 struct memory_status
 {

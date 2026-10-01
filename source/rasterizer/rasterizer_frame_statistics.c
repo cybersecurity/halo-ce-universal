@@ -206,6 +206,7 @@ typedef char verify_rasterizer_frame_statistics_profile_log_file_offset[
 	offsetof(
 		struct rasterizer_frame_statistics_private_globals_definition,
 		profile_log_file) == 0x758 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_rasterizer_frame_statistics_fps_sample_times_offset[
 	offsetof(
 		struct rasterizer_frame_statistics_private_globals_definition,
@@ -213,6 +214,7 @@ typedef char verify_rasterizer_frame_statistics_fps_sample_times_offset[
 typedef char verify_rasterizer_frame_statistics_private_globals_size[
 	sizeof(struct rasterizer_frame_statistics_private_globals_definition) == 0x850 ? 1 : -1];
 
+#endif
 /* ---------- prototypes */
 
 static boolean eat_my_shorts(
@@ -374,7 +376,7 @@ long rasterizer_frame_statistics_count_static_vertices(
 
 				memcpy(
 					rasterizer_frame_statistics_temp_buffer,
-					triangle_buffer->base_address,
+					xbox_pointer(triangle_buffer->base_address),
 					sizeof(word) * triangle_buffer->count * NUMBER_OF_VERTICES_PER_TRIANGLE);
 				qsort_2byte(rasterizer_frame_statistics_temp_buffer, index_count, eat_my_shorts);
 				for (index = 0; index < index_count; index++)

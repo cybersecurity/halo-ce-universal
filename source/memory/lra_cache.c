@@ -57,10 +57,19 @@ symbols in this file:
 /* ---------- prototypes */
 
 static void lra_default_update_proc(
+#ifdef HALO_64BIT
+	void **address,
+	void *new_address);
+#else
 	long *address,
 	long new_address);
+#endif
 static void lra_default_delete_proc(
+#ifdef HALO_64BIT
+	void **address);
+#else
 	long *address);
+#endif
 static void lra_block_delete(
 	struct lra_block *block,
 	struct lra_cache *cache);
@@ -117,7 +126,11 @@ struct lra_cache *lra_new(
 
 		if (base_address)
 		{
+#ifdef HALO_64BIT
+			match_assert("c:\\halo\\SOURCE\\memory\\lra_cache.c", 107, !(POINTER_BITS(base_address)&3));
+#else
 			match_assert("c:\\halo\\SOURCE\\memory\\lra_cache.c", 107, !((long)base_address&3));
+#endif
 
 			csmemset(cache, 0, sizeof(struct lra_cache));
 			csstrncpy(cache->name, name, MAXIMUM_LRA_CACHE_NAME_LENGTH);
@@ -228,7 +241,11 @@ void lra_unlock(
 void *lra_allocate(
 	struct lra_cache *cache,
 	long size,
+#ifdef HALO_64BIT
+	void **address)
+#else
 	long *address)
+#endif
 {
 	void *result = NULL;
 
@@ -300,7 +317,11 @@ void *lra_allocate(
 				block->next = next_block;
 
 				result = (char *)block + sizeof(struct lra_block);
+#ifdef HALO_64BIT
+				cache->update_proc(address, result);
+#else
 				cache->update_proc(address, (long)result);
+#endif
 
 				if (last_block)
 				{
@@ -318,8 +339,13 @@ void *lra_allocate(
 /* ---------- private code */
 
 static void lra_default_update_proc(
+#ifdef HALO_64BIT
+	void **address,
+	void *new_address)
+#else
 	long *address,
 	long new_address)
+#endif
 {
 	*address = new_address;
 
@@ -327,7 +353,11 @@ static void lra_default_update_proc(
 }
 
 static void lra_default_delete_proc(
+#ifdef HALO_64BIT
+	void **address)
+#else
 	long *address)
+#endif
 {
 	*address = 0;
 

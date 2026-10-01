@@ -27,6 +27,9 @@ disconnected.
 #include "p2p_internal.h"
 
 #include <stdio.h>
+#ifdef HALO_64BIT
+#include <stdlib.h>
+#endif
 #include <string.h>
 
 enum
@@ -173,7 +176,14 @@ static void send_activity(void)
 	else
 	{
 		size = snprintf(json, sizeof(json),
+#ifdef HALO_64BIT
+			"{\"cmd\":\"SET_ACTIVITY\",\"nonce\":\"%lu\",\"args\":{\"pid\":%lu,\"activity\":{"
+			"\"details\":\"In Menus\","
+			"\"assets\":{\"large_image\":\"logo\",\"large_text\":\"Halo: Combat Evolved\"},"
+			"\"instance\":false}}}",
+#else
 			"{\"cmd\":\"SET_ACTIVITY\",\"nonce\":\"%lu\",\"args\":{\"pid\":%lu}}",
+#endif
 			++discord.nonce, (unsigned long)posix_process_id());
 	}
 	discord_send(_opcode_frame, json, size);
@@ -326,6 +336,26 @@ void p2p_discord_update(void)
 			snprintf(scheme, sizeof(scheme), "discord-%s", application);
 			/* (it lets go of the p2p lock while it may wait) */
 			p2p_register_url_scheme(scheme, "Halo: Combat Evolved");
+#ifdef HALO_64BIT
+#ifdef __APPLE__
+			/* Discord on macOS opens discord-<application>:// (Info.plist
+			declares it) unless a games/<application>.json names a command,
+			which it takes for a page of its own instead of running it: the
+			one an earlier version wrote goes */
+			{
+				const char *home = getenv("HOME");
+
+				if (home && *home)
+				{
+					char path[1024];
+
+					snprintf(path, sizeof(path), "%s/Library/Application Support/discord/games/%s.json",
+						home, application);
+					remove(path);
+				}
+			}
+#endif
+#endif
 		}
 	}
 	if (!discord.enabled)

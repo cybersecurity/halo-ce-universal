@@ -143,6 +143,20 @@ struct hs_function_definition
 	short parameter_types[1];
 };
 
+#ifdef HALO_64BIT
+/* A function's parameter types: the first is in the definition, the rest
+follow it in its hs_function_definition_with_N_parameters wrapper. On the
+Xbox the two were contiguous; on a 64-bit host the definition is padded to
+its pointers' alignment, so the rest start sizeof(definition) in. */
+#define HS_FUNCTION_PARAMETER_TYPE(function, index) \
+	((index) == 0 ? (function)->parameter_types[0] : \
+		((short const *)((char const *)(function) + sizeof(struct hs_function_definition)))[(index) - 1])
+
+/* the same, contiguous, for code that walks them as an array (hs_runtime.c) */
+short const *hs_function_parameter_types(
+	struct hs_function_definition const *function);
+#endif
+
 struct hs_external_global_definition
 {
 	char const *name;
@@ -268,4 +282,9 @@ extern boolean debug_trigger_volumes;
 
 /* ---------- public code */
 
+#ifdef HALO_64BIT
+void hs_node_gc(
+	void);
+
+#endif
 #endif // __HS_H

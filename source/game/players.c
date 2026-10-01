@@ -275,6 +275,10 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
+#ifdef HALO_64BIT
+#include "cseries/errors.h"
+#include "networking/network_messages.h"
+#endif
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -395,11 +399,13 @@ struct players_static_data
 	struct profile_section update_after_game_profile;
 	struct player_screen_flash_parameters screen_flash_parameters[2];
 };
+#ifndef HALO_64BIT
 
 typedef char players_static_data_size_assert[
 	sizeof(struct players_static_data) == 0xC18 ? 1 : -1];
 typedef char players_static_data_screen_flash_offset_assert[
 	offsetof(struct players_static_data, screen_flash_parameters) == 0xBF0 ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 

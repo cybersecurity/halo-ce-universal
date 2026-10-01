@@ -291,6 +291,7 @@ typedef char verify_animation_compressed_data_offset_offset[
 	offsetof(struct animation, compressed_data_offset) == 0x88 ? 1 : -1];
 typedef char verify_animation_data_offset[
 	offsetof(struct animation, data) == 0xA0 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_animation_list_entry_size[
 	sizeof(struct animation_list_entry) == 0x08 ? 1 : -1];
 typedef char verify_animation_list_size[
@@ -298,6 +299,7 @@ typedef char verify_animation_list_size[
 typedef char verify_animation_list_animations_offset[
 	offsetof(struct animation_list, animations) == 0x04 ? 1 : -1];
 
+#endif
 static struct animation_list_entry weapon_type_animation_list_entries[] =
 {
 	{ "reload-1", _animation_replacement },

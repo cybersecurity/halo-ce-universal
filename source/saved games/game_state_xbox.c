@@ -127,6 +127,7 @@ struct xbox_game_state_globals_prefix
 	byte reserved00E[2];
 	HANDLE handle;
 };
+#ifndef HALO_64BIT
 
 typedef char verify_xbox_game_state_buffer_offset[
 	offsetof(struct xbox_game_state_globals_prefix, buffer) == 0x4 ? 1 : -1];
@@ -136,6 +137,7 @@ typedef char verify_xbox_game_state_handle_offset[
 	offsetof(struct xbox_game_state_globals_prefix, handle) == 0x10 ? 1 : -1];
 typedef char verify_xbox_game_state_globals_prefix_size[
 	sizeof(struct xbox_game_state_globals_prefix) == 0x14 ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 
@@ -185,18 +187,33 @@ void *game_state_allocate_buffer(
 		"c:\\halo\\SOURCE\\saved games\\game_state_xbox.c",
 		58,
 		result);
+#ifdef HALO_64BIT
+	match_assert(
+		"c:\\halo\\SOURCE\\saved games\\game_state_xbox.c",
+		59,
+		xbox_address(result)==address);
+#else
 	match_assert(
 		"c:\\halo\\SOURCE\\saved games\\game_state_xbox.c",
 		59,
 		(unsigned long)result==address);
+#endif
 
 	XPhysicalProtect(
+#ifdef HALO_64BIT
+		xbox_pointer(address+cpu_size),
+#else
 		(void *)(address+cpu_size),
+#endif
 		gpu_size,
 		PAGE_READWRITE|PAGE_WRITECOMBINE);
 
 	xbox_game_state_globals.buffer_allocated = TRUE;
+#ifdef HALO_64BIT
+	xbox_game_state_globals.buffer = xbox_pointer(address);
+#else
 	xbox_game_state_globals.buffer = (void *)address;
+#endif
 	xbox_game_state_globals.buffer_size = cpu_size+gpu_size;
 
 	return result;

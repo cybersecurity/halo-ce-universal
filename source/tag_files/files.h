@@ -12,7 +12,14 @@ header included in hcex build.
 
 enum
 {
+#ifdef HALO_64BIT
+	/* struct file_reference_info with its file handle: 268 bytes on the
+	Xbox, 272 with a 64-bit handle. Callers only see the opaque size, so a
+	short one let the file layer write past their stack variables. */
+	FILE_REFERENCE_SIZE = 264 + sizeof(void *),
+#else
 	FILE_REFERENCE_SIZE = 268,
+#endif
 	MAXIMUM_FILENAME_LENGTH = 255
 };
 
@@ -122,7 +129,11 @@ enum
 
 struct file_reference
 {
+#ifdef HALO_64BIT
+	char data[FILE_REFERENCE_SIZE] __attribute__((aligned(sizeof(void *))));
+#else
 	char data[FILE_REFERENCE_SIZE];
+#endif
 };
 
 struct file_last_modification_date

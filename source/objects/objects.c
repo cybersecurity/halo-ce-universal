@@ -296,7 +296,7 @@ void *object_iterator_next(
 	abs_index = iterator->absolute_index;
 
 	// The operation to get this header is inlined in the original code?
-	header = (struct object_header_datum *)((char*)object_header_data->data + sizeof(struct object_header_datum) * abs_index);
+	header = (struct object_header_datum *)((char*)xbox_pointer(object_header_data->data) + sizeof(struct object_header_datum) * abs_index);
 
 	while (abs_index<object_header_data->count)
 	{
@@ -451,7 +451,7 @@ void objects_information_get(
 
 	memset(information, 0, sizeof(*information));
 	
-	header = (struct object_header_datum *)object_header_data->data;
+	header = (struct object_header_datum *)xbox_pointer(object_header_data->data);
 	for (i = 0; i<object_header_data->count; header++)
 	{
 		if (header->identifier)
@@ -2922,7 +2922,7 @@ void object_render_debug(
 		real_vector3d velocity;
 		real_matrix4x3 world_matrix;
 		
-		char* model_name = strrchr(object_definition->object.model.name, '\\');
+		char* model_name = strrchr(xbox_pointer(object_definition->object.model.name), '\\');
 		object_get_world_matrix(object_index, &world_matrix);
 		object_get_velocities(object_index, &velocity, NULL);
 
@@ -4190,7 +4190,7 @@ void objects_update(
 
 	if (csmemcmp(last_active_cluster_bits, active_cluster_bits, BIT_VECTOR_SIZE_IN_BYTES(cluster_count)))
 	{
-		object_header = (struct object_header_datum *)object_header_data->data;
+		object_header = (struct object_header_datum *)xbox_pointer(object_header_data->data);
 		for (i = 0; i<object_header_data->count; ++object_header)
 		{
 			if (object_header->identifier &&
@@ -4231,7 +4231,7 @@ void objects_update(
 			cluster_count);
 	}
 
-	object_header = (struct object_header_datum *)object_header_data->data;
+	object_header = (struct object_header_datum *)xbox_pointer(object_header_data->data);
 	for (i = 0; i<object_header_data->count; ++object_header)
 	{
 		if (object_header->identifier)
@@ -4254,7 +4254,7 @@ void objects_update(
 		++i;
 	}
 
-	object_header = (struct object_header_datum *)object_header_data->data;
+	object_header = (struct object_header_datum *)xbox_pointer(object_header_data->data);
 	for (i = 0; i<object_header_data->count; ++object_header)
 	{
 		if (object_header->identifier)

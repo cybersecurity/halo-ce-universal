@@ -182,6 +182,13 @@ static int symbol_sort_proc(
 	const void *elem1,
 	const void *elem2);
 
+#ifdef HALO_64BIT
+/* <execinfo.h> */
+int backtrace(void **frames, int count);
+/* platform/src/posix_files.c: names an address without allocating */
+void posix_describe_address(void *address, char *buffer, unsigned int size);
+
+#endif
 /* ---------- globals */
 
 static struct _stack_walk_globals stack_walk_globals =
@@ -190,8 +197,15 @@ static struct _stack_walk_globals stack_walk_globals =
 	FALSE
 };
 
+#ifdef HALO_64BIT
+/* frame pointers are pointer-sized; a frame record is { previous frame,
+return address } on both x86 and arm64 */
+static __UINTPTR_TYPE__ *old_ebp;
+static __UINTPTR_TYPE__ walk_up_current_frame;
+#else
 static unsigned long *old_ebp;
 static unsigned long walk_up_current_frame;
+#endif
 
 /* ---------- public code */
 
@@ -314,10 +328,22 @@ void stack_walk_with_context(
 	short levels_to_ignore,
 	CONTEXT *context_pointer)
 {
+#ifdef HALO_64BIT
+	/* The Xbox walked EBP frames and named them from the map file; the
+	modern build asks the host, which knows its own symbols. The CONTEXT of
+	a structured exception never arises here. */
+	void *frames[64];
+	int count;
+#else
 	unsigned long routine_addresses[64] = { 0 };
 	unsigned long levels_dumped;
+#endif
 	long frame_number;
 
+#ifdef HALO_64BIT
+	(void)context_pointer;
+	count = backtrace(frames, NUMBEROF(frames));
+#else
 	if (context_pointer)
 	{
 		initialize_stack_walk(context_pointer);
@@ -336,12 +362,28 @@ void stack_walk_with_context(
 			&levels_dumped);
 	}
 
+#endif
 	if (!error_stream)
 	{
 		error(_error_silent, "Printing stuff for Mat's edification");
+#ifdef HALO_64BIT
+	}
+	/* frame 0 is this function */
+	for (frame_number = count - 1; frame_number > levels_to_ignore; frame_number--)
+	{
+		char symbol_name[256];
+#endif
 
+#ifdef HALO_64BIT
+		posix_describe_address(frames[frame_number], symbol_name, sizeof(symbol_name));
+		if (!error_stream)
+#else
 		for (frame_number = levels_dumped - 1; frame_number >= levels_to_ignore; frame_number--)
+#endif
 		{
+#ifdef HALO_64BIT
+			error(_error_silent, "%s", symbol_name);
+#else
 #ifdef HALO_ANDROID
 			/* the call site (the BL before the return address), for
 			llvm-symbolizer --obj=build/android/halo_guest.elf */
@@ -385,9 +427,13 @@ void stack_walk_with_context(
 		if (stack_walk_globals.symbol_table.number_of_symbols && !stack_walk_globals.disregard_symbol_names)
 		{
 			symbol_name = symbol_name_from_address(context_pointer->Eip, &stack_walk_globals.symbol_table);
+#endif
 		}
 		else
 		{
+#ifdef HALO_64BIT
+			fprintf(error_stream, "%s\n", symbol_name);
+#else
 			symbol_name = "?????";
 		}
 
@@ -423,6 +469,7 @@ void stack_walk_with_context(
 				stack_walk_globals.symbol_table.number_of_symbols && !stack_walk_globals.disregard_symbol_names
 					? symbol_name_from_address(routine_addresses[frame_number], &stack_walk_globals.symbol_table)
 					: "?????");
+#endif
 		}
 	}
 
@@ -579,7 +626,7 @@ int load_symbol_table(
 
 			if (strcmp(symbol_name, "_load_symbol_table")==0)
 			{
-				stack_walk_globals.fixup = rva_base - (unsigned long)load_symbol_table;
+				stack_walk_globals.fixup = rva_base - (unsigned long)POINTER_BITS(load_symbol_table);
 			}
 
 			/* BUG (preserved for exact matching): January checks only whether
@@ -752,7 +799,11 @@ static int symbol_sort_proc(
 static boolean is_valid_ebp(
 	void)
 {
+#ifdef HALO_64BIT
+	return 0==(walk_up_current_frame & (sizeof(__UINTPTR_TYPE__) - 1)) && walk_up_current_frame >= POINTER_BITS(old_ebp);
+#else
 	return 0==(walk_up_current_frame & (sizeof(unsigned long) - 1)) && walk_up_current_frame >= (unsigned long)old_ebp;
+#endif
 }
 
 static unsigned long walk_up(
@@ -762,6 +813,11 @@ static unsigned long walk_up(
 
 	if (walk_up_current_frame)
 	{
+#ifdef HALO_64BIT
+		/* addresses are reported in 32 bits, as the symbol table has them */
+		routine_address = (unsigned int)((__UINTPTR_TYPE__ *)walk_up_current_frame)[1];
+		walk_up_current_frame = ((__UINTPTR_TYPE__ *)walk_up_current_frame)[0];
+#else
 #ifdef HALO_ANDROID
 		/* an AArch64 frame record: the caller's frame pointer, then the
 		return address, 8 bytes each (the upper halves are zero) */
@@ -770,12 +826,17 @@ static unsigned long walk_up(
 		routine_address = ((unsigned long *)walk_up_current_frame)[1];
 #endif
 		walk_up_current_frame = ((unsigned long *)walk_up_current_frame)[0];
+#endif
 		if (!is_valid_ebp())
 		{
 			walk_up_current_frame = 0;
 		}
 
+#ifdef HALO_64BIT
+		old_ebp = (__UINTPTR_TYPE__ *)walk_up_current_frame;
+#else
 		old_ebp = (unsigned long *)walk_up_current_frame;
+#endif
 	}
 
 	return routine_address;
@@ -784,7 +845,11 @@ static unsigned long walk_up(
 static void initialize_stack_walk(
 	CONTEXT *context)
 {
+#ifdef HALO_64BIT
+	old_ebp = (__UINTPTR_TYPE__ *)(__UINTPTR_TYPE__)context->Esp;
+#else
 	old_ebp = (unsigned long *)context->Esp;
+#endif
 	walk_up_current_frame = context->Ebp;
 	return;
 }
@@ -831,8 +896,8 @@ static void walk_stack(
 {
 	unsigned long level;
 
-	walk_up_current_frame = (unsigned long)__builtin_frame_address(0);
-	old_ebp = (unsigned long *)walk_up_current_frame;
+	walk_up_current_frame = (__typeof__(walk_up_current_frame))(__UINTPTR_TYPE__)__builtin_frame_address(0);
+	old_ebp = (__typeof__(old_ebp))walk_up_current_frame;
 
 	if (!is_valid_ebp())
 	{

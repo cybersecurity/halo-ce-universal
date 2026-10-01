@@ -17,6 +17,11 @@ much shorter than the Linux build's halo_linux_prefix.h.
 
 #define HALO_WINDOWS 1
 
+/* ---------- pointers inside Xbox data (the 64-bit macOS build's; no-ops
+here, as in the Linux build: the shared sources name them) */
+
+#include "../../../source/cseries/xbox_address.h"
+
 /* ---------- XDK architecture selection */
 
 #define _X86_ 1

@@ -488,7 +488,7 @@ static void structure_visibility_traverse_surface_lists(
 			&structure->clusters,
 			rendered_cluster->cluster_index,
 			struct structure_visibility_cluster);
-		long *surface_index_buffer = (long *)cluster->surface_indices.address;
+		long *surface_index_buffer = (long *)xbox_pointer(cluster->surface_indices.address);
 		struct render_frustum *frustum = structures_use_pvs_for_vs || render.cluster_index == NONE
 			? &render.frustum
 			: &rendered_cluster->frustum;
@@ -519,10 +519,17 @@ static void structure_visibility_traverse_surface_lists(
 				}
 
 				surface_index = *surface_index_buffer++;
+#ifdef HALO_64BIT
+				match_assert(
+					"c:\\halo\\SOURCE\\structures\\structure_visibility.c",
+					0x1A0,
+					surface_index_buffer-(long *) xbox_pointer(cluster->surface_indices.address)<=cluster->surface_indices.count);
+#else
 				match_assert(
 					"c:\\halo\\SOURCE\\structures\\structure_visibility.c",
 					0x1A0,
 					surface_index_buffer-(long *) cluster->surface_indices.address<=cluster->surface_indices.count);
+#endif
 				if (!BIT_VECTOR_TEST_FLAG(render.environment_surface_flags, surface_index))
 				{
 					struct structure_visibility_surface *surface = TAG_BLOCK_GET_ELEMENT(
@@ -530,13 +537,13 @@ static void structure_visibility_traverse_surface_lists(
 						surface_index,
 						struct structure_visibility_surface);
 					real_point3d const *vertex0 = (real_point3d const *)(
-						(byte *)material->compressed_vertex_data.address +
+						(byte *)xbox_pointer(material->compressed_vertex_data.address) +
 						surface->vertex_indices[0] * COMPRESSED_STRUCTURE_VERTEX_SIZE);
 					real_point3d const *vertex1 = (real_point3d const *)(
-						(byte *)material->compressed_vertex_data.address +
+						(byte *)xbox_pointer(material->compressed_vertex_data.address) +
 						surface->vertex_indices[1] * COMPRESSED_STRUCTURE_VERTEX_SIZE);
 					real_point3d const *vertex2 = (real_point3d const *)(
-						(byte *)material->compressed_vertex_data.address +
+						(byte *)xbox_pointer(material->compressed_vertex_data.address) +
 						surface->vertex_indices[2] * COMPRESSED_STRUCTURE_VERTEX_SIZE);
 
 					if (render_frustum_triangle_visible(
@@ -955,7 +962,7 @@ static short portal_hull_from_portal(
 			portal->plane_index,
 			real_plane3d),
 		(short)portal->vertices.count,
-		(real_point3d const *)portal->vertices.address,
+		(real_point3d const *)xbox_pointer(portal->vertices.address),
 		direction ? -1 : 1,
 		result);
 }
@@ -1026,7 +1033,7 @@ boolean structure_visibility_find_mirror(
 							frustum,
 							&mirror->plane,
 							(short)mirror->points.count,
-							(real_point3d const *)mirror->points.address,
+							(real_point3d const *)xbox_pointer(mirror->points.address),
 							1,
 							&mirror_hull);
 
@@ -1584,7 +1591,7 @@ static void structure_visibility_traverse_cluster(
 				(render.visible_sky_model ||
 					points_within_distance(
 						(short)portal->vertices.count,
-						(real_point3d const *)portal->vertices.address,
+						(real_point3d const *)xbox_pointer(portal->vertices.address),
 						render.camera.z_far)))
 			{
 				struct portal_hull clipped_hull;

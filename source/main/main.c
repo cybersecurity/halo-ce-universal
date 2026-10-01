@@ -388,6 +388,11 @@ symbols in this file:
 #include "text/draw_string.h"
 #include "text/font_group.h"
 #include "tag_files/files.h"
+#ifdef HALO_64BIT
+#include "input/input_abstraction.h"
+#include "interface/player_ui.h"
+#include "interface/marketing_and_strategic_business_development.h"
+#endif
 
 /* ---------- constants */
 
@@ -559,8 +564,10 @@ struct _main_globals
 typedef char main_hud_globals_font_tag_index_offset_assert[
 	offsetof(struct hud_globals_definition, messaging.single_player_font.index) == 0x54 ? 1 : -1];
 
+#ifndef HALO_64BIT
 typedef char main_globals_size_assert[
 	sizeof(struct _main_globals) == 0x620 ? 1 : -1];
+#endif
 typedef char main_globals_frame_start_milliseconds_offset_assert[
 	offsetof(struct _main_globals, frame_start_milliseconds) == 0x00 ? 1 : -1];
 typedef char main_globals_rasterizer_target_index_offset_assert[
@@ -577,6 +584,7 @@ typedef char main_globals_connection_offset_assert[
 	offsetof(struct _main_globals, connection) == 0x2C ? 1 : -1];
 typedef char main_globals_movie_offset_assert[
 	offsetof(struct _main_globals, movie) == 0x30 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char main_globals_defer_map_change_offset_assert[
 	offsetof(struct _main_globals, defer_map_change) == 0x45 ? 1 : -1];
 typedef char main_globals_reset_map_offset_assert[
@@ -624,6 +632,7 @@ typedef char main_globals_vblank_flip_deltas_offset_assert[
 typedef char main_globals_vblank_debug_string_offset_assert[
 	offsetof(struct _main_globals, vblank_debug_string) == 0x41C ? 1 : -1];
 
+#endif
 struct game_options
 {
 	unsigned long flags;

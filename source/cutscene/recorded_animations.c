@@ -470,7 +470,7 @@ void recorded_animation_verify(
 	long ticks_left;
 	boolean finished;
 
-	stream = animation->event_stream.address;
+	stream = xbox_pointer(animation->event_stream.address);
 	playback_stream = stream;
 	size = animation->event_stream.size;
 	ticks_left = (word)animation->length_in_ticks;

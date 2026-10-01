@@ -96,7 +96,7 @@ void bitmap_quantitize(
 		 * non-NULL buffer before leaving this block. */
 		if (source && next_source)
 		{
-			bitmap_quantitize_read_row(source, bitmap->base_address, bitmap->width);
+			bitmap_quantitize_read_row(source, xbox_pointer(bitmap->base_address), bitmap->width);
 
 			for (y = 0; y < bitmap->height - 1; y++)
 			{

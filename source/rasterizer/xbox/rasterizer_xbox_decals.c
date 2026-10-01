@@ -318,7 +318,11 @@ void *_rasterizer_decal_vertices_lock(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_decals.c",
 		219,
 		global_d3d_device);
+#ifdef HALO_64BIT
+	vertex_data_offset = lruv_block_get_address(
+#else
 	vertex_data_offset = (unsigned long)lruv_block_get_address(
+#endif
 		local_vertex_cache,
 		cache_index);
 	rasterizer_globals.current_lock_operation = _rasterizer_lock_decal_vertices;
@@ -399,10 +403,18 @@ void _rasterizer_decals_initialize(
 		92,
 		local_d3d_vertex_buffer);
 	local_d3d_vertex_buffer->Common = 1;
+#ifdef HALO_64BIT
+	local_d3d_vertex_buffer->Data = xbox_address(game_state_gpu_malloc(
+#else
 	local_d3d_vertex_buffer->Data = (unsigned long)game_state_gpu_malloc(
+#endif
 		"decal vertices",
 		NULL,
+#ifdef HALO_64BIT
+		DECAL_VERTEX_CACHE_SIZE));
+#else
 		DECAL_VERTEX_CACHE_SIZE);
+#endif
 	local_d3d_vertex_buffer->Lock = 0;
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_decals.c",
@@ -738,7 +750,11 @@ void _rasterizer_decals_draw(
 				rasterizer_frame_statistics.decal_texture_change_count++;
 		}
 
+#ifdef HALO_64BIT
+		vertex_data_offset = lruv_block_get_address(local_vertex_cache, decal_index);
+#else
 		vertex_data_offset = (unsigned long)lruv_block_get_address(local_vertex_cache, decal_index);
+#endif
 		color = decal->color;
 		intensity = (decal->intensity * (color >> 24) + 127) >> 8;
 		match_assert(

@@ -288,7 +288,11 @@ void lruv_block_touch(
 	return;
 }
 
+#ifdef HALO_64BIT
+unsigned int lruv_block_get_address(
+#else
 void *lruv_block_get_address(
+#endif
 	struct lruv_cache *cache,
 	long block_index)
 {
@@ -297,7 +301,11 @@ void *lruv_block_get_address(
 	lruv_cache_verify(cache, FALSE);
 	block = datum_get(cache->blocks, block_index);
 
+#ifdef HALO_64BIT
+	return block->first_page_index << cache->page_size_bits;
+#else
 	return (void *)(block->first_page_index << cache->page_size_bits);
+#endif
 }
 
 boolean lruv_block_touched(

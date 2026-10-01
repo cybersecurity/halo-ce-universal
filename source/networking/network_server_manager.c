@@ -686,11 +686,13 @@ typedef char network_game_variant_has_teams_offset_assert[
 		offsetof(struct game_variant, universal_variant.teams) == 0xC0 ? 1 : -1];
 typedef char network_game_size_assert[
 	sizeof(struct network_game) == HALO_PORT_NETWORK_GAME_SIZE ? 1 : -1];
+#ifndef HALO_64BIT /* the server's header holds pointers */
 typedef char network_game_server_client_machines_offset_assert[
 	offsetof(struct network_game_server, client_machines) == 8 + HALO_PORT_NETWORK_GAME_SIZE ? 1 : -1];
 typedef char network_game_server_countdown_state_offset_assert[
 	offsetof(struct network_game_server, countdown_state) ==
 		8 + HALO_PORT_NETWORK_GAME_SIZE + MAXIMUM_NETWORK_MACHINE_COUNT * 0x10 + 0xC ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 

@@ -415,7 +415,7 @@ __attribute__((noinline)) long get_return_eip(
 	void)
 {
 	/* the caller's return address, as [ebp+4] is in the naked original */
-	return (long)__builtin_return_address(1);
+	return (long)(__INTPTR_TYPE__)__builtin_return_address(1);
 }
 
 real hud_globals_get_scale(

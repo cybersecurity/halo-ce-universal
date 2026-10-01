@@ -92,6 +92,9 @@ symbols in this file:
 #include "rasterizer/xbox/rasterizer_xbox_state.h"
 #include "shaders/shader_definitions.h"
 #include "shaders/shaders.h"
+#ifdef HALO_64BIT
+#include "rasterizer/rasterizer_transparent_geometry.h"
+#endif
 
 /* ---------- constants */
 
@@ -108,6 +111,7 @@ enum
 
 /* January's assert strings name this type and its sorted_index field, and pin
 the stride: the group array is walked with a 0xA0 element size. */
+#ifndef HALO_64BIT
 struct transparent_geometry_group
 {
 	unsigned long geometry_flags;
@@ -128,12 +132,14 @@ struct transparent_geometry_group
 
 typedef char transparent_geometry_group_size_assert[
 	sizeof(struct transparent_geometry_group) == 0xA0 ? 1 : -1];
+#endif
 typedef char transparent_geometry_group_geometry_flags_offset_assert[
 	offsetof(struct transparent_geometry_group, geometry_flags) == 0x0 ? 1 : -1];
 typedef char transparent_geometry_group_object_index_offset_assert[
 	offsetof(struct transparent_geometry_group, object_index) == 0x4 ? 1 : -1];
 typedef char transparent_geometry_group_source_object_index_offset_assert[
 	offsetof(struct transparent_geometry_group, source_object_index) == 0x8 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char transparent_geometry_group_shader_offset_assert[
 	offsetof(struct transparent_geometry_group, shader) == 0xC ? 1 : -1];
 typedef char transparent_geometry_group_dynamic_vertex_buffer_index_offset_assert[
@@ -147,6 +153,7 @@ typedef char transparent_geometry_group_sorted_index_offset_assert[
 typedef char transparent_geometry_group_cortana_hack_offset_assert[
 	offsetof(struct transparent_geometry_group, cortana_hack) == 0x9D ? 1 : -1];
 
+#endif
 /* ---------- prototypes */
 static void rasterizer_sort_external(
 	void);
@@ -173,13 +180,25 @@ boolean rasterizer_transparent_geometry_initialize(
 
 	transparent_geometry_groups = debug_malloc(
 		RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS * sizeof(struct transparent_geometry_group),
+#ifdef HALO_64BIT
+		TRUE, "c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0x29);
+#else
 		FALSE, "c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0x29);
+#endif
 	transparent_geometry_group_sorted_indices = debug_malloc(
 		RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS * sizeof(short),
+#ifdef HALO_64BIT
+		TRUE, "c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0x2B);
+#else
 		FALSE, "c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0x2B);
+#endif
 	transparent_geometry_groups2 = debug_malloc(
 		RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS2 * sizeof(struct transparent_geometry_group),
+#ifdef HALO_64BIT
+		TRUE, "c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0x2E);
+#else
 		FALSE, "c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0x2E);
+#endif
 
 	transparent_geometry_group_count2 = 0;
 	transparent_geometry_group_count = 0;
@@ -275,7 +294,11 @@ short rasterizer_transparent_geometry_get_group_presorted_index(
 		match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0xCB,
 			group_presorted_index>=0 && group_presorted_index<transparent_geometry_group_count);
 		match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0xCC,
+#ifdef HALO_64BIT
+			((byte const *)group-(byte const *)transparent_geometry_groups)%sizeof(struct transparent_geometry_group)==0);
+#else
 			((unsigned long)group-(unsigned long)transparent_geometry_groups)%sizeof(struct transparent_geometry_group)==0);
+#endif
 	}
 
 	return group_presorted_index;
@@ -287,7 +310,11 @@ void *rasterizer_transparent_geometry_get_group_from_presorted_index(
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0xBC,
 		group_presorted_index>=0 && group_presorted_index<transparent_geometry_group_count);
 
+#ifdef HALO_64BIT
+	return transparent_geometry_groups + group_presorted_index;
+#else
 	return (byte *)transparent_geometry_groups + group_presorted_index*0xA0;
+#endif
 }
 
 void *rasterizer_transparent_geometry_get_groups2(
@@ -346,6 +373,9 @@ struct transparent_geometry_group *rasterizer_transparent_geometry_new_group(
 	if (group_index<RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS)
 	{
 		group = transparent_geometry_groups + group_index;
+#ifdef HALO_64BIT
+		csmemset(group, 0, sizeof(*group));
+#endif
 		group->sorted_index = group_index;
 		transparent_geometry_group_count = group_index + 1;
 	}
@@ -362,6 +392,9 @@ struct transparent_geometry_group *rasterizer_transparent_geometry_new_group2(
 	if (group_index<RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS2)
 	{
 		group = transparent_geometry_groups2 + group_index;
+#ifdef HALO_64BIT
+		csmemset(group, 0, sizeof(*group));
+#endif
 		group->sorted_index = group_index;
 		transparent_geometry_group_count2 = group_index + 1;
 	}

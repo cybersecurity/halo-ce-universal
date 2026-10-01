@@ -180,6 +180,9 @@ symbols in this file:
 #include "physics/collision_usage.h"
 #include "props.h"
 #include "units/units.h"
+#ifdef HALO_64BIT
+#include "game/game.h"
+#endif
 
 
 /* ---------- constants */

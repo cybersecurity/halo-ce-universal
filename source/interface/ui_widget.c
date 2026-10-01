@@ -677,6 +677,9 @@ struct widget_instance;
 #include "text/text_group.h"
 #include "text/unicode.h"
 #include "ui_widget.h"
+#ifdef HALO_64BIT
+#include "interface/ui_widget_instance.h"
+#endif
 
 /* ---------- constants */
 
@@ -1160,6 +1163,7 @@ struct ui_widget_bss_prefix
 	unsigned long dpad_event_times[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS][NUMBER_OF_DPAD_DIRECTIONS];
 };
 
+#ifndef HALO_64BIT
 typedef char verify_ui_widget_fade_to_black_offset[
 	offsetof(
 		struct ui_widget_runtime_globals_prefix,
@@ -1202,10 +1206,12 @@ typedef char verify_ui_widget_main_menu_music_active_offset[
 		main_menu_music_active) == 0x66 ? 1 : -1];
 typedef char verify_ui_widget_runtime_globals_prefix_size[
 	sizeof(struct ui_widget_runtime_globals_prefix) == 0x68 ? 1 : -1];
+#endif
 typedef char verify_ui_widget_globals_offset[
 	offsetof(
 		struct ui_widget_bss_prefix,
 		widget_globals) == 0x800 ? 1 : -1];
+#ifndef HALO_64BIT
 typedef char verify_ui_widget_main_menu_active_offset[
 	offsetof(
 		struct ui_widget_bss_prefix,
@@ -1287,6 +1293,7 @@ typedef char verify_widget_instance_focused_child_offset[
 typedef char verify_widget_instance_text_box_string_list_index_offset[
 	offsetof(struct widget_instance, parameters.text_box.string_list_index) == 0x40 ? 1 : -1];
 
+#endif
 /* ---------- prototypes */
 
 static boolean transition_to_game_in_progress(
@@ -2174,7 +2181,7 @@ void ui_widget_delete(
 		handler_index++)
 	{
 		struct ui_widget_event_handler_reference *handler =
-			(struct ui_widget_event_handler_reference *)definition->event_handlers.address + handler_index;
+			(struct ui_widget_event_handler_reference *)xbox_pointer(definition->event_handlers.address) + handler_index;
 
 		if (handler->event_type == _widget_event_deleted &&
 			TEST_FLAG(handler->flags, _event_handler_run_function_bit))
@@ -3376,7 +3383,7 @@ static void event_handler_dispatch(
 				conditional_index++)
 			{
 				struct ui_widget_conditional_reference *conditional =
-					(struct ui_widget_conditional_reference *)definition->conditional_widgets.address +
+					(struct ui_widget_conditional_reference *)xbox_pointer(definition->conditional_widgets.address) +
 					conditional_index;
 
 				if (function_failed == TRUE &&
@@ -3467,7 +3474,7 @@ static boolean ui_widget_load_children_recursive(
 		child_index++)
 	{
 		struct ui_widget_child_reference *reference =
-			(struct ui_widget_child_reference *)definition->child_widgets.address + child_index;
+			(struct ui_widget_child_reference *)xbox_pointer(definition->child_widgets.address) + child_index;
 		short controller_index = widget->local_player_index;
 
 		if (TEST_FLAG(reference->flags, _child_widget_use_custom_controller_index_bit))
@@ -3613,7 +3620,7 @@ static void widget_instance_initialize(
 		handler_index++)
 	{
 		struct ui_widget_event_handler_reference *handler =
-			(struct ui_widget_event_handler_reference *)definition->event_handlers.address + handler_index;
+			(struct ui_widget_event_handler_reference *)xbox_pointer(definition->event_handlers.address) + handler_index;
 
 		if (handler->event_type == _widget_event_created)
 		{
@@ -4903,7 +4910,7 @@ static void widget_instance_render_text_box(
 	{
 		struct ui_widget_search_and_replace_reference *reference =
 			(struct ui_widget_search_and_replace_reference *)
-				definition->search_and_replace_functions.address +
+				xbox_pointer(definition->search_and_replace_functions.address) +
 			search_index;
 
 		if (reference && reference->search_string[0])
@@ -5096,7 +5103,7 @@ static void widget_instance_render_spinner_list(
 				{
 					struct ui_widget_search_and_replace_reference *reference =
 						(struct ui_widget_search_and_replace_reference *)
-							definition->search_and_replace_functions.address +
+							xbox_pointer(definition->search_and_replace_functions.address) +
 						search_index;
 
 					if (reference && reference->search_string[0])
@@ -5739,7 +5746,7 @@ static void widget_instance_render_recursive(
 	{
 		struct ui_widget_game_data_input_reference *input =
 			(struct ui_widget_game_data_input_reference *)
-				definition->game_data_inputs.address +
+				xbox_pointer(definition->game_data_inputs.address) +
 			input_index;
 
 		ui_widget_game_data_function_invoke(widget, input->function);
@@ -6335,7 +6342,7 @@ static void widget_instance_process_one_event_recursive(
 				{
 					struct ui_widget_event_handler_reference *handler =
 						(struct ui_widget_event_handler_reference *)
-							definition->event_handlers.address + handler_index;
+							xbox_pointer(definition->event_handlers.address) + handler_index;
 
 					if (handler->event_type == _widget_event_back_button)
 					{
@@ -6352,7 +6359,7 @@ static void widget_instance_process_one_event_recursive(
 				{
 					struct ui_widget_event_handler_reference *handler =
 						(struct ui_widget_event_handler_reference *)
-							definition->event_handlers.address + handler_index;
+							xbox_pointer(definition->event_handlers.address) + handler_index;
 
 					if (handler->event_type == _widget_event_b_button)
 					{
@@ -6622,7 +6629,7 @@ static void widget_instance_process_one_event_recursive(
 			if (widget_deleted)
 				break;
 			handler = (struct ui_widget_event_handler_reference *)
-				definition->event_handlers.address + handler_index;
+				xbox_pointer(definition->event_handlers.address) + handler_index;
 			switch (event->type)
 			{
 			case _event_type_left_stick:

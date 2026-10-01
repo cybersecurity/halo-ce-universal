@@ -10,9 +10,14 @@ byte-for-byte identical to what the matching MSVC build compiles.
 #ifndef __HALO_LINUX_PREFIX_H
 #define __HALO_LINUX_PREFIX_H
 
-#if !defined(__i386__) && !defined(HALO_ANDROID)
+#if !defined(__i386__) && !defined(HALO_ANDROID) && !defined(HALO_64BIT)
 #error the Linux port targets 32-bit x86: game data structures assume 32-bit pointers
 #endif
+
+/* ---------- pointers inside Xbox data (the 64-bit build; a no-op for the
+32-bit ones) */
+
+#include "../../../source/cseries/xbox_address.h"
 
 /* ---------- XDK architecture selection (MSVC predefines these) */
 
@@ -24,6 +29,40 @@ byte-for-byte identical to what the matching MSVC build compiles.
 #define _USE_MATH_DEFINES
 /* the XDK's COM headers decorate methods with __export when _WIN32 is unset */
 #define __export
+
+/* ---------- the host C library on macOS
+
+Apple's libc headers use `__inline` for their extern inline helpers, which the MSVC inline semantics below redefine. Include the
+C runtime headers the game uses before that happens; their include guards
+keep later includes from seeing the redefinition. <limits.h> is left out:
+cseries.h defines LONG_MAX and friends as enumerators. wint_t is 16 bits wide
+with -fshort-wchar and must be fixed before the host headers define theirs. */
+
+#ifdef __APPLE__
+#include <stddef.h>
+#ifndef __wint_t_defined
+#define __wint_t_defined 1
+#define _WINT_T 1
+typedef unsigned short wint_t;
+#endif
+/* the XDK's Winsock declares a 32-bit u_long; the host's is 64 */
+#define u_long halo_host_u_long
+#include <sys/types.h>
+#undef u_long
+#include <stdarg.h>
+#include <float.h>
+#include <ctype.h>
+#include <errno.h>
+#include <setjmp.h>
+#include <signal.h>
+#include <time.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <wchar.h>
+#include <assert.h>
+#endif
 
 /* ---------- MSVC inline semantics
 

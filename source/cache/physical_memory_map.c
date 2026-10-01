@@ -74,12 +74,22 @@ void physical_memory_allocate(
 	void)
 {
 	physical_memory_map_globals.game_state_base_address = XPhysicalAlloc(GAME_STATE_SIZE, GAME_STATE_BASE_ADDRESS & 0x7FFFFFFF, 0, PAGE_READWRITE);
+#ifdef HALO_64BIT
+#line 46 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
+	match_assert(__FILE__, __LINE__, XBOX_ADDRESS(physical_memory_map_globals.game_state_base_address)==GAME_STATE_BASE_ADDRESS);
+#else
 #line 46 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
 	match_assert(__FILE__, __LINE__, (unsigned long)physical_memory_map_globals.game_state_base_address==GAME_STATE_BASE_ADDRESS);
+#endif
 
 	physical_memory_map_globals.tag_cache_base_address = XPhysicalAlloc(TAG_CACHE_SIZE, TAG_CACHE_BASE_ADDRESS & 0x7FFFFFFF, 0, PAGE_READWRITE);
+#ifdef HALO_64BIT
+#line 50 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
+	match_assert(__FILE__, __LINE__, XBOX_ADDRESS(physical_memory_map_globals.tag_cache_base_address)==TAG_CACHE_BASE_ADDRESS);
+#else
 #line 50 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
 	match_assert(__FILE__, __LINE__, (unsigned long)physical_memory_map_globals.tag_cache_base_address==TAG_CACHE_BASE_ADDRESS);
+#endif
 
 	physical_memory_map_globals.texture_cache_base_address = XPhysicalAlloc(TEXTURE_CACHE_SIZE, -1, 0, PAGE_READWRITE | PAGE_WRITECOMBINE);
 #line 55 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"

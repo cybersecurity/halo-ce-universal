@@ -30,6 +30,14 @@ static void fill_information(const struct stat *st, struct posix_file_informatio
 	if (!(st->st_mode & S_IWUSR))
 		information->flags |= _posix_file_is_read_only;
 	split64((unsigned long long)st->st_size, &information->size_low, &information->size_high);
+#ifdef __APPLE__
+	information->modification_seconds = (posix_ulong)st->st_mtimespec.tv_sec;
+	information->modification_nanoseconds = (posix_ulong)st->st_mtimespec.tv_nsec;
+	information->access_seconds = (posix_ulong)st->st_atimespec.tv_sec;
+	information->access_nanoseconds = (posix_ulong)st->st_atimespec.tv_nsec;
+	information->creation_seconds = (posix_ulong)st->st_birthtimespec.tv_sec;
+	information->creation_nanoseconds = (posix_ulong)st->st_birthtimespec.tv_nsec;
+#else
 	information->modification_seconds = (posix_ulong)st->st_mtim.tv_sec;
 	information->modification_nanoseconds = (posix_ulong)st->st_mtim.tv_nsec;
 	information->access_seconds = (posix_ulong)st->st_atim.tv_sec;
@@ -37,6 +45,7 @@ static void fill_information(const struct stat *st, struct posix_file_informatio
 	/* Linux has no portable creation time; the change time is the closest */
 	information->creation_seconds = (posix_ulong)st->st_ctim.tv_sec;
 	information->creation_nanoseconds = (posix_ulong)st->st_ctim.tv_nsec;
+#endif
 }
 
 int posix_stat(const char *path, struct posix_file_information *information)
@@ -66,9 +75,9 @@ int posix_set_file_times(const char *path,
 	struct timespec times[2];
 
 	times[0].tv_sec = (time_t)access_seconds;
-	times[0].tv_nsec = access_seconds ? (long)access_nanoseconds : UTIME_OMIT;
+	times[0].tv_nsec = access_seconds ? (int)access_nanoseconds : UTIME_OMIT;
 	times[1].tv_sec = (time_t)modification_seconds;
-	times[1].tv_nsec = modification_seconds ? (long)modification_nanoseconds : UTIME_OMIT;
+	times[1].tv_nsec = modification_seconds ? (int)modification_nanoseconds : UTIME_OMIT;
 	return utimensat(AT_FDCWD, path, times, 0);
 }
 
@@ -230,4 +239,26 @@ int posix_find_entry_case_insensitive(const char *directory, const char *name,
 	}
 	closedir(handle);
 	return found;
+}
+
+/* ---------- symbols */
+
+#include <dlfcn.h>
+#include <stdio.h>
+
+/* Describe a code address as "symbol+offset" without allocating (the game's
+stack dump runs inside its own allocator's assertions). */
+void posix_describe_address(void *address, char *buffer, posix_ulong size)
+{
+	Dl_info information;
+
+	if (dladdr(address, &information) && information.dli_sname)
+	{
+		snprintf(buffer, size, "%p %s+%lu", address, information.dli_sname,
+			(unsigned long)((char *)address - (char *)information.dli_saddr));
+	}
+	else
+	{
+		snprintf(buffer, size, "%p ?????", address);
+	}
 }

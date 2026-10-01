@@ -63,9 +63,16 @@ struct config_setting
 	const char *comment;
 };
 
+/* macOS starts in a window, as its games do */
+#ifdef __APPLE__
+#define DEFAULT_FULLSCREEN "false"
+#else
+#define DEFAULT_FULLSCREEN "true"
+#endif
+
 static const struct config_setting config_settings[] =
 {
-	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
+	{ "display.fullscreen", _config_boolean, DEFAULT_FULLSCREEN, "HALO_FULLSCREEN", _environment_value, _platform_desktop,
 		"Start fullscreen, drawing at the display's resolution and shape; false\n"
 		"starts in a window, which draws the Xbox's 640x480. F11 switches." },
 	{ "display.window_scale", _config_integer, "2", "HALO_WINDOW_SCALE", _environment_value, _platform_desktop,

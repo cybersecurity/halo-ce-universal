@@ -111,6 +111,9 @@ symbols in this file:
 #include "network_game_manager.h"
 #include "network_game_globals.h"
 #include "network_server_manager_internal.h"
+#ifdef HALO_64BIT
+#include "cseries/cseries_windows.h"
+#endif
 
 /* ---------- constants */
 
@@ -142,7 +145,11 @@ struct player_action_collection
 typedef char network_player_action_collection_size_assert[
 	sizeof(struct player_action_collection) == 0x80 ? 1 : -1];
 
+#ifdef HALO_64BIT
+/* the Xbox packing only matched January's .data layout; native here */
+#else
 #pragma pack(push, 2)
+#endif
 struct player_action_collection_definition
 {
 	char const *name;
@@ -154,7 +161,9 @@ struct player_action_collection_definition
 	byte __padding11[3];
 	short previous_client_state;
 };
+#ifndef HALO_64BIT
 #pragma pack(pop)
+#endif
 
 struct player_action_packet_definition_storage
 {
@@ -163,11 +172,13 @@ struct player_action_packet_definition_storage
 	struct data_packet_field collection_fields[13];
 	short __padding9a;
 };
+#ifndef HALO_64BIT
 
 typedef char player_action_collection_definition_size_assert[
 	sizeof(struct player_action_collection_definition) == 0x16 ? 1 : -1];
 typedef char player_action_packet_definition_storage_size_assert[
 	sizeof(struct player_action_packet_definition_storage) == 0x9C ? 1 : -1];
+#endif
 
 struct client_game_update_message
 {
@@ -200,9 +211,11 @@ struct network_game_globals
 	byte __padding0b;
 	unsigned long last_client_update_time;
 };
+#ifndef HALO_64BIT
 
 typedef char network_game_globals_size_assert[
 	sizeof(struct network_game_globals) == 0x10 ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 

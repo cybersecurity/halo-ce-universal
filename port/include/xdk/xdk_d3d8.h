@@ -446,7 +446,8 @@ D3DINLINE void __stdcall D3DIndexBuffer_Lock(D3DIndexBuffer *buffer, UINT offset
 {
 	(void)size;
 	(void)flags;
-	*data = (BYTE *)buffer->Data + offset;
+	/* (an Xbox address; cseries/xbox_address.h) */
+	*data = (BYTE *)xbox_pointer(buffer->Data) + offset;
 }
 
 D3DINLINE void __stdcall D3DIndexBuffer_Unlock(D3DIndexBuffer *buffer)

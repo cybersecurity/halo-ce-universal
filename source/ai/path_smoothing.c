@@ -325,7 +325,7 @@ static boolean find_turning_point(
 		&structure->collision_bsp,
 		0,
 		struct collision_bsp);
-	pathfinding_surfaces = structure->pathfinding_surfaces.address;
+	pathfinding_surfaces = xbox_pointer(structure->pathfinding_surfaces.address);
 	breakable_surface_flags = breakable_surface_flags_get();
 	starting_vertex_index = NONE;
 	loop_reference_vertex_index = NONE;

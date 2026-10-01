@@ -179,6 +179,9 @@ struct game_options;
 #include "structures/structures.h"
 #include "units/units.h"
 #include "units/vehicles.h"
+#ifdef HALO_64BIT
+#include "rasterizer/common/rasterizer_common.h"
+#endif
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);

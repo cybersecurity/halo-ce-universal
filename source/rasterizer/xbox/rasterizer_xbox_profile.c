@@ -177,8 +177,10 @@ struct rasterizer_profile_globals
 	const char *profile_names[NUMBER_OF_RASTERIZER_PROFILES];
 };
 
+#ifndef HALO_64BIT
 typedef char rasterizer_profile_globals_size_assert[
 	sizeof(struct rasterizer_profile_globals) == 124 ? 1 : -1];
+#endif
 typedef char rasterizer_profile_globals_window_index_offset_assert[
 	offsetof(struct rasterizer_profile_globals, window_index) == 4 ? 1 : -1];
 typedef char rasterizer_profile_globals_profile_names_offset_assert[

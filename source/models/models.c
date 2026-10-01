@@ -220,13 +220,18 @@ struct render_sort_filth
 	short part_index;
 	word pad;
 };
+#ifndef HALO_64BIT
 
 typedef char verify_render_model_effect_size[sizeof(struct render_model_effect) == 0x28 ? 1 : -1];
 typedef char verify_rasterizer_model_begin_parameters_size[sizeof(struct rasterizer_model_begin_parameters) == 0xCC ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 
 #include "rasterizer/rasterizer_models.h"
+#ifdef HALO_64BIT
+#include "rasterizer/rasterizer_model_types.h"
+#endif
 
 static void render_model_parts(
 	struct model const *model,
