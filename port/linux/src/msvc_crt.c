@@ -295,7 +295,33 @@ static unsigned short msvc_to_control_word(unsigned int value, unsigned short wo
 	return word;
 }
 
-#ifdef HALO_ANDROID
+#ifdef HALO_WEB
+/* WebAssembly always rounds to nearest and has no exception flags: the MSVC
+control word is only remembered */
+static unsigned int msvc_control_word = CW_DEFAULT;
+
+unsigned int _control87(unsigned int new_value, unsigned int mask)
+{
+	if (mask)
+		msvc_control_word = (msvc_control_word & ~mask) | (new_value & mask);
+	return msvc_control_word;
+}
+
+unsigned int _controlfp(unsigned int new_value, unsigned int mask)
+{
+	return _control87(new_value, mask & ~_EM_DENORMAL);
+}
+
+unsigned int _statusfp(void)
+{
+	return 0;
+}
+
+unsigned int _clearfp(void)
+{
+	return 0;
+}
+#elif defined(HALO_ANDROID)
 /* AArch64: the rounding mode lives in FPCR.RMode, the sticky exception
 flags in FPSR. Precision control and exception unmasking have no
 equivalent; the rest of the MSVC control word is only remembered. */

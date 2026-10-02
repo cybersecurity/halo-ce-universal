@@ -1,0 +1,93 @@
+name: Web
+
+# The web port (port/web/README.md): builds it with Emscripten for every
+# pushed commit. Production Pages uses the separate reviewed static branch;
+# an engine build alone must not replace the deployed launcher.
+on:
+  push:
+    paths-ignore:
+      - "docs/**"
+      - "research/**"
+  workflow_dispatch:
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  EMSDK_VERSION: 6.0.10
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/emsdk
+          key: emsdk-${{ env.EMSDK_VERSION }}
+
+      - name: Install Emscripten
+        run: |
+          if [ ! -x ~/emsdk/upstream/emscripten/emcc ]; then
+            git clone --depth 1 https://github.com/emscripten-core/emsdk.git ~/emsdk
+            ~/emsdk/emsdk install "$EMSDK_VERSION"
+          fi
+          ~/emsdk/emsdk activate "$EMSDK_VERSION"
+          sudo apt-get install -y ninja-build
+
+      - name: Build
+        run: |
+          source ~/emsdk/emsdk_env.sh
+          python3 configure.py --release
+          ninja web
+
+      - name: Check browser invitation and cache handling
+        run: |
+          node --test tools/tests/*.test.cjs
+          node --test tools/test_web_quick_play.mjs
+          node --test tools/test_web_touch_controls.mjs
+          node tools/test_source_cache.mjs
+          clang -std=c11 -pthread -fsanitize=address,undefined -g -Iport/linux/src tools/test_web_net.c -o build/test_web_net
+          build/test_web_net
+          clang -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g -Itools -Isource tools/test_quick_play.c -o build/test_quick_play
+          build/test_quick_play
+          clang -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tools/tests/network-checkpoint-test.c -o build/test_network_checkpoint
+          build/test_network_checkpoint
+          python3 tools/test_web_migration_managers.py
+          python3 tools/test_web_connection_idle.py
+          python3 tools/test_network_migration_checkpoint_runtime.py
+          python3 tools/test_web_server_policy.py
+          python3 tools/test_network_player_rejoin.py
+          python3 tools/test_web_player_names.py
+          python3 tools/test_web_solo_host.py
+          python3 tools/test_network_pending_rejoin.py
+          python3 tools/test_network_client_update_lifecycle.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-runtime
+          path: build/web/site
+
+  relay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: sudo apt-get update && sudo apt-get install -y gcc-multilib
+      - name: Test native P2P bridge with local host fixture
+        run: make -C port/relay test
+      - name: Test WebSocket session handling
+        working-directory: tools/browser-relay
+        run: |
+          npm ci --ignore-scripts
+          npm test
+          NATIVE_WORKER=../../port/relay/halo-relay-worker-test npm run test:native

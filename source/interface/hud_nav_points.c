@@ -215,6 +215,29 @@ struct hud_nav_object_datum
 static void hud_update_nav_point_local_player(
 	short local_player_index);
 
+void *object_try_and_get_and_verify_type(
+	long object_index,
+	unsigned long valid_type_flags);
+
+void object_get_bounding_sphere(
+	long object_index,
+	real_point3d *center,
+	real *radius);
+
+real_point3d *game_engine_get_goal_position(
+	real_point3d *position,
+	short goal_index);
+
+void custom_render_nav_point(
+	short local_player_index,
+	real_point3d const *position,
+	short nav_index,
+	short render_type);
+
+void unit_get_head_position(
+	long unit_index,
+	real_point3d *head_position);
+
 /* ---------- globals */
 
 static struct hud_nav_point_player_datum *nav_point_data;

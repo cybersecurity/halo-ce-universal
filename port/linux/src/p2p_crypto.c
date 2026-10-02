@@ -12,7 +12,11 @@ messages, so only holders of the invite read them; the tunnel's packets are
 sealed with keys only its two machines have.
 */
 
+#ifdef HALO_RELAY
+#include "relay_platform.h"
+#else
 #include "platform.h"
+#endif
 #include "posix.h"
 #include "p2p_internal.h"
 

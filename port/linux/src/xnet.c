@@ -49,6 +49,9 @@ alone peers reach.
 #include "posix.h"
 #include "port_config.h"
 #include "p2p.h"
+#ifdef HALO_WEB
+#include "web_shared.h"
+#endif
 
 #include <stdlib.h>
 #include <string.h>
@@ -1054,6 +1057,27 @@ INT WSAAPI XNetUnregisterKey(const XNKID *key_identifier)
 INT WSAAPI XNetXnAddrToInAddr(const XNADDR *address, const XNKID *key_identifier, IN_ADDR *result)
 {
 	unsigned long peer;
+#ifdef HALO_WEB
+	struct web_shared_state *web = web_shared_state();
+	if (__atomic_load_n(&web->gateway_enabled, __ATOMIC_ACQUIRE))
+	{
+		unsigned int identifier[2] = {0, 0};
+		int index;
+		memcpy(identifier, address->abEnet, 6);
+		for (index = 0; index < WEB_GATEWAY_PEERS; index++)
+		{
+			unsigned int ip = __atomic_load_n(&web->gateway_peers[index][2], __ATOMIC_ACQUIRE);
+			if (ip && identifier[0] == (unsigned int)__atomic_load_n(&web->gateway_peers[index][0], __ATOMIC_RELAXED)
+				&& identifier[1] == (unsigned int)__atomic_load_n(&web->gateway_peers[index][1], __ATOMIC_RELAXED))
+			{
+				result->s_addr = ip;
+				return 0;
+			}
+		}
+		*result = address->ina;
+		return 0;
+	}
+#endif
 
 	(void)key_identifier;
 	/* an internet play peer's XNADDR carries its identifier */
@@ -1083,6 +1107,18 @@ DWORD WSAAPI XNetGetTitleXnAddr(XNADDR *address)
 	address->bSizeOfStruct = sizeof(*address);
 	address->ina.s_addr = ip;
 	memcpy(address->abEnet, p2p_identifier(), sizeof(address->abEnet));
+#ifdef HALO_WEB
+	{
+		struct web_shared_state *web = web_shared_state();
+		if (__atomic_load_n(&web->gateway_enabled, __ATOMIC_ACQUIRE))
+		{
+			unsigned int identifier[2];
+			identifier[0] = __atomic_load_n(&web->gateway_identifier[0], __ATOMIC_RELAXED);
+			identifier[1] = __atomic_load_n(&web->gateway_identifier[1], __ATOMIC_RELAXED);
+			memcpy(address->abEnet, identifier, sizeof(address->abEnet));
+		}
+	}
+#endif
 	return ip ? (XNET_GET_XNADDR_ETHERNET | XNET_GET_XNADDR_DHCP) : XNET_GET_XNADDR_ETHERNET;
 }
 

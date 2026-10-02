@@ -1197,3 +1197,28 @@ static struct update *update_client_get_update(
 
 	return NULL;
 }
+
+#ifdef HALO_WEB
+void update_queues_migrate(void)
+{
+	struct data_iterator iterator;
+	struct update_server_queue_datum *queue;
+	long tick = game_time_get();
+	csmemset(update_server_pending_control_flags, 0, sizeof(update_server_pending_control_flags));
+	csmemset(update_client_relayed_actions, 0, sizeof(update_client_relayed_actions));
+	csmemset(update_server_distributed_inputs, 0, sizeof(update_server_distributed_inputs));
+	csmemset(update_client_local_inputs, 0, sizeof(update_client_local_inputs));
+	if (!update_server_globals.initialized || !update_client_globals.initialized)
+		return;
+	update_server_start();
+	update_server_globals.next_update_number_to_build = tick;
+	update_client_globals.next_update_number_to_dequeue = tick;
+	update_client_globals.latest_update_number_received = tick - 1;
+	csmemset(update_server_globals.updates, 0, sizeof(update_server_globals.updates));
+	csmemset(update_client_globals.updates, NONE, sizeof(update_client_globals.updates));
+	csmemset(&update_client_globals.saved_action_collection, 0, sizeof(update_client_globals.saved_action_collection));
+	data_iterator_new(&iterator, update_server_globals.queues);
+	while ((queue = data_iterator_next(&iterator)) != NULL)
+		queue->next_update_number = tick;
+}
+#endif

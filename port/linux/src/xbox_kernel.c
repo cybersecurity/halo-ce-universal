@@ -646,6 +646,20 @@ DWORD WINAPI GetTickCount(void)
 	struct timespec now;
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
+#ifdef HALO_WEB
+	/* a browser's monotonic clock counts from 1970: count from the start,
+	as an Xbox counts from its boot (the network code compares tick counts
+	as signed longs, which a count past 2^31 turns negative) */
+	{
+		static unsigned long long start;
+		unsigned long long milliseconds = (unsigned long long)now.tv_sec * 1000ULL +
+			(unsigned long long)now.tv_nsec / 1000000ULL;
+
+		if (!start)
+			start = milliseconds;
+		return (DWORD)(milliseconds - start + 60000ULL);
+	}
+#endif
 	return (DWORD)((unsigned long long)now.tv_sec * 1000ULL + (unsigned long long)now.tv_nsec / 1000000ULL);
 }
 
@@ -661,6 +675,16 @@ BOOL WINAPI QueryPerformanceCounter(LARGE_INTEGER *count)
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	count->QuadPart = (LONGLONG)((unsigned long long)now.tv_sec * PLATFORM_PERFORMANCE_FREQUENCY +
 		(unsigned long long)now.tv_nsec / (1000000000ULL / PLATFORM_PERFORMANCE_FREQUENCY));
+#ifdef HALO_WEB
+	/* (from the start, as GetTickCount) */
+	{
+		static LONGLONG start;
+
+		if (!start)
+			start = count->QuadPart - 60 * (LONGLONG)PLATFORM_PERFORMANCE_FREQUENCY;
+		count->QuadPart -= start;
+	}
+#endif
 	return TRUE;
 }
 

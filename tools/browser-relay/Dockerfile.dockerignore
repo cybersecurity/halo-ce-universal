@@ -1,0 +1,21 @@
+# This relay needs source only. Never send extracted game data or local credentials to Docker.
+**
+!port/
+!port/linux/
+!port/linux/src/
+!port/linux/src/**
+!port/third_party/
+!port/third_party/kcp/
+!port/third_party/kcp/**
+!port/relay/
+!port/relay/**
+port/relay/halo-relay-worker*
+port/relay/policy-test
+port/relay/__pycache__/
+port/relay/build/
+!tools/
+!tools/browser-relay/
+!tools/browser-relay/package.json
+!tools/browser-relay/package-lock.json
+!tools/browser-relay/server.mjs
+!tools/browser-relay/protocol.mjs

@@ -85,6 +85,64 @@ static void stub_engine_player_killed_player(void);
 
 /* ---------- globals */
 
+#ifdef HALO_WEB
+/* WebAssembly calls must match the callee's signature: the engine's
+callbacks (struct game_engine) take arguments the stubs above ignore */
+static void stub_player_added(long player_index) { stub_engine_player_added(); }
+static void stub_statistics_append(long statistic) { stub_engine_statistics_append(); }
+static void stub_handle_client_message(void *message) { stub_engine_handle_client_message(); }
+static void stub_handle_server_message(void *message) { stub_engine_handle_server_message(); }
+static boolean stub_allow_pick_up(long unit_index, long weapon_index) { return stub_engine_allow_pick_up(); }
+static void stub_player_damaged_player(long damaging_player_index, long dead_player_index, boolean damage_type)
+{
+	stub_engine_player_damaged_player();
+}
+static void stub_player_killed_player(long killing_player_index, long killing_object_index, long dead_player_index,
+	boolean friendly_fire)
+{
+	stub_engine_player_killed_player();
+}
+
+struct stub_game_engine stub_engine =
+{
+	"stub",
+	_game_engine_type_stub,
+	{
+		stub_engine_dispose,
+		(stub_game_engine_callback) stub_engine_initialize_for_new_map,
+		stub_engine_dispose_from_old_map,
+		(stub_game_engine_callback) stub_player_added,
+		stub_engine_game_ending,
+		stub_engine_game_starting,
+		(stub_game_engine_callback) stub_statistics_append,
+		(stub_game_engine_callback) stub_handle_client_message,
+		(stub_game_engine_callback) stub_handle_server_message,
+		stub_engine_pregame_post_rasterize,
+		stub_engine_post_rasterize,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		stub_engine_update,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		(stub_game_engine_callback) stub_allow_pick_up,
+		(stub_game_engine_callback) stub_player_damaged_player,
+		(stub_game_engine_callback) stub_player_killed_player,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+	},
+};
+#else
 struct stub_game_engine stub_engine =
 {
 	"stub",
@@ -124,6 +182,7 @@ struct stub_game_engine stub_engine =
 		NULL,
 	},
 };
+#endif
 
 /* ---------- public code */
 

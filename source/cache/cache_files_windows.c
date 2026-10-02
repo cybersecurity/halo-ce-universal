@@ -1121,6 +1121,15 @@ static void cache_file_windows_thread_proc(
 	return;
 }
 
+#ifdef HALO_WEB
+static DWORD WINAPI cache_file_windows_thread_start(
+	LPVOID parameter)
+{
+	cache_file_windows_thread_proc();
+	return 0;
+}
+#endif
+
 static void cache_file_windows_thread_create(
 	void)
 {
@@ -1132,7 +1141,12 @@ static void cache_file_windows_thread_create(
 	cache_file_globals.thread = CreateThread(
 		NULL,
 		CACHE_FILE_THREAD_STACK_SIZE,
+#ifdef HALO_WEB
+		/* a WebAssembly call must match the callee's signature */
+		cache_file_windows_thread_start,
+#else
 		(LPTHREAD_START_ROUTINE)cache_file_windows_thread_proc,
+#endif
 		NULL,
 		0,
 		NULL);

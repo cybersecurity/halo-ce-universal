@@ -143,6 +143,12 @@ symbols in this file:
 #include "render/render_debug.h"
 #include "render/render_debug_geometry.h"
 
+#ifdef HALO_WEB
+/* called without a prototype in scope; a WebAssembly call must match the
+definition's signature */
+void render_debug_line(boolean immediate, real_point3d const *point0, real_point3d const *point1, real_argb_color const *color);
+#endif
+
 /* ---------- constants */
 
 enum

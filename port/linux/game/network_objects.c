@@ -57,6 +57,7 @@ same datum index (identifier and all), so that any message can name one:
 #include "units/vehicle_datum.h"
 #include "items/items.h"
 #include "items/weapons.h"
+#include "items/projectiles.h"
 #include "items/weapon_definitions.h"
 #include "items/equipment_definitions.h"
 #include "network_distributed.h"
@@ -429,6 +430,10 @@ static boolean objects_client_ask_again;
 long until it asks again */
 static boolean objects_client_synchronized;
 static long objects_client_ready_time;
+/* During reattachment keep the surviving world until the host has replayed
+its current object identities. Then retire only generations absent from it. */
+static boolean objects_client_resynchronizing;
+static boolean objects_client_resync_seen[MAXIMUM_TRACKED_OBJECTS];
 static long objects_client_ready_interval;
 /* ... when it last failed to make one (NONE: not since the host last told
 it all), and how long it waits after the next failure */
@@ -1966,6 +1971,8 @@ void network_objects_handle_changes(
 		if (change->change == _object_change_create)
 		{
 			distributed_client_create(change);
+			if (objects_client_resynchronizing && objects_client_has[absolute_index] == change->object_index)
+				objects_client_resync_seen[absolute_index] = TRUE;
 		}
 		else if (change->change == _object_change_delete &&
 			objects_client_has[absolute_index] == change->object_index)
@@ -1980,6 +1987,7 @@ void network_objects_handle_changes(
 void network_objects_handle_synchronized(
 	void)
 {
+	long absolute_index;
 	/* (a create failed since this machine last asked: not all of them, it
 	asks again) */
 	if (objects_client_failed_time != NONE)
@@ -1988,6 +1996,17 @@ void network_objects_handle_synchronized(
 			return;
 		objects_client_failed_time = NONE;
 		objects_client_retry_ticks = CLIENT_RETRY_TICKS;
+	}
+	if (objects_client_resynchronizing)
+	{
+		for (absolute_index = 0; absolute_index < MAXIMUM_TRACKED_OBJECTS; absolute_index++)
+		{
+			if (objects_client_has[absolute_index] == NONE || objects_client_resync_seen[absolute_index])
+				continue;
+			distributed_client_delete(objects_client_has[absolute_index]);
+			objects_client_has[absolute_index] = NONE;
+		}
+		objects_client_resynchronizing = FALSE;
 	}
 	objects_client_synchronized = TRUE;
 }
@@ -2591,6 +2610,8 @@ void network_objects_new_game(
 	}
 	objects_client_synchronized = FALSE;
 	objects_client_ready_time = NONE;
+	objects_client_resynchronizing = FALSE;
+	csmemset(objects_client_resync_seen, 0, sizeof(objects_client_resync_seen));
 	objects_client_ready_interval = CLIENT_READY_INTERVAL_TICKS;
 	objects_client_failed_time = NONE;
 	objects_client_retry_ticks = CLIENT_RETRY_TICKS;
@@ -2612,4 +2633,239 @@ void network_objects_new_game(
 			objects_client_own_vehicles[local_player_index][index].vehicle_index = NONE;
 		}
 	}
+}
+
+/* A handover snapshot supplements the visible replica with authority-only
+cooldowns, item ages, weapon reload/heat state and in-flight projectiles.
+These records contain values and canonical object indices, never pointers,
+cluster-list links, renderer caches, or local audio/effect identifiers. */
+struct migration_object_state
+{
+	struct distributed_object_change identity;
+	long shield_damage_decay_timer;
+	long body_damage_decay_timer;
+	short shield_stun_ticks;
+	short type;
+	long owner_object_index;
+	long parent_object_index;
+	short parent_node_index;
+	short pad;
+	struct _item_datum item;
+	struct _weapon_datum weapon;
+	struct _projectile_datum projectile;
+};
+
+long network_objects_migration_write(byte *buffer, long size)
+{
+	struct object_iterator iterator;
+	struct object_datum *object;
+	long count = 0;
+	long offset = sizeof(count);
+	if (size < offset)
+		return 0;
+	object_iterator_new(&iterator, NETWORKED_OBJECT_TYPES | _object_mask_projectile, 0);
+	while ((object = object_iterator_next(&iterator)) != NULL)
+	{
+		struct migration_object_state state;
+		if (size - offset < (long)sizeof(state))
+			return 0;
+		memset(&state, 0, sizeof(state));
+		distributed_change_from_object(iterator.index, &state.identity);
+		state.type = object->object.type;
+		state.shield_damage_decay_timer = object->object.shield_damage_decay_timer;
+		state.body_damage_decay_timer = object->object.body_damage_decay_timer;
+		state.shield_stun_ticks = object->object.shield_stun_ticks;
+		state.owner_object_index = object->object.owner_object_index;
+		state.parent_object_index = object->object.parent_object_index;
+		state.parent_node_index = object->object.parent_node_index;
+		if (state.type == _object_type_projectile && state.parent_object_index != NONE)
+		{
+			object_get_origin(iterator.index, &state.identity.position);
+			object_get_orientation(iterator.index, &state.identity.forward, &state.identity.up);
+		}
+		if (TEST_FLAG(_object_mask_item | _object_mask_projectile, state.type))
+			state.item = ((struct item_datum *)object)->item;
+		if (state.type == _object_type_weapon)
+		{
+			short trigger;
+			state.weapon = ((struct weapon_datum *)object)->weapon;
+			/* Effects are local allocations, even when their object is shared. */
+			state.weapon.overheated_effect_index = NONE;
+			for (trigger = 0; trigger < 2; trigger++)
+				state.weapon.triggers[trigger].charging_effect_index = NONE;
+		}
+		if (state.type == _object_type_projectile)
+		{
+			state.projectile = ((struct projectile_datum *)object)->projectile;
+			state.projectile.tracer_attachment_index = NONE;
+		}
+		memcpy(buffer + offset, &state, sizeof(state));
+		offset += sizeof(state);
+		count++;
+	}
+	memcpy(buffer, &count, sizeof(count));
+	return offset;
+}
+
+boolean network_objects_migration_validate(byte const *buffer, long size)
+{
+	long count;
+	long index;
+	byte seen[MAXIMUM_TRACKED_OBJECTS];
+	if (size < (long)sizeof(count))
+		return FALSE;
+	memcpy(&count, buffer, sizeof(count));
+	if (count < 0 || count > MAXIMUM_TRACKED_OBJECTS ||
+		size - (long)sizeof(count) != count * (long)sizeof(struct migration_object_state))
+		return FALSE;
+	memset(seen, 0, sizeof(seen));
+	for (index = 0; index < count; index++)
+	{
+		struct migration_object_state state;
+		long absolute;
+		memcpy(&state, buffer + sizeof(count) + index * sizeof(state), sizeof(state));
+		absolute = DATUM_INDEX_TO_ABSOLUTE_INDEX(state.identity.object_index);
+		if (absolute < 0 || absolute >= MAXIMUM_TRACKED_OBJECTS || seen[absolute] ||
+			state.type < 0 || state.type >= NUMBER_OF_OBJECT_TYPES ||
+			!TEST_FLAG(NETWORKED_OBJECT_TYPES | _object_mask_projectile, state.type) ||
+			state.identity.definition_index == NONE ||
+			state.identity.owner_player_index != NO_PLAYER &&
+			state.identity.owner_player_index >= MAXIMUM_TRACKED_PLAYERS)
+			return FALSE;
+		seen[absolute] = 1;
+	}
+	return TRUE;
+}
+
+static boolean network_objects_migration_weapon_local(struct object_datum const *object)
+{
+	struct unit_datum *owner = (struct unit_datum *)object_try_and_get_and_verify_type(
+		object->object.parent_object_index, _object_mask_unit);
+	return owner && distributed_player_is_local(owner->unit.player_index);
+}
+
+boolean network_objects_migration_restore(byte const *buffer, long size, long elapsed_ticks)
+{
+	long count;
+	long index;
+	if (!network_objects_migration_validate(buffer, size))
+		return FALSE;
+	memcpy(&count, buffer, sizeof(count));
+	/* Locally predicted projectiles are outside the canonical world. Replace
+them with the checkpoint's exact generations before assuming authority. */
+	{
+		struct object_iterator iterator;
+		struct object_datum *object;
+		object_iterator_new(&iterator, _object_mask_projectile, 0);
+		while ((object = object_iterator_next(&iterator)) != NULL)
+			distributed_client_delete(iterator.index);
+	}
+	for (index = 0; index < count; index++)
+	{
+		struct migration_object_state state;
+		struct object_datum *object;
+		long object_index;
+		unsigned long item_flags = 0;
+		memcpy(&state, buffer + sizeof(count) + index * sizeof(state), sizeof(state));
+		object_index = state.identity.object_index;
+		if (state.type == _object_type_projectile)
+		{
+			long absolute = DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
+			/* A newer canonical object took this slot after the checkpoint:
+the generation wins. Never delete a surviving player's current object. */
+			struct datum_header const *header = (struct datum_header const *)
+				((byte const *)object_header_data->data + absolute * object_header_data->size);
+			if (header->identifier)
+				continue;
+			distributed_client_create(&state.identity);
+		}
+		object = object_try_and_get(object_index);
+		if (!object || object->definition_index != state.identity.definition_index || object->object.type != state.type)
+			continue;
+		object->object.shield_damage_decay_timer = state.shield_damage_decay_timer;
+		object->object.body_damage_decay_timer = state.body_damage_decay_timer;
+		object->object.shield_stun_ticks = state.shield_stun_ticks;
+		if (TEST_FLAG(_object_mask_item | _object_mask_projectile, state.type))
+		{
+			item_flags = ((struct item_datum *)object)->item.flags;
+			((struct item_datum *)object)->item = state.item;
+		}
+		if (state.type == _object_type_weapon)
+		{
+			struct _weapon_datum *weapon = &((struct weapon_datum *)object)->weapon;
+			boolean keep_current = network_objects_migration_weapon_local(object);
+			short magazine;
+			/* Ammo, magazine/reload state and trigger flags are one coherent
+tuple. Combining newer ammo with an old reload can discard a filled clip
+on the next tick. Local prediction, or any newer inventory, wins together. */
+			for (magazine = 0; magazine < 2; magazine++)
+			{
+				if (weapon->magazines[magazine].rounds_total != state.weapon.magazines[magazine].rounds_total ||
+					weapon->magazines[magazine].rounds_loaded != state.weapon.magazines[magazine].rounds_loaded)
+					keep_current = TRUE;
+			}
+			if (keep_current)
+				((struct item_datum *)object)->item.flags = item_flags;
+			else
+				*weapon = state.weapon;
+			if (weapon->tracked_object_index != NONE && !object_try_and_get(weapon->tracked_object_index))
+				weapon->tracked_object_index = NONE;
+		}
+		if (state.type == _object_type_projectile)
+		{
+			object->object.owner_object_index = state.owner_object_index != NONE &&
+				object_try_and_get(state.owner_object_index) ? state.owner_object_index : NONE;
+			((struct projectile_datum *)object)->projectile = state.projectile;
+			if (state.projectile.ignore_object_index != NONE && !object_try_and_get(state.projectile.ignore_object_index))
+				((struct projectile_datum *)object)->projectile.ignore_object_index = NONE;
+			if (state.projectile.target_object_index != NONE && !object_try_and_get(state.projectile.target_object_index))
+				((struct projectile_datum *)object)->projectile.target_object_index = NONE;
+			if (state.parent_object_index != NONE && object_try_and_get(state.parent_object_index))
+				object_attach_to_node(state.parent_object_index, object_index, state.parent_node_index);
+		}
+	}
+	/* Replay only unconfirmed projectile movement. Applying its damage again
+would duplicate an explosion already reflected in the surviving world. */
+	network_damage_migration_replay(TRUE);
+	for (index = 0; index < count; index++)
+	{
+		struct migration_object_state state;
+		long step;
+		memcpy(&state, buffer + sizeof(count) + index * sizeof(state), sizeof(state));
+		if (state.type != _object_type_projectile)
+			continue;
+		for (step = 0; step < elapsed_ticks; step++)
+		{
+			struct object_header_datum *header = object_header_try_and_get(state.identity.object_index);
+			if (!header || !header->datum || TEST_FLAG(header->flags, _object_header_being_deleted_bit))
+				break;
+			projectile_update(state.identity.object_index);
+		}
+	}
+	network_damage_migration_replay(FALSE);
+	return TRUE;
+}
+
+void network_objects_migration_reset_transport(void)
+{
+	long absolute;
+	/* A promoted host will reannounce the inherited objects. Existing clients
+retain their canonical object generations and can accept those announcements. */
+	for (absolute = 0; absolute < MAXIMUM_TRACKED_OBJECTS; absolute++)
+		objects_host_told[absolute] = NONE;
+	objects_host_resting_cursor = 0;
+	memset(objects_host_inventories, 0, sizeof(objects_host_inventories));
+	memset(objects_host_vehicle_predictions, 0, sizeof(objects_host_vehicle_predictions));
+	if (network_game_distributed_client())
+	{
+		/* The new stream may have missed a spawn or delete. Ask for the
+		existing host's complete object set, without loading a new match. */
+		objects_client_synchronized = FALSE;
+		objects_client_resynchronizing = TRUE;
+		memset(objects_client_resync_seen, 0, sizeof(objects_client_resync_seen));
+	}
+	objects_client_ready_time = NONE;
+	objects_client_creating_index = NONE;
+	objects_client_creating = FALSE;
+	objects_client_deleting = FALSE;
 }

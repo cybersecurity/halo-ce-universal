@@ -75,6 +75,8 @@ with the host ABI.
 #define WINSOCK_SO_ERROR 0x1007
 #define WINSOCK_SO_TYPE 0x1008
 
+#ifndef HALO_WEB
+/* (the web build's sockets are port/web/src/web_net.c) */
 static __thread int last_error;
 
 static int fail(void)
@@ -499,6 +501,7 @@ posix_ulong posix_local_ipv4_address(void)
 	that is up, running and not loopback */
 	return result ? result : interface_address(0);
 }
+#endif
 
 void posix_random_bytes(void *buffer, posix_ulong size)
 {
@@ -542,6 +545,7 @@ void posix_random_bytes(void *buffer, posix_ulong size)
 	}
 }
 
+#ifndef HALO_WEB
 posix_ulong posix_resolve_ipv4(const char *host)
 {
 	struct addrinfo hints, *results;
@@ -557,6 +561,8 @@ posix_ulong posix_resolve_ipv4(const char *host)
 	freeaddrinfo(results);
 	return address;
 }
+
+#endif
 
 /* ---------- the process and the desktop */
 

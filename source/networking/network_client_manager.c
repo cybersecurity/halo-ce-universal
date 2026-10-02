@@ -391,6 +391,10 @@ symbols in this file:
 #include "networking/network_messages.h"
 #include "networking/network_server_manager.h"
 #include "text/unicode.h"
+#ifdef HALO_WEB
+#include "network_migration.h"
+#include "../../port/linux/game/network_distributed.h"
+#endif
 
 /* ---------- constants */
 
@@ -411,16 +415,6 @@ enum
 	long as the host waits for a silent machine, network_server_manager.c):
 	network_game_client_network_lost */
 	NETWORK_GAME_CLIENT_LINK_DOWN_TIMEOUT = 15000,
-};
-
-enum network_game_client_state
-{
-	_network_game_client_state_searching,
-	_network_game_client_state_joining,
-	_network_game_client_state_pregame,
-	_network_game_client_state_ingame,
-	_network_game_client_state_postgame,
-	NUMBER_OF_NETWORK_GAME_CLIENT_STATES,
 };
 
 enum
@@ -800,6 +794,16 @@ struct network_game_client network_game_client_dont_use_directly;
 boolean allow_out_of_sync = FALSE;
 boolean network_game_client_dont_use_directly_in_use = FALSE;
 
+#ifdef HALO_WEB
+static struct
+{
+	boolean reconnecting, acknowledged;
+	unsigned long epoch, target, retry_at, attach_at;
+	short host_machine;
+	unsigned long owner_addresses[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+} client_migration;
+#endif
+
 /* ---------- public code */
 
 /* transport_network_available asks the system for its interfaces
@@ -1050,6 +1054,13 @@ void network_game_client_game_shutdown(
 		0x3FC,
 		client);
 
+#ifdef HALO_WEB
+	if (client->state == _network_game_client_state_ingame && web_match_migration_enabled())
+	{
+		web_match_migration_lost();
+		return;
+	}
+#endif
 	network_game_client_set_error(
 		client,
 		_network_game_client_error_server_shutdown);
@@ -1754,6 +1765,12 @@ boolean network_game_client_remove_player(
 				machine_remove_player(player_index);
 			}
 
+			/* A distributed machine slot may be reused before the old player's
+			datum is retired (it remains for the scoreboard). Its new players
+			must not inherit that datum's input ownership or fill its four slots. */
+			if (network_game_distributed())
+				network_player_remove_from_machine(player_datum->network_player_data.machine_index, player_index);
+
 			for (network_player_index = 0;
 				network_player_index < MAXIMUM_NUMBER_OF_PLAYERS;
 				network_player_index++)
@@ -1892,6 +1909,21 @@ boolean network_game_client_update_local_player_data(
 	return success;
 }
 
+#ifdef HALO_WEB
+static void network_game_client_sync_added_machine(struct network_game_client *client,
+	struct network_player const *player)
+{
+	if (client->state == _network_game_client_state_ingame && network_player_is_valid(player) &&
+		!network_machine_is_valid(&client->game.machines[player->machine_index]))
+	{
+		struct network_machine *machine = &client->game.machines[player->machine_index];
+		csmemset(machine, 0, sizeof(*machine));
+		machine->machine_index = player->machine_index;
+		client->game.machine_count++;
+	}
+}
+#endif
+
 boolean network_game_client_add_player_to_game(
 	struct network_game_client *client,
 	struct network_player *player)
@@ -1909,6 +1941,11 @@ boolean network_game_client_add_player_to_game(
 
 		if (success)
 		{
+#ifdef HALO_WEB
+			/* A late join can reuse a departed host's slot. The player packet
+			also admits that machine to this client's preserved session roster. */
+			network_game_client_sync_added_machine(client, player);
+#endif
 			if (client->state == _network_game_client_state_ingame)
 			{
 				/* port: the slot it went in, which in the distributed netcode's
@@ -2192,6 +2229,10 @@ struct network_game_client *network_game_client_create(
 	void)
 {
 	struct network_game_client *client = &network_game_client_dont_use_directly;
+#ifdef HALO_WEB
+	csmemset(&client_migration, 0, sizeof(client_migration));
+	client_migration.epoch = web_quick_play_initial_epoch();
+#endif
 
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
@@ -2810,19 +2851,80 @@ static boolean network_game_client_idle_pregame(
 	return success;
 }
 
+#ifdef HALO_WEB
+static boolean network_game_client_idle_migration(struct network_game_client *client)
+{		unsigned long now = system_milliseconds();
+	if (!client->connection || !network_connection_active(client->connection) ||
+		(!network_connection_connected(client->connection) && now - client_migration.retry_at >= 1000UL))
+	{
+		if (now - client_migration.retry_at < 1000UL)
+			return TRUE;
+		client_migration.retry_at = now;
+		if (client->connection)
+			network_connection_delete(client->connection);
+		client->connection = network_connection_new(_network_connection_type_client, NETWORK_GAME_CLIENT_PORT);
+		if (!client->connection)
+			return TRUE;
+		{
+			struct transport_address address = { 0 };
+			address.address_length = IPV4_ADDRESS_LENGTH;
+			address.address.long_words[0] = client_migration.target;
+			address.port = NETWORK_GAME_SERVER_PORT;
+			network_connection_connect(client->connection, &address, NULL);
+		}
+	}
+	if (!network_connection_idle(client->connection, 15000, NULL))
+	{
+		/* Timeout leaves the old connection marked active/connected. Retire
+		   it explicitly so the next bounded retry can open a fresh stream. */
+		network_connection_delete(client->connection);
+		client->connection = NULL;
+		network_event("migration connection timed out; retrying machine #%d, epoch #%lu",
+			client->machine_index, client_migration.epoch);
+		return TRUE;
+	}
+	if (network_connection_connected(client->connection))
+	{
+		if (!client_migration.acknowledged && now - client_migration.attach_at >= 500UL)
+		{
+			struct network_migration_message attach = { 0 };
+			attach.type = NETWORK_MIGRATION_MESSAGE;
+			attach.version = NETWORK_MIGRATION_VERSION;
+			attach.epoch = client_migration.epoch;
+			attach.session_seed = client->game.random_seed;
+			attach.machine_index = client->machine_index;
+			attach.kind = NETWORK_MIGRATION_ATTACH;
+			build_message_header(&attach.header, sizeof(attach), 2, 0);
+			network_connection_write(client->connection, &attach, sizeof(attach), NULL, TRUE);
+			client_migration.attach_at = now;
+		}
+		network_game_client_process_incoming_messages(client);
+	}
+	return TRUE;
+}
+#endif
+
 static boolean network_game_client_idle_ingame(
 	struct network_game_client *client)
 {
 	boolean success = TRUE;
+#ifdef HALO_WEB
+	if (client_migration.reconnecting)
+		return network_game_client_idle_migration(client);
+#endif
 	/* port: until the host's first update the host may still be loading the
 	map (its main thread, which sends nothing meanwhile), as long as it waits
 	for the other machines to load (network_server_manager.c's
 	NETWORK_GAME_SERVER_MAXIMUM_WAIT_TIME_FOR_LEVEL_LOADING) */
 	boolean started = network_game_client_server_has_started_game(client);
 
-	if (!network_connection_active(client->connection) ||
+	if (!client->connection || !network_connection_active(client->connection) ||
 		!network_connection_connected(client->connection))
 	{
+#ifdef HALO_WEB
+		if (web_match_migration_lost())
+			return TRUE;
+#endif
 		error(_error_silent, "new idle in game abort hit");
 		display_error_when_main_menu_loaded(_error_network_server_shut_down);
 		success = FALSE;
@@ -2877,6 +2979,10 @@ static boolean network_game_client_idle_ingame(
 			if (!network_connection_active(client->connection) ||
 				!network_connection_connected(client->connection))
 			{
+#ifdef HALO_WEB
+				if (web_match_migration_lost())
+					return TRUE;
+#endif
 				error(_error_silent, "new2 idle in game abort hit");
 				display_error_when_main_menu_loaded(_error_network_server_shut_down);
 				success = FALSE;
@@ -2886,6 +2992,13 @@ static boolean network_game_client_idle_ingame(
 		}
 	}
 
+#ifdef HALO_WEB
+	if (!success && web_match_migration_enabled())
+	{
+		web_match_migration_lost();
+		return TRUE;
+	}
+#endif
 	return success;
 }
 
@@ -3053,6 +3166,56 @@ boolean network_game_client_join_first_available_game(
 	return FALSE;
 }
 
+#ifdef HALO_WEB
+short network_game_client_quick_join(unsigned long target_address)
+{
+	struct network_game_client *client = global_network_game_client_get();
+	long index;
+
+	if (!client || client->state != _network_game_client_state_searching || client->join_in_progress ||
+		!client->connection || network_connection_connected(client->connection))
+		return 0;
+	for (index = 0; index < MAXIMUM_NETWORK_ADVERTISED_GAMES; index++)
+	{
+		struct network_advertised_game *game = &client->available_games[index];
+		struct transport_address address = { { { 0 } } };
+		struct network_join_parameters parameters;
+
+		if (!network_game_client_advertised_game_is_valid(game) ||
+			game->platform != network_game_get_local_platform())
+			continue;
+		transport_client_start((XNADDR const *)&game->xnaddr, (XNKEY const *)&game->key,
+			(XNKID const *)&game->key_id, NETWORK_GAME_SERVER_PORT, &address);
+		if (!address.address.long_words[0] || !address.port ||
+			(target_address && address.address.long_words[0] != target_address))
+			continue;
+		if (!network_game_client_advertised_game_compatible(client, game, FALSE))
+			return -1;
+		if (!game->open)
+			return -2;
+		csmemset(&parameters, 0, sizeof(parameters));
+		network_game_generate_join_game_token(parameters.join_token);
+		return network_game_client_initiate_join_game(client, game, &parameters, &address) ? 1 : -3;
+	}
+	return 0;
+}
+
+boolean network_game_client_has_local_player(struct network_game_client *client, short controller_index)
+{
+	long index;
+	if (!client || client->machine_index == NONE)
+		return FALSE;
+	for (index = 0; index < MAXIMUM_NUMBER_OF_PLAYERS; index++)
+	{
+		struct network_player *player = &client->game.players[index];
+		if (network_player_is_valid(player) && player->machine_index == client->machine_index &&
+			player->controller_index == controller_index)
+			return TRUE;
+	}
+	return FALSE;
+}
+#endif
+
 /* ... and puts this machine's players on a team (a team game needs both
 teams), as the pregame screen's team choice does; NONE: the other team from
 another machine's player */
@@ -3086,4 +3249,162 @@ boolean network_game_client_set_team(
 	}
 	return success;
 }
+#ifdef HALO_WEB
+unsigned long network_game_migration_epoch(void)
+{
+	return client_migration.epoch;
+}
 
+void network_game_client_migration_routes(unsigned long const *addresses, short count)
+{
+	if (count == HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+		csmemcpy(client_migration.owner_addresses, addresses, sizeof(client_migration.owner_addresses));
+}
+
+boolean network_game_client_migration_validate_machines(void const *buffer, long size)
+{
+	struct network_migration_membership const *membership = buffer;
+	long index, count = 0;
+	if (!buffer || size != sizeof(*membership))
+		return FALSE;
+	for (index = 0; index < HALO_PORT_MAXIMUM_NETWORK_MACHINES; index++)
+	{
+		short machine_index = membership->machines[index].machine_index;
+		if (machine_index == NONE)
+			continue;
+		if (machine_index != index)
+			return FALSE;
+		count++;
+	}
+	return membership->machine_count == count;
+}
+
+boolean network_game_client_migration_set_machines(void const *buffer, long size)
+{
+	struct network_game_client *client = global_network_game_client_get();
+	struct network_migration_membership const *membership = buffer;
+	if (!client || sizeof(client->game.machines) != sizeof(membership->machines) ||
+		!network_game_client_migration_validate_machines(buffer, size))
+		return FALSE;
+	csmemcpy(client->game.machines, membership->machines, sizeof(client->game.machines));
+	client->game.machine_count = (short)membership->machine_count;
+	return TRUE;
+}
+
+unsigned long network_game_client_migration_owner_address(short machine_index)
+{
+	return machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES ?
+		client_migration.owner_addresses[machine_index] : 0;
+}
+
+void network_game_client_migration_set_host_machine(short machine_index)
+{
+	if (machine_index >= 0 && machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
+		client_migration.host_machine = machine_index;
+}
+
+short network_game_client_migration_host_machine(struct network_game_client *client)
+{
+	(void)client;
+	return client_migration.host_machine;
+}
+
+void network_game_client_migration_remove_machine(struct network_game_client *client, short machine_index)
+{
+	long index;
+	if (machine_index < 0 || machine_index >= MAXIMUM_NETWORK_MACHINE_COUNT || machine_index == client->machine_index ||
+		!network_machine_is_valid(&client->game.machines[machine_index]))
+		return;
+	for (index = 0; index < MAXIMUM_NUMBER_OF_PLAYERS; index++)
+	{
+		struct network_player *player = &client->game.players[index];
+		if (network_player_is_valid(player) && player->machine_index == machine_index)
+		{
+			long datum_index = unstrip_player_index(player->player_list_index);
+			struct player_datum *datum = datum_index != NONE ? player_try_and_get(datum_index) : NULL;
+			if (datum)
+			{
+				datum->quit_out_of_game_time = game_time_get() + 1;
+				/* Score history keeps the datum, but its departed machine no
+				longer owns input when a fresh player reuses this machine slot. */
+				network_player_remove_from_machine(machine_index, datum_index);
+			}
+		}
+	}
+	network_game_remove_machine(&client->game, &client->game.machines[machine_index]);
+}
+
+boolean network_game_client_begin_migration(struct network_game_client *client, unsigned long target, unsigned long epoch)
+{
+	if (!client || client->state != _network_game_client_state_ingame || !target ||
+		epoch < client_migration.epoch)
+		return FALSE;
+	if (target != IPV4_LOOPBACK_ADDRESS && global_network_game_server_get())
+		network_game_demote_migration_host();
+	if (client->connect_process)
+	{
+		cancel_connect_process(client->connect_process);
+		client->connect_process = NULL;
+	}
+	if (client->connection)
+		network_connection_delete(client->connection);
+	client->connection = NULL;
+	client_migration.reconnecting = TRUE;
+	client_migration.acknowledged = FALSE;
+	client_migration.epoch = epoch;
+	client_migration.target = target;
+	client_migration.retry_at = system_milliseconds() - 1000UL;
+	client_migration.attach_at = system_milliseconds() - 500UL;
+	client->error = _network_game_client_error_none;
+	client->connection_silent = FALSE;
+	network_distributed_migration_reset_transport();
+	update_queues_migrate();
+	network_event("reattaching machine #%d to the same match, epoch #%lu", client->machine_index, epoch);
+	return TRUE;
+}
+
+boolean network_game_client_migration_waiting(struct network_game_client *client)
+{
+	return client && client_migration.reconnecting && !client_migration.acknowledged;
+}
+
+boolean network_game_client_migration_ready(struct network_game_client *client)
+{
+	return client && client_migration.acknowledged;
+}
+
+boolean network_game_client_handle_migration(struct network_game_client *client, void const *message,
+	word size, struct transport_address *address)
+{
+	struct network_migration_message ack;
+	short index;
+	if (size < 4 || ((byte const *)message)[2] != NETWORK_MIGRATION_MESSAGE)
+		return FALSE;
+	if (size != sizeof(ack))
+		return TRUE;
+	csmemcpy(&ack, message, sizeof(ack));
+	if (!client_migration.reconnecting || GET_MESSAGE_FLAGS(ack.header) || GET_MESSAGE_TYPE(ack.header) != 2 ||
+		ack.version != NETWORK_MIGRATION_VERSION || ack.kind != NETWORK_MIGRATION_ACK ||
+		ack.epoch != client_migration.epoch || ack.session_seed != client->game.random_seed ||
+		ack.machine_index != client->machine_index || ack.host_machine_index < 0 ||
+		ack.host_machine_index >= MAXIMUM_NETWORK_MACHINE_COUNT || ack.game_tick < 0 ||
+		!network_game_client_address_matches_server(client, address))
+		return TRUE;
+	if (!(ack.machine_present[client->machine_index / 8] & (1 << (client->machine_index % 8))) ||
+		!(ack.machine_present[ack.host_machine_index / 8] & (1 << (ack.host_machine_index % 8))) ||
+		!network_machine_is_valid(&client->game.machines[ack.host_machine_index]))
+		return TRUE;
+	for (index = 0; index < MAXIMUM_NETWORK_MACHINE_COUNT; index++)
+		if (!(ack.machine_present[index / 8] & (1 << (index % 8))))
+			network_game_client_migration_remove_machine(client, index);
+	client_migration.host_machine = ack.host_machine_index;
+	client_migration.acknowledged = TRUE;
+	client_migration.reconnecting = FALSE;
+	game_time_set_distributed(ack.game_tick);
+	update_queues_migrate();
+	client->next_update_number = MAX(ack.game_tick, 1);
+	network_event("machine #%d preserved its match at tick #%ld with host #%d", client->machine_index,
+		ack.game_tick, ack.host_machine_index);
+	return TRUE;
+}
+#endif

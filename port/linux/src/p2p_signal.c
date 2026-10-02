@@ -54,7 +54,11 @@ the host ends before the tunnel reached it, or when the host has not
 answered it in a while.
 */
 
+#ifdef HALO_RELAY
+#include "relay_platform.h"
+#else
 #include "platform.h"
+#endif
 #include "posix.h"
 #include "port_config.h"
 #include "p2p_internal.h"

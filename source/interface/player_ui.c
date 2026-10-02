@@ -602,7 +602,16 @@ void player_ui_fast_setup_network_server(
 	dispose_global_network_game_server();
 	dispose_global_network_game_client();
 	game_connection_set(_game_connection_local);
+#ifdef HALO_WEB
+	/* Quick play supplies its initial map before playlist initialization;
+	ordinary System Link retains its original default selection. */
+	{
+		extern char const *web_quick_play_initial_map(void);
+		main_set_multiplayer_map_name(web_quick_play_initial_map());
+	}
+#else
 	main_set_multiplayer_map_name("");
+#endif
 	player_ui_globals.multiplayer_variant_specified = FALSE;
 	if (ui_widget_load_by_name_or_tag(
 		"ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen",

@@ -109,6 +109,12 @@ symbols in this file:
 
 #include <xtl.h>
 
+#ifdef HALO_WEB
+/* called without a prototype in scope; a WebAssembly call must match the
+definition's signature */
+short cache_file_read(long tag_index, long offset, long size, void *buffer, boolean *completion_flag_reference, boolean blocking);
+#endif
+
 /* ---------- constants */
 
 /* ---------- macros */

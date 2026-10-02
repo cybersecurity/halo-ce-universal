@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Halo CE">
+<meta name="theme-color" content="#0b0d12">
+<title>Halo CE Web</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="screen" aria-label="Game"></canvas>
+<div id="touch" class="touch-layer" hidden></div>
+
+<main id="launcher">
+  <section class="panel">
+    <header>
+      <h1>Halo CE <span>Web</span></h1>
+      <p class="subtitle">The Halo: Combat Evolved decompilation, running in your browser.</p>
+    </header>
+
+    <div id="checks" class="checks" aria-live="polite"></div>
+
+    <div id="install-hint" class="hint" hidden>
+      <strong>Install it:</strong> tap <span class="share-glyph" aria-hidden="true">⬆︎</span> Share, then
+      <em>Add to Home Screen</em>. The installed app runs full screen and keeps its data.
+    </div>
+    <div id="install-android" class="hint" hidden>
+      <strong>Install it</strong> to play full screen and keep the game data:
+      <button type="button" class="button small-button" id="install-button" hidden>Install app</button>
+      <span id="install-android-menu">open the browser's menu <span aria-hidden="true">⋮</span>, then <em>Install app</em>
+        (or <em>Add to Home screen</em>).</span>
+    </div>
+
+    <div id="iphone-tips" class="hint" hidden>
+      <strong>iPhone tips:</strong> swipe down from the top-right to open Control Center.
+      Turn off <strong>Portrait Orientation Lock</strong> to play sideways.
+      For sound, turn off <strong>Silent Mode</strong> and raise the volume.
+      <p class="small">With a Home button, swipe up from the bottom instead.
+        If Silent Mode isn't in Control Center, use your Ring/Silent switch or Action button.</p>
+    </div>
+
+    <div id="step-data" class="step" hidden>
+      <h2>Game data</h2>
+      <p>Choose your own Halo: Combat Evolved Xbox disc image (<code>.iso</code> or <code>.xiso</code>).
+        The maps are copied into this browser and reused on later visits. This site does not provide
+        a disc image or game maps.</p>
+      <label class="button primary" for="iso-file">Choose disc image…</label>
+      <input id="iso-file" type="file" accept=".iso,.xiso,application/octet-stream,application/x-iso9660-image" hidden>
+      <div id="progress" class="progress" hidden>
+        <div class="bar"><div id="progress-fill"></div></div>
+        <p id="progress-text"></p>
+      </div>
+    </div>
+
+    <div id="step-play" class="step" hidden>
+      <p id="quick-status" class="small" role="status" aria-live="polite"></p>
+      <button id="play" class="button primary" type="button">Play main menu</button>
+      <div class="row">
+        <button id="main-menu" class="button" type="button">Main menu</button>
+        <button id="quick-retry" class="button" type="button" hidden>Retry multiplayer</button>
+      </div>
+      <p class="small" id="data-summary"></p>
+    </div>
+
+    <section class="online" id="browser-rooms" aria-labelledby="online-title">
+      <button id="room-close" class="button small-button" type="button" hidden>Back to game</button>
+      <h2 id="online-title">Browser rooms</h2>
+      <p class="small">The room opens a multiplayer match automatically when your game data is ready.
+        One player hosts. If the host disconnects, gameplay pauses while another connected player
+        takes over the same match, preserving scores and positions. Your address: <code id="online-address"></code></p>
+      <p class="room-line" id="online-default-room">Default public room <strong id="online-default-code">FQLX01</strong>
+        <button type="button" class="button small-button" id="online-default">Join default room</button></p>
+      <label class="row">Your name <input id="online-name" type="text" maxlength="24" placeholder="Player" autocomplete="nickname"></label>
+      <div id="online-join" class="row">
+        <button type="button" class="button" id="online-create">New room</button>
+        <input id="online-input" aria-label="Room code" type="text" inputmode="latin" autocapitalize="characters" placeholder="Room code" maxlength="16">
+        <button type="button" class="button" id="online-enter">Join</button>
+      </div>
+      <div id="online-room" hidden>
+        <p class="room-line">Room <strong id="online-code"></strong>
+          <button type="button" class="button small-button" id="online-share">Share link</button>
+          <button type="button" class="button small-button" id="online-leave">Leave</button></p>
+        <p class="small" id="online-status"></p>
+        <p class="small" id="online-names"></p>
+      </div>
+    </section>
+
+    <details class="settings">
+      <summary>Settings and data</summary>
+      <label class="row"><input type="checkbox" id="opt-touch"> Touch controls</label>
+      <label class="row"><input type="checkbox" id="opt-touch-fps"> Compact FPS touch controls (gameplay)</label>
+      <p class="small">Choose before starting. The controller layout includes menu buttons; the compact layout focuses on gameplay.</p>
+      <label class="row">Aim sensitivity <input type="range" id="opt-look" min="0.4" max="3" step="0.1"></label>
+      <label class="row">Render resolution <select id="opt-resolution">
+        <option value="480">480p · lowest memory</option>
+        <option value="720">720p · balanced</option>
+        <option value="1080">1080p · high detail</option>
+        <option value="1440">1440p · highest detail</option>
+      </select></label>
+      <label class="row"><input type="checkbox" id="opt-vsync" checked> Wait for the display (smoother, saves battery)</label>
+      <label class="row"><input type="checkbox" id="opt-gldebug"> Log graphics errors (for bug reports)</label>
+      <p class="small">Online play: a TURN relay, for networks that WebRTC cannot cross directly (some mobile networks).</p>
+      <label class="row">TURN server <input type="text" id="opt-turn-url" placeholder="turn:host:3478"></label>
+      <label class="row">TURN user <input type="text" id="opt-turn-user" autocomplete="off"></label>
+      <label class="row">TURN password <input type="password" id="opt-turn-password" autocomplete="off"></label>
+      <div class="row buttons">
+        <button type="button" class="button" id="export-saves">Export saved games</button>
+        <button type="button" class="button" id="show-log">Show log</button>
+        <button type="button" class="button danger" id="delete-data">Delete game data</button>
+      </div>
+      <p class="small" id="storage-summary"></p>
+      <p class="small" id="version"></p>
+    </details>
+
+    <p class="legal">An unofficial fan project, not affiliated with or endorsed by Microsoft, Xbox Game Studios
+      or Bungie.</p>
+  </section>
+</main>
+
+<button id="room-toggle" class="button small-button room-toggle" type="button" hidden>Room</button>
+<section id="quick-panel" class="quick-panel" hidden aria-label="Multiplayer connection">
+  <p id="quick-game-status" role="status" aria-live="polite"></p>
+  <button id="quick-menu" class="button small-button" type="button">Main menu</button>
+  <button id="quick-log" class="button small-button" type="button">Show log</button>
+</section>
+<!-- Cached launchers still bind these IDs. Keep inert compatibility elements
+     so a network document can start before its service-worker update. -->
+<div id="interaction-prompt" hidden aria-hidden="true" style="display:none!important">
+  <button id="interaction-enable" type="button" hidden></button>
+  <button id="interaction-menu" type="button" hidden></button>
+</div>
+
+<div id="rotate" class="overlay" hidden>
+  <div class="panel">
+    <p>Turn your device sideways to play.</p>
+    <div id="rotate-iphone-tips" hidden>
+      <p>Still upright? <strong>Portrait Orientation Lock</strong> may be on.
+        Swipe down from the top-right to open Control Center and turn it off.</p>
+      <p>For sound, turn off <strong>Silent Mode</strong> in Control Center and raise the volume.</p>
+      <p class="small">With a Home button, swipe up from the bottom instead.
+        If Silent Mode isn't in Control Center, use your Ring/Silent switch or Action button.</p>
+    </div>
+  </div>
+</div>
+<div id="toast" class="toast" hidden></div>
+<aside id="update-notice" class="update-notice" hidden aria-label="Game update">
+  <span id="update-message" role="status" aria-live="polite">A new version is available. Updating restarts the game.</span>
+  <button id="update-button" class="button small-button" type="button">Update</button>
+</aside>
+<div id="fatal" class="overlay fatal" hidden>
+  <div class="panel">
+    <h2>The game stopped</h2>
+    <pre id="fatal-text"></pre>
+    <div class="row buttons">
+      <button type="button" class="button primary" id="fatal-reload">Reload</button>
+      <button type="button" class="button" id="fatal-menu">Main menu</button>
+      <button type="button" class="button" id="fatal-log">Copy log</button>
+    </div>
+  </div>
+</div>
+<div id="log-view" class="overlay" hidden>
+  <div class="panel wide">
+    <pre id="log-text"></pre>
+    <div class="row buttons">
+      <button type="button" class="button" id="log-copy">Copy</button>
+      <button type="button" class="button" id="log-download">Download full log</button>
+      <button type="button" class="button primary" id="log-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="input.js"></script>
+<script src="site-config.js"></script>
+<script src="native-invite.js"></script>
+<script src="gateway.js"></script>
+<script src="net.js"></script>
+<script src="cache.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

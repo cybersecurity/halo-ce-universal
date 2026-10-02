@@ -39,6 +39,14 @@ DWORD WINAPI XLaunchNewImageA(LPCSTR image_path, PLAUNCH_DATA launch_data)
 	(void)launch_data;
 	/* On the Xbox this reboots into another executable and never returns */
 	platform_log("XLaunchNewImage(\"%s\"): exiting", image_path ? image_path : "(dashboard)");
+#ifdef HALO_WEB
+	{
+		/* the page offers to start again (port/web/src/web_library.js) */
+		extern void web_js_post(int kind, const char *text);
+
+		web_js_post(5, "The game quit to the Xbox dashboard.");
+	}
+#endif
 	exit(EXIT_SUCCESS);
 }
 

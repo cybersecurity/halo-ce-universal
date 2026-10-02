@@ -93,7 +93,9 @@ is dead; version 8 is the first whose clients play by the host's rules
 (below), so a build without them joins no host of it; version 9 tells
 every machine of a player the host dropped for cheating, each client
 tells the host its Discord user, and a machine's join request carries its
-hardware id; version 10 sends every player's ping for the scoreboard.
+hardware id; version 10 sends every player's ping for the scoreboard;
+version 11 adds browser match-preserving host migration, typed checkpoints,
+and original-roster reattachment.
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console

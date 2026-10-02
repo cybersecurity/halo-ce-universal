@@ -68,6 +68,11 @@ void network_game_server_change_map_name(
 void network_game_server_change_game_variant(
 	struct network_game_server *server,
 	struct game_variant *variant);
+#ifdef HALO_WEB
+/* Validate the quick-play Slayer setup. Browser distributed System Link
+also allows a solo start and remains open for in-progress joins. */
+boolean network_game_server_enable_quick_play(struct network_game_server *server);
+#endif
 
 /* ---------- globals */
 

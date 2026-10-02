@@ -1,0 +1,491 @@
+:root {
+  --bg: #0b0d12;
+  --panel: #151922;
+  --panel-edge: #262c3a;
+  --text: #e8ebf2;
+  --muted: #9aa3b5;
+  --accent: #7fd1ff;
+  --accent-strong: #3fb4f2;
+  --danger: #ff6b6b;
+  --ok: #7be38c;
+  --warn: #ffd166;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+body.playing {
+  overflow: hidden;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#screen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  display: none;
+  background: #000;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+body.playing #screen { display: block; }
+body.playing #launcher { display: none; }
+body.playing.room-settings { touch-action: auto; user-select: text; -webkit-user-select: text; }
+body.playing.room-settings #launcher {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  overflow: auto;
+  align-items: flex-start;
+  background: rgba(11, 13, 18, 0.96);
+}
+.room-toggle {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 15;
+}
+
+.quick-panel {
+  position: fixed;
+  z-index: 15;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px));
+  padding: 12px 16px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 12px;
+  background: rgba(21, 25, 34, 0.96);
+}
+.quick-panel { top: max(12px, env(safe-area-inset-top)); }
+.quick-panel p { margin: 0 0 10px; }
+.quick-panel[data-state=error] { border-color: var(--danger); }
+
+#launcher {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.panel {
+  width: 100%;
+  max-width: 560px;
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.panel.wide { max-width: 900px; }
+
+h1 { margin: 0; font-size: 28px; letter-spacing: 0.02em; }
+h1 span { color: var(--accent); font-weight: 500; }
+h2 { font-size: 17px; margin: 18px 0 6px; }
+.subtitle { color: var(--muted); margin: 4px 0 12px; }
+.small { color: var(--muted); font-size: 13px; }
+.legal { color: var(--muted); font-size: 12px; margin: 18px 0 0; }
+code { background: #0e1117; padding: 1px 5px; border-radius: 4px; }
+
+.checks { display: grid; gap: 4px; margin: 8px 0; font-size: 14px; }
+.check::before { content: "✓ "; color: var(--ok); }
+.check.bad::before { content: "✕ "; color: var(--danger); }
+.check.warn::before { content: "! "; color: var(--warn); }
+
+.hint {
+  background: #10202b;
+  border: 1px solid #1f4058;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 10px 0;
+  font-size: 14px;
+}
+
+.share-glyph { display: inline-block; font-weight: 700; color: var(--accent); }
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-edge);
+  background: #1d2330;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.button.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: #04121c; }
+.button.danger { color: var(--danger); }
+.button:disabled { opacity: 0.5; }
+#play { width: 100%; font-size: 18px; min-height: 52px; margin-top: 12px; }
+
+.progress { margin-top: 12px; }
+.bar { height: 8px; background: #0e1117; border-radius: 4px; overflow: hidden; }
+#progress-fill { height: 100%; width: 0; background: var(--accent-strong); transition: width 0.2s; }
+
+
+.online { margin-top: 18px; border-top: 1px solid var(--panel-edge); padding-top: 4px; }
+.online input[type=text] {
+  flex: 1;
+  min-width: 120px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-edge);
+  background: #0e1117;
+  color: var(--text);
+  font: inherit;
+}
+.room-line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0 4px; }
+.room-line strong { font-size: 20px; letter-spacing: 0.12em; color: var(--accent); }
+.small-button { min-height: 34px; padding: 0 12px; font-size: 13px; }
+.settings input[type=text], .settings input[type=password], .settings select {
+  flex: 1;
+  min-width: 120px;
+  min-height: 36px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-edge);
+  background: #0e1117;
+  color: var(--text);
+  font: inherit;
+}
+.settings { margin-top: 16px; border-top: 1px solid var(--panel-edge); padding-top: 10px; }
+.settings summary { cursor: pointer; color: var(--muted); min-height: 32px; }
+.row { display: flex; gap: 10px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+.row input[type=range] { flex: 1; min-width: 120px; }
+.row.buttons .button { flex: 1 1 auto; }
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 6, 9, 0.92);
+  z-index: 20;
+  padding: 16px;
+  text-align: center;
+}
+
+.overlay[hidden] { display: none; }
+.overlay pre {
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 60vh;
+  overflow: auto;
+  font-size: 12px;
+  background: #0e1117;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  top: max(12px, env(safe-area-inset-top));
+  transform: translateX(-50%);
+  background: rgba(21, 25, 34, 0.95);
+  border: 1px solid var(--panel-edge);
+  padding: 8px 14px;
+  border-radius: 10px;
+  z-index: 30;
+  font-size: 14px;
+  max-width: calc(100vw - 32px);
+}
+
+.update-notice {
+  position: fixed;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 8px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: rgba(21, 25, 34, 0.98);
+  z-index: 31;
+  font-size: 14px;
+}
+.update-notice .button { flex-shrink: 0; }
+
+/* ---------- touch controls
+
+Laid out like the original Xbox controller (the Controller S): A, B, X and Y
+as green, red, blue and yellow translucent gems in a diamond, the white and
+black buttons below them, the L and R triggers above each side, back and
+start between the thumbs, a round d-pad under the left thumb, and the left
+stick where the left thumb lands. */
+
+.touch-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  touch-action: none;
+  --edge-left: env(safe-area-inset-left);
+  --edge-right: env(safe-area-inset-right);
+  --edge-bottom: env(safe-area-inset-bottom);
+  --face: 56px;
+  --gap: 5px;
+  /* the controller's charcoal body */
+  --body: rgba(28, 30, 28, 0.5);
+  --rim: rgba(160, 170, 160, 0.45);
+}
+
+body.has-controller .touch-layer { display: none; }
+
+.touch-button {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(235, 240, 235, 0.95);
+  background: var(--body);
+  border: 1.5px solid var(--rim);
+  -webkit-user-select: none;
+  user-select: none;
+  font-family: "Arial Black", "Helvetica Neue", Arial, sans-serif;
+  transition: transform 0.06s, filter 0.06s;
+}
+
+.touch-button.pressed { transform: scale(0.92); filter: brightness(1.45); }
+
+.touch-button .glyph { font-weight: 900; line-height: 1; }
+.touch-button .caption {
+  position: absolute;
+  top: 100%;
+  margin-top: 3px;
+  font: 700 9px/1 -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+/* A, B, X and Y: domed translucent gems, their letters embossed */
+.touch-button.face {
+  width: var(--face);
+  height: var(--face);
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 -6px 10px rgba(0, 0, 0, 0.35), inset 0 5px 8px rgba(255, 255, 255, 0.35),
+    0 3px 6px rgba(0, 0, 0, 0.45);
+  --diamond-right: calc(46px + var(--edge-right));
+  --diamond-bottom: calc(96px + var(--edge-bottom));
+}
+
+.touch-button.face .glyph {
+  font-size: 22px;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 1px rgba(255, 255, 255, 0.4);
+}
+
+.face-a { background: radial-gradient(circle at 38% 30%, rgba(160, 235, 120, 0.85), rgba(40, 150, 40, 0.72) 60%, rgba(15, 80, 20, 0.8)); }
+.face-b { background: radial-gradient(circle at 38% 30%, rgba(255, 150, 150, 0.85), rgba(210, 30, 35, 0.72) 60%, rgba(110, 10, 15, 0.8)); }
+.face-x { background: radial-gradient(circle at 38% 30%, rgba(150, 200, 255, 0.85), rgba(30, 90, 210, 0.72) 60%, rgba(10, 40, 120, 0.8)); }
+.face-y { background: radial-gradient(circle at 38% 30%, rgba(255, 240, 150, 0.9), rgba(235, 190, 20, 0.75) 60%, rgba(140, 100, 0, 0.8)); }
+.face-y .glyph { color: rgba(70, 50, 0, 0.85); text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5); }
+
+.face-a { right: calc(var(--diamond-right) + var(--face) + var(--gap)); bottom: var(--diamond-bottom); }
+.face-b { right: var(--diamond-right); bottom: calc(var(--diamond-bottom) + var(--face) + var(--gap)); }
+.face-x { right: calc(var(--diamond-right) + 2 * (var(--face) + var(--gap))); bottom: calc(var(--diamond-bottom) + var(--face) + var(--gap)); }
+.face-y { right: calc(var(--diamond-right) + var(--face) + var(--gap)); bottom: calc(var(--diamond-bottom) + 2 * (var(--face) + var(--gap))); }
+
+/* white and black: smaller gems below the diamond, towards the edge */
+.touch-button.duo {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  bottom: calc(22px + var(--edge-bottom));
+  box-shadow: inset 0 -5px 8px rgba(0, 0, 0, 0.35), inset 0 4px 6px rgba(255, 255, 255, 0.3), 0 3px 6px rgba(0, 0, 0, 0.45);
+}
+
+.duo-white {
+  right: calc(76px + var(--edge-right));
+  background: radial-gradient(circle at 38% 30%, rgba(255, 255, 255, 0.95), rgba(215, 220, 215, 0.85) 60%, rgba(150, 155, 150, 0.85));
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.duo-black {
+  right: calc(24px + var(--edge-right));
+  background: radial-gradient(circle at 38% 30%, rgba(110, 110, 110, 0.95), rgba(30, 30, 30, 0.9) 60%, rgba(5, 5, 5, 0.9));
+  border-color: rgba(150, 150, 150, 0.6);
+}
+
+/* the triggers: the controller's curved L and R above each side */
+.touch-button.trigger {
+  width: 96px;
+  height: 52px;
+  top: calc(56px + env(safe-area-inset-top));
+  background: linear-gradient(180deg, rgba(90, 95, 90, 0.6), rgba(30, 32, 30, 0.6));
+}
+
+.touch-button.trigger .glyph { font-size: 22px; }
+.touch-button.trigger.left-side { left: calc(26px + var(--edge-left)); border-radius: 30px 14px 10px 22px; }
+.touch-button.trigger.right-side { right: calc(26px + var(--edge-right)); border-radius: 14px 30px 22px 10px; }
+
+/* the stick clicks: pressing a thumbstick, which a touch screen cannot do */
+.touch-button.stick-click {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(60, 64, 60, 0.6) 35%, rgba(25, 27, 25, 0.6) 36%);
+}
+
+.touch-button.left-click { left: calc(200px + var(--edge-left)); bottom: calc(var(--edge-bottom) + 176px); }
+.touch-button.right-click { right: calc(236px + var(--edge-right)); bottom: calc(var(--edge-bottom) + 176px); }
+
+/* back and start: the small black buttons between the thumbs */
+.touch-button.system {
+  width: 54px;
+  height: 26px;
+  border-radius: 13px;
+  bottom: calc(24px + var(--edge-bottom));
+  background: rgba(15, 15, 15, 0.65);
+}
+
+.touch-button.system .glyph { font: 800 9px/1 -apple-system, BlinkMacSystemFont, Roboto, sans-serif; letter-spacing: 0.08em; }
+.touch-button.back { left: calc(50% - 62px); }
+.touch-button.start { left: calc(50% + 8px); }
+
+/* the d-pad: a round plate with a cross, each arm a button */
+.touch-dpad {
+  position: absolute;
+  left: calc(190px + var(--edge-left));
+  bottom: calc(var(--edge-bottom) + 14px);
+  width: 124px;
+  height: 124px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, rgba(80, 84, 80, 0.5), rgba(25, 27, 25, 0.55));
+  border: 1.5px solid var(--rim);
+}
+
+.touch-dpad .touch-button {
+  width: 38px;
+  height: 40px;
+  border-radius: 4px;
+  background: rgba(20, 21, 20, 0.7);
+  border-color: rgba(120, 125, 120, 0.4);
+}
+
+.touch-dpad .up { left: 42px; top: 8px; }
+.touch-dpad .down { left: 42px; bottom: 8px; }
+.touch-dpad .left { left: 8px; top: 41px; width: 40px; height: 38px; }
+.touch-dpad .right { right: 8px; top: 41px; width: 40px; height: 38px; }
+
+.touch-dpad .touch-button::after {
+  content: "";
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+}
+
+.touch-dpad .up::after { border-bottom-color: rgba(220, 225, 220, 0.8); transform: translateY(-3px); }
+.touch-dpad .down::after { border-top-color: rgba(220, 225, 220, 0.8); transform: translateY(3px); }
+.touch-dpad .left::after { border-right-color: rgba(220, 225, 220, 0.8); transform: translateX(-3px); }
+.touch-dpad .right::after { border-left-color: rgba(220, 225, 220, 0.8); transform: translateX(3px); }
+
+/* the left stick: a concave black thumbstick where the thumb lands */
+.touch-stick {
+  position: absolute;
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  border: 1.5px solid var(--rim);
+  background: radial-gradient(circle, rgba(28, 30, 28, 0.2) 0%, rgba(28, 30, 28, 0.5) 100%);
+  left: calc(34px + var(--edge-left));
+  bottom: calc(46px + var(--edge-bottom));
+  pointer-events: none;
+  opacity: 0.65;
+  transition: opacity 0.1s;
+}
+
+.touch-stick.active { opacity: 1; }
+
+.touch-knob {
+  position: absolute;
+  left: 32px;
+  top: 32px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, rgba(18, 18, 18, 0.95) 38%, rgba(55, 58, 55, 0.95) 40%,
+    rgba(30, 32, 30, 0.95) 70%);
+  border: 1.5px solid rgba(140, 145, 140, 0.6);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.55);
+}
+
+/* smaller phones in landscape */
+@media (max-height: 380px) {
+  .touch-layer { --face: 50px; }
+  .touch-button.face { --diamond-bottom: calc(86px + var(--edge-bottom)); }
+  .touch-button.trigger { top: calc(46px + env(safe-area-inset-top)); height: 46px; width: 86px; }
+  .touch-button.left-click, .touch-button.right-click { bottom: calc(var(--edge-bottom) + 158px); }
+  .touch-button.right-click { right: calc(210px + var(--edge-right)); }
+}
+
+
+/* Optional compact FPS gameplay layout. */
+.touch-layer.fps-controls { -webkit-user-select: none; user-select: none; }
+/* Compact two-thumb HUD, independent of the legacy controller artwork. */
+.touch-layer.fps-controls .touch-button {
+  width: 46px; height: 46px; min-width: 44px; min-height: 44px;
+  border: 1px solid #ffffff70; border-radius: 50%;
+  background: #14202d55; box-shadow: none;
+  color: #fff; opacity: .78; display: flex; align-items: center; justify-content: center;
+  font-family: system-ui, sans-serif;
+}
+.touch-layer.fps-controls .touch-button.pressed { background: #d5ecff55; opacity: 1; }
+.touch-layer.fps-controls .glyph { font-size: 23px; font-weight: 500; }
+.touch-layer.fps-controls .caption { white-space: nowrap; position: absolute; top: auto; bottom: 4px; margin: 0; font: 600 7px/1 system-ui; letter-spacing: 0; }
+.touch-layer.fps-controls .glyph { transform: translateY(-4px); }
+.touch-layer.fps-controls .fps-fire { width: 64px; height: 64px; right: calc(82px + env(safe-area-inset-right)); bottom: calc(126px + env(safe-area-inset-bottom)); }
+.touch-layer.fps-controls .fps-fire .glyph { font-size: 36px; }
+.touch-layer.fps-controls .fps-jump { right: calc(18px + env(safe-area-inset-right)); bottom: calc(78px + env(safe-area-inset-bottom)); }
+.touch-layer.fps-controls .fps-crouch { right: calc(74px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); }
+.touch-layer.fps-controls .fps-melee { right: calc(18px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); }
+.touch-layer.fps-controls .fps-reload { right: calc(134px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); }
+/* Invisible target over the engine's ammo/weapon HUD, including while pressed. */
+.touch-layer.fps-controls .fps-weapon-hud,
+.touch-layer.fps-controls .fps-weapon-hud.pressed {
+  left: max(6vw, env(safe-area-inset-left)); top: max(4vh, env(safe-area-inset-top));
+  width: 16vw; height: 16vh; opacity: 0; border: 0; background: transparent;
+}
+.touch-layer.fps-controls .fps-zoom { right: calc(18px + env(safe-area-inset-right)); bottom: calc(142px + env(safe-area-inset-bottom)); }
+.touch-layer.fps-controls .fps-grenade { left: calc(148px + env(safe-area-inset-left)); bottom: calc(34px + env(safe-area-inset-bottom)); }
+.touch-layer.fps-controls .fps-grenade-type { left: calc(204px + env(safe-area-inset-left)); bottom: calc(34px + env(safe-area-inset-bottom)); }
+.touch-layer.fps-controls .touch-stick { opacity: 0; width: 96px; height: 96px; left: calc(28px + env(safe-area-inset-left)); bottom: calc(28px + env(safe-area-inset-bottom)); border: 1px solid #ffffff50; background: #14202d22; box-shadow: none; }
+.touch-layer.fps-controls .touch-knob { left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border: 1px solid #ffffff80; background: #d2e9fa33; box-shadow: none; }
+
+.touch-layer.fps-controls .touch-stick.active { opacity: 1; }

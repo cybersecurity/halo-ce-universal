@@ -344,6 +344,9 @@ long *machine_get_player_list(
 void machine_remove_player(
 	long player_index);
 
+/* Stop accepting input for a departed player while retaining its game datum. */
+void network_player_remove_from_machine(long machine_index, long player_index);
+
 long player_new(
 	long machine_index,
 	long player_index,

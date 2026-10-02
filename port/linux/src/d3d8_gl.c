@@ -553,6 +553,10 @@ static void state_element_array_buffer(GLuint buffer)
 	}
 }
 
+#ifdef HALO_WEB
+#include "web_geometry.h"
+#endif
+
 static void state_attribute_pointer(GLuint index, GLuint buffer, GLint size, GLenum type, GLboolean normalized,
 	BOOL integer, GLsizei stride, unsigned long offset)
 {
@@ -755,6 +759,9 @@ static void surface_dimensions(const D3DSurface *surface, unsigned long *width, 
 static struct render_target_entry *render_target_get(const D3DSurface *surface)
 {
 	struct render_target_entry *entry;
+#ifdef HALO_WEB
+	struct render_target_entry *resized = NULL;
+#endif
 	unsigned long width, height;
 	BOOL depth;
 
@@ -772,13 +779,23 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	for (entry = *render_target_bucket(surface->Data); entry; entry = entry->next_in_bucket)
 	{
 		if (entry->target.data == surface->Data && entry->target.width == width &&
-			entry->target.height == height && entry->target.depth == depth &&
-			entry->target.scale[0] == scale[0] && entry->target.scale[1] == scale[1])
+			entry->target.height == height && entry->target.depth == depth)
 		{
-			return entry;
+			if (entry->target.scale[0] == scale[0] && entry->target.scale[1] == scale[1])
+				return entry;
+#ifdef HALO_WEB
+			/* A browser resize changes the scale, not the guest surface.
+			Reuse its texture (and attached FBOs) instead of retaining a
+			full color/depth allocation for every window size forever. */
+			resized = entry;
+#endif
 		}
 	}
+#ifdef HALO_WEB
+	entry = resized ? resized : calloc(1, sizeof(*entry));
+#else
 	entry = calloc(1, sizeof(*entry));
+#endif
 	entry->target.data = surface->Data;
 	entry->target.width = width;
 	entry->target.height = height;
@@ -787,7 +804,8 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	entry->target.scale[1] = scale[1];
 	entry->target.gl_width = (unsigned long)(width * scale[0] + 0.5f);
 	entry->target.gl_height = (unsigned long)(height * scale[1] + 0.5f);
-	glGenTextures(1, &entry->target.texture);
+	if (!entry->target.texture)
+		glGenTextures(1, &entry->target.texture);
 	glBindTexture(GL_TEXTURE_2D, entry->target.texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 	if (depth)
@@ -797,6 +815,10 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)entry->target.gl_width, (GLsizei)entry->target.gl_height,
 			0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
 	xgpu_gl_state_invalidate();
+#ifdef HALO_WEB
+	if (resized)
+		return entry;
+#endif
 	entry->next = render_targets;
 	render_targets = entry;
 	entry->next_in_bucket = *render_target_bucket(entry->target.data);
@@ -922,7 +944,19 @@ static void gl_initialize(void)
 #endif
 	glGenVertexArrays(1, &device.vertex_array);
 	glBindVertexArray(device.vertex_array);
+#ifdef HALO_WEB
+	{
+		const char *geometry_cache = getenv("HALO_WEB_GEOMETRY_CACHE");
+
+		web_geometry.enabled = geometry_cache && !strcmp(geometry_cache, "1");
+		if (web_geometry.enabled)
+			platform_log("browser geometry cache: rotating uploads and retained vertices enabled");
+	}
+#endif
 #ifdef HALO_ANDROID
+#ifdef HALO_WEB
+	if (!web_geometry.enabled)
+#endif
 	{
 		int ring;
 
@@ -1369,6 +1403,11 @@ void WINAPI D3DDevice_BeginVisibilityTest(void)
 		return;
 	}
 #endif
+#ifdef HALO_WEB
+	/* WebGL answers queries only between tasks, which the game's thread
+	never returns to: every test passes (D3DDevice_GetVisibilityTestResult) */
+	return;
+#endif
 	glBeginQuery(VISIBILITY_QUERY, device.queries[0]);
 }
 
@@ -1389,6 +1428,10 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 		device.query_pending[index] = TRUE;
 		return S_OK;
 	}
+#endif
+#ifdef HALO_WEB
+	device.query_pending[index] = TRUE;
+	return S_OK;
 #endif
 	glEndQuery(VISIBILITY_QUERY);
 	/* the target's pixels to a game pixel: the result is a count of the
@@ -1458,6 +1501,11 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 			*result = visibility_unscaled(device.visibility_results[index], index);
 		return S_OK;
 	}
+#endif
+#ifdef HALO_WEB
+	if (result)
+		*result = VISIBILITY_ALL_SAMPLES;
+	return S_OK;
 #endif
 	glGetQueryObjectuiv(device.queries[index], GL_QUERY_RESULT_AVAILABLE, &available);
 	if (!available)
@@ -2942,6 +2990,12 @@ static BOOL mirror_range(unsigned long address, unsigned long size, GLuint *buff
 	unsigned long segment, first, last, page, oldest = ~0UL, newest = 0;
 	BOOL present = TRUE;
 
+#ifdef HALO_WEB
+	/* The retained cache compares the exact bytes consumed by this draw,
+	including swizzled colours, rather than hashing entire guest pages. */
+	if (web_geometry.enabled)
+		return FALSE;
+#endif
 	if (!size || address < PLATFORM_CONTIGUOUS_BASE || start + size > PLATFORM_CONTIGUOUS_SIZE)
 		return FALSE;
 	segment = start / MIRROR_SEGMENT_SIZE;
@@ -3040,6 +3094,10 @@ between two of them would leave the attributes already pointed at the
 buffer reading its new, empty storage. */
 static void stream_reserve(unsigned long size)
 {
+#ifdef HALO_WEB
+	if (web_geometry.enabled)
+		return;
+#endif
 	if (device.stream_offset + size > STREAM_BUFFER_SIZE)
 	{
 		/* orphan the buffer and start again */
@@ -3049,10 +3107,18 @@ static void stream_reserve(unsigned long size)
 	}
 }
 
-static unsigned long stream_upload(const void *data, unsigned long size)
+static unsigned long stream_upload_key(const void *key, const void *data, unsigned long size)
 {
 	unsigned long offset;
 
+#ifdef HALO_WEB
+	if (web_geometry.enabled)
+	{
+		device.stream_buffer = web_geometry_vertices(key, data, size);
+		return 0;
+	}
+#endif
+	(void)key;
 	size = (size + 15) & ~15UL;
 	stream_reserve(size);
 	offset = device.stream_offset;
@@ -3064,6 +3130,11 @@ static unsigned long stream_upload(const void *data, unsigned long size)
 #endif
 	device.stream_offset += size;
 	return offset;
+}
+
+static unsigned long stream_upload(const void *data, unsigned long size)
+{
+	return stream_upload_key(data, data, size);
 }
 
 #ifdef HALO_ANDROID
@@ -3104,7 +3175,9 @@ static unsigned long stream_upload_swizzled(const struct vertex_shader_object *d
 			color[2] = blue;
 		}
 	}
-	return stream_upload(scratch, size);
+	/* The scratch allocation is shared by all streams. Cache by the source
+	range and compare the converted bytes, not by the scratch address. */
+	return stream_upload_key(data, scratch, size);
 }
 #endif
 
@@ -3112,6 +3185,13 @@ static unsigned long index_upload(const void *data, unsigned long size)
 {
 	unsigned long offset;
 
+#ifdef HALO_WEB
+	if (web_geometry.enabled)
+	{
+		device.index_buffer = web_geometry_stream(GL_ELEMENT_ARRAY_BUFFER, data, size);
+		return 0;
+	}
+#endif
 	size = (size + 15) & ~15UL;
 	state_element_array_buffer(device.index_buffer);
 	if (device.index_offset + size > INDEX_BUFFER_SIZE)
@@ -3314,6 +3394,10 @@ void WINAPI D3DDevice_DrawVertices(D3DPRIMITIVETYPE primitive_type, UINT start_v
 {
 	if (!vertex_count || !prepare_draw(FALSE))
 		return;
+#ifdef HALO_WEB
+	if (web_geometry.enabled)
+		web_geometry_begin_draw(device.frame);
+#endif
 	trace_draw("draw", primitive_type, vertex_count, NULL);
 	setup_streams(start_vertex, vertex_count);
 	if (primitive_type == D3DPT_QUADLIST)
@@ -3342,6 +3426,10 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 
 	if (!vertex_count || !index_data || !prepare_draw(FALSE))
 		return;
+#ifdef HALO_WEB
+	if (web_geometry.enabled)
+		web_geometry_begin_draw(device.frame);
+#endif
 	/* quads are drawn as triangles, from indices made for the draw */
 	mirrored = primitive_type != D3DPT_QUADLIST &&
 #ifdef HALO_ANDROID
@@ -3420,13 +3508,45 @@ void WINAPI D3DDevice_End(void)
 	device.immediate_active = FALSE;
 	if (!count || !prepare_draw(TRUE))
 		return;
+#ifdef HALO_WEB
+	if (web_geometry.enabled)
+		web_geometry_begin_draw(device.frame);
+#endif
 	trace_draw("immediate", type, count, device.immediate_vertices);
+#ifdef HALO_WEB
+	/* WebGL allows strides of at most 255 bytes, less than a whole immediate
+	vertex: each attribute goes up as an array of its own */
+	{
+		unsigned long attribute_bytes = count * 4 * sizeof(float);
+		float *arrays = malloc(XGPU_VERTEX_ATTRIBUTE_COUNT * attribute_bytes);
+		unsigned long vertex;
+
+		if (!arrays)
+			return;
+		for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+		{
+			for (vertex = 0; vertex < count; vertex++)
+			{
+				memcpy(arrays + (index * count + vertex) * 4,
+					device.immediate_vertices + vertex * XGPU_VERTEX_ATTRIBUTE_COUNT * 4 + index * 4, 4 * sizeof(float));
+			}
+		}
+		offset = stream_upload(arrays, XGPU_VERTEX_ATTRIBUTE_COUNT * attribute_bytes);
+		free(arrays);
+		for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+		{
+			state_attribute_pointer(index, device.stream_buffer, 4, GL_FLOAT, GL_FALSE, FALSE,
+				(GLsizei)(4 * sizeof(float)), offset + index * attribute_bytes);
+		}
+	}
+#else
 	offset = stream_upload(device.immediate_vertices, count * stride);
 	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
 	{
 		state_attribute_pointer(index, device.stream_buffer, 4, GL_FLOAT, GL_FALSE, FALSE, (GLsizei)stride,
 			offset + index * 4 * sizeof(float));
 	}
+#endif
 	if (type == D3DPT_QUADLIST)
 	{
 		unsigned long index_count;
@@ -3668,13 +3788,18 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		xgpu_gl_state_invalidate();
 		xgpu_texture_cache_begin_frame();
 #ifdef HALO_ANDROID
-		host_gl_fence_frame((unsigned int)device.buffer_ring);
-		device.buffer_ring = (device.buffer_ring + 1) % STREAM_BUFFER_RING;
-		host_gl_wait_frame((unsigned int)device.buffer_ring);
-		device.stream_buffer = device.stream_buffers[device.buffer_ring];
-		device.index_buffer = device.index_buffers[device.buffer_ring];
-		device.stream_offset = 0;
-		device.index_offset = 0;
+#ifdef HALO_WEB
+		if (!web_geometry.enabled)
+#endif
+		{
+			host_gl_fence_frame((unsigned int)device.buffer_ring);
+			device.buffer_ring = (device.buffer_ring + 1) % STREAM_BUFFER_RING;
+			host_gl_wait_frame((unsigned int)device.buffer_ring);
+			device.stream_buffer = device.stream_buffers[device.buffer_ring];
+			device.index_buffer = device.index_buffers[device.buffer_ring];
+			device.stream_offset = 0;
+			device.index_offset = 0;
+		}
 #else
 		device.stream_offset = STREAM_BUFFER_SIZE; /* orphan next frame */
 		device.index_offset = INDEX_BUFFER_SIZE;
@@ -3684,6 +3809,20 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 	stats.presents++;
 	if (debug_settings.statistics && device.frame % 60 == 0)
 	{
+#ifdef HALO_WEB
+		if (web_geometry.enabled)
+		{
+			platform_log("browser geometry: %lu hits, %lu misses, %lu promotions, %lu invalidations; "
+				"%lu KB uploaded, %lu KB avoided, %lu KB compared; %lu KB retained, "
+				"%lu KB stream storage (%lu KB peak), %lu buffers trimmed",
+				web_geometry.stats.hits, web_geometry.stats.misses, web_geometry.stats.promotions,
+				web_geometry.stats.invalidations, web_geometry.stats.uploaded_bytes / 1024,
+				web_geometry.stats.avoided_bytes / 1024, web_geometry.stats.comparisons / 1024,
+				web_geometry.snapshot_bytes / 1024, web_geometry.stream_bytes / 1024,
+				web_geometry.stats.peak_stream_bytes / 1024, web_geometry.stats.trimmed_buffers);
+			memset(&web_geometry.stats, 0, sizeof(web_geometry.stats));
+		}
+#endif
 		platform_log("frame %lu: %lu draws, %lu immediate, %lu clears, %lu target changes; skipped %lu no program, %lu no target, %lu link; "
 			"%lu KB mirrored, %lu KB streamed",
 			device.frame, stats.draws / stats.presents, stats.immediate_draws / stats.presents, stats.clears / stats.presents,

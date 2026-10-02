@@ -389,6 +389,13 @@ symbols in this file:
 #include "text/font_group.h"
 #include "tag_files/files.h"
 
+#ifdef HALO_WEB
+/* called without a prototype in scope; a WebAssembly call must match the
+definition's signature */
+boolean cache_files_give_time_to_precache(char const *map_name);
+short player_ui_get_single_player_local_player_controller(short local_player_index);
+#endif
+
 /* ---------- constants */
 
 enum
@@ -656,6 +663,11 @@ typedef char screenshot_and_framerate_globals_size_assert[
 	sizeof(struct _screenshot_and_framerate_globals) == 0x38B ? 1 : -1];
 
 void network_test_update(boolean main_menu_loaded, real seconds);
+#ifdef HALO_WEB
+void quick_play_update(boolean main_menu_loaded);
+boolean web_match_migration_enabled(void);
+boolean web_match_migration_lost(void);
+#endif
 
 /* ---------- prototypes */
 
@@ -3186,6 +3198,11 @@ void main_loop(
 		event_manager_update();
 		telnet_console_process();
 
+#ifdef HALO_WEB
+		/* Production quick play owns only session setup, never player input. */
+		quick_play_update(main_globals.main_menu_scenario_loaded);
+#endif
+
 		if (!shell_application_is_paused())
 		{
 			render_frame = TRUE;
@@ -3197,24 +3214,39 @@ void main_loop(
 			{
 				if (!network_game_client_start_frame())
 				{
-					display_error_when_main_menu_loaded(6);
-					error(_error_silent, "the game host went down");
-					network_game_abort();
+#ifdef HALO_WEB
+					if (!web_match_migration_lost())
+#endif
+					{
+						display_error_when_main_menu_loaded(6);
+						error(_error_silent, "the game host went down");
+						network_game_abort();
+					}
 				}
 			}
 			else if (connection==_game_connection_network_server)
 			{
 				if (!network_game_client_start_frame())
 				{
-					display_error_when_main_menu_loaded(1);
-					error(_error_silent, "the game host went down");
-					network_game_abort();
+#ifdef HALO_WEB
+					if (!web_match_migration_lost())
+#endif
+					{
+						display_error_when_main_menu_loaded(1);
+						error(_error_silent, "the game host went down");
+						network_game_abort();
+					}
 				}
 				else if (!network_game_server_start_frame())
 				{
-					display_error_when_main_menu_loaded(1);
-					error(_error_silent, "the game host went down");
-					network_game_abort();
+#ifdef HALO_WEB
+					if (!web_match_migration_lost())
+#endif
+					{
+						display_error_when_main_menu_loaded(1);
+						error(_error_silent, "the game host went down");
+						network_game_abort();
+					}
 				}
 			}
 			else if (connection==_game_connection_film_playback)
@@ -3249,8 +3281,13 @@ void main_loop(
 					connection = main_globals.connection;
 					if (connection>_game_connection_local && connection<=_game_connection_network_server && !network_game_client_end_frame())
 					{
-						display_error_when_main_menu_loaded(1);
-						network_game_abort();
+#ifdef HALO_WEB
+						if (!web_match_migration_lost())
+#endif
+						{
+							display_error_when_main_menu_loaded(1);
+							network_game_abort();
+						}
 					}
 
 					game_time_update((real)main_globals.halt_time_scale*main_globals.seconds_elapsed);

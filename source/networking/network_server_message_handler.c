@@ -260,6 +260,9 @@ symbols in this file:
 #include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager_internal.h"
+#ifdef HALO_WEB
+#include "network_migration.h"
+#endif
 #include "networking/network_server_message_handler.h"
 #include "text/unicode.h"
 /* system_milliseconds(), for the settings update interval */
@@ -1120,6 +1123,10 @@ boolean network_game_server_handle_client_message(
 		0xCF,
 		server && machine && message && (message_buffer_size == GET_MESSAGE_SIZE(*message)));
 
+#ifdef HALO_WEB
+	if (GET_MESSAGE_TYPE(*message) == 2 && network_game_server_handle_migration(server, machine, message, message_buffer_size))
+		return TRUE;
+#endif
 	message_type = (byte)GET_MESSAGE_TYPE(*message);
 	if (GET_MESSAGE_FLAGS(*message))
 	{

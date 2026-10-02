@@ -118,10 +118,18 @@ void rasterizer_set_texture(
 	long bitmap_definition_index,
 	short bitmap_sequence_index);
 
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+void rasterizer_set_vertex_shader_permutation(
+	short vertex_type,
+	short permutation,
+	short one_node);
+#else
 void rasterizer_set_vertex_shader_permutation(
 	short vertex_type,
 	short permutation,
 	boolean one_node);
+#endif
 
 void rasterizer_set_pixel_shader(
 	struct pixel_shader_definition const *definition);

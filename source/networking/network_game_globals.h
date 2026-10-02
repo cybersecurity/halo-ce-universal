@@ -77,6 +77,7 @@ boolean create_global_network_game_server(
 decides nothing the host does */
 boolean network_game_distributed_client(
 	void);
+boolean network_game_distributed(void);
 
 /* ---------- globals */
 

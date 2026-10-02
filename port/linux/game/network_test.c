@@ -12,6 +12,8 @@ Automated system link sessions for testing the netcode without the menus
   makes it short) the next, as the host's button on the scores does;
 - "join" searches for games and joins the first it finds, as picking it in
   the system link list does.
+- "observe" only logs the existing game; it never creates a session,
+  adds players or runs the scripted kills, pickups and vehicle actions.
 
 Once the game runs, every second each machine logs where every player's
 unit is, so the machines' views of the game can be compared.
@@ -58,6 +60,12 @@ Called from the main loop every frame (main.c).
 #include <stdio.h>
 #include <string.h>
 
+#ifdef HALO_WEB
+/* called without a prototype in scope; a WebAssembly call must match the
+definition's signature */
+boolean player_handle_powerup(long player_index, short powerup_type, short duration);
+#endif
+
 /* the platform layer's (port/linux/src/port_config.c) */
 const char *config_string(char const *name);
 double config_real(char const *name);
@@ -77,6 +85,7 @@ enum
 	_network_test_off,
 	_network_test_host,
 	_network_test_join,
+	_network_test_observe,
 };
 
 static struct
@@ -107,6 +116,7 @@ static struct
 	char pickup_weapon[64];
 	long score_to_win;
 	long logged_time;
+	long observed_time;
 } network_test;
 
 /* the variant at the index of the list (copied to name), FALSE past its end */
@@ -157,6 +167,10 @@ static void network_test_read_settings(
 	else if (!strcmp(setting, "join"))
 	{
 		network_test.mode = _network_test_join;
+	}
+	else if (!strcmp(setting, "observe"))
+	{
+		network_test.mode = _network_test_observe;
 	}
 	network_test.start_delay = (real)config_real("debug.network_test_start");
 	network_test.kill_interval = (real)config_real("debug.network_test_kill");
@@ -728,6 +742,24 @@ void network_test_update(
 		network_test_read_settings();
 	if (network_test.mode == _network_test_off)
 		return;
+	if (network_test.mode == _network_test_observe)
+	{
+		if (game_in_progress() && !main_menu_loaded)
+		{
+			long observed_time = game_time_get();
+
+			/* Migration can restore an earlier confirmed game tick. Report it
+			immediately instead of waiting for the prediction clock to catch up. */
+			if (observed_time < network_test.observed_time ||
+				observed_time - network_test.logged_time >= TICKS_PER_SECOND)
+			{
+				network_test.logged_time = observed_time;
+				network_test_log_players();
+			}
+			network_test.observed_time = observed_time;
+		}
+		return;
+	}
 
 	/* the game running: report (from the start of each game: the next
 	game's time starts over) */

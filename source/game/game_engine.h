@@ -577,6 +577,9 @@ void game_engine_player_killed(
 /* ---------- globals */
 
 extern struct game_engine *game_engine;
+long game_engine_write_migration_state(byte *buffer, long size);
+boolean game_engine_validate_migration_state(byte const *buffer, long size);
+boolean game_engine_read_migration_state(byte const *buffer, long size, boolean restore_game_type);
 
 /* ---------- public code */
 

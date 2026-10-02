@@ -48,6 +48,16 @@ static int protection_to_host(DWORD protect)
 __attribute__((constructor(101)))
 static void contiguous_arena_reserve(void)
 {
+#ifdef HALO_WEB
+	/* the window is the top of the WebAssembly memory, which the C heap
+	stays below (port/web/src/web_main.c) */
+	if ((unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL >=
+		(unsigned long long)PLATFORM_CONTIGUOUS_BASE + PLATFORM_CONTIGUOUS_SIZE)
+		arena_reserved = TRUE;
+	else
+		platform_log("the WebAssembly memory does not reach the Xbox contiguous memory window");
+	return;
+#endif
 	void *wanted = (void *)PLATFORM_CONTIGUOUS_BASE;
 	void *result = mmap(wanted, PLATFORM_CONTIGUOUS_SIZE, PROT_NONE,
 		MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE, -1, 0);
@@ -140,6 +150,10 @@ void *platform_contiguous_alloc(unsigned long size, unsigned long alignment,
 
 	address = (void *)(PLATFORM_CONTIGUOUS_BASE + first * PAGE_SIZE_BYTES);
 	memory_watch_forget(address, count * PAGE_SIZE_BYTES);
+#ifdef HALO_WEB
+	/* fresh zeroed pages (WebAssembly memory cannot be remapped) */
+	memset(address, 0, count * PAGE_SIZE_BYTES);
+#else
 	/* map fresh zeroed pages over the reservation */
 	if (mmap(address, count * PAGE_SIZE_BYTES, protection_to_host(protect),
 		MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0) != address)
@@ -147,6 +161,7 @@ void *platform_contiguous_alloc(unsigned long size, unsigned long alignment,
 		pthread_mutex_unlock(&arena_lock);
 		return NULL;
 	}
+#endif
 	for (page = first; page < first + count; page++)
 		page_protection[page] = protect;
 	block_page_count[first] = count;
@@ -166,8 +181,10 @@ void platform_contiguous_free(void *address)
 	if (count)
 	{
 		memory_watch_forget(address, count * PAGE_SIZE_BYTES);
+#ifndef HALO_WEB
 		mmap(address, count * PAGE_SIZE_BYTES, PROT_NONE,
 			MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED, -1, 0);
+#endif
 		for (page = first; page < first + count; page++)
 			page_protection[page] = 0;
 		block_page_count[first] = 0;
@@ -209,7 +226,12 @@ BOOL WINAPI VirtualProtect(LPVOID address, SIZE_T size, DWORD new_protect, PDWOR
 		*old_protect = platform_is_contiguous(address) ?
 			page_protection[(start - PLATFORM_CONTIGUOUS_BASE) / PAGE_SIZE_BYTES] : PAGE_READWRITE;
 	memory_watch_forget((void *)start, end - start);
+#ifdef HALO_WEB
+	/* WebAssembly memory has no page protection: the pages stay writable */
+	if (0)
+#else
 	if (mprotect((void *)start, end - start, protection_to_host(new_protect)) != 0)
+#endif
 	{
 		platform_set_last_error_from_errno(errno);
 		return FALSE;

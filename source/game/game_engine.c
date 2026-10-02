@@ -567,6 +567,10 @@ symbols in this file:
 #include "math/integer_math.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
+#ifdef HALO_WEB
+#include "networking/network_migration.h"
+#include "../../port/web/src/web_ping.h"
+#endif
 #include "objects.h"
 #include "objects/damage_effect_definitions.h"
 #include "physics/collision_features.h"
@@ -782,6 +786,10 @@ typedef char verify_game_engine_stage_size[
 
 /* ---------- prototypes */
 
+#ifdef HALO_WEB
+boolean web_quick_play_pistol_starts(void);
+#endif
+
 void game_engine_playlist_next(
 	long parameter0,
 	long parameter1,
@@ -853,6 +861,16 @@ static void game_engine_verify_current_map(
 
 void game_engine_post_rasterize_post_game(
 	void);
+
+struct bitmap_data *bitmap_group_try_and_get_bitmap(
+	long bitmap_group_index,
+	short bitmap_index);
+
+long hud_get_font_index(
+	void);
+
+real_argb_color *hud_get_text_color(
+	real_argb_color *color);
 
 static boolean internal_rasterize_score(
 	long player_index,
@@ -1369,8 +1387,12 @@ static void rasterize_in_game_score_draw_line(
 	long row_index)
 {
 	rectangle2d bounds = render.camera.window_bounds;
-	short narrow_tab_stops[3];
-	short wide_tab_stops[3];
+	short narrow_tab_stops[3
+#ifdef HALO_WEB
+		+ 1
+#endif
+	];
+	short wide_tab_stops[NUMBEROF(narrow_tab_stops)];
 	short *tab_stops;
 	boolean splitscreen;
 	long font_index;
@@ -1383,6 +1405,13 @@ static void rasterize_in_game_score_draw_line(
 	wide_tab_stops[0] = 130;
 	wide_tab_stops[1] = 195;
 	wide_tab_stops[2] = 315;
+#ifdef HALO_WEB
+	/* Leave room for the host label beside a full-length player name. */
+	narrow_tab_stops[2] += 50;
+	wide_tab_stops[2] += 50;
+	narrow_tab_stops[3] = 280;
+	wide_tab_stops[3] = 440;
+#endif
 
 	if (bounds.x1 - bounds.x0 > 320)
 		tab_stops = wide_tab_stops;
@@ -1390,7 +1419,7 @@ static void rasterize_in_game_score_draw_line(
 		tab_stops = narrow_tab_stops;
 
 	if (row_index)
-		draw_string_set_tab_stops(tab_stops, 3);
+		draw_string_set_tab_stops(tab_stops, NUMBEROF(narrow_tab_stops));
 	else
 		draw_string_set_tab_stops(NULL, 0);
 
@@ -1555,6 +1584,65 @@ long populate_statistic_buffer(
 
 
 
+#ifdef HALO_WEB
+static long game_engine_score_host_player(void)
+{
+	struct network_game_client *client = global_network_game_client_get();
+	short host_machine, index;
+	long *players;
+
+	if (!client || !network_game_is_active())
+		return NONE;
+	host_machine = network_game_client_migration_host_machine(client);
+	if (host_machine < 0 || host_machine >= HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+		return NONE;
+	players = machine_get_player_list(host_machine);
+	for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
+	{
+		struct player_datum *player = player_try_and_get(players[index]);
+		/* Departed score datums can share a reused machine ID. Only the
+		current input owner is eligible for the host label. */
+		if (player && !player->quit_out_of_game &&
+			player->network_player_data.machine_index == host_machine)
+			return players[index];
+	}
+	return NONE;
+}
+
+static int game_engine_score_host_ping(long player_index)
+{
+	struct network_game_client *client = global_network_game_client_get();
+	struct player_datum *player = player_try_and_get(player_index);
+	unsigned long address, host_address;
+	short machine, host_machine, index;
+	long *players;
+	if (!client || !network_game_is_active() || !player || player->quit_out_of_game)
+		return -1;
+	machine = player->network_player_data.machine_index;
+	host_machine = network_game_client_migration_host_machine(client);
+	if (machine < 0 || machine >= HALO_PORT_MAXIMUM_NETWORK_MACHINES ||
+		host_machine < 0 || host_machine >= HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+		return -1;
+	players = machine_get_player_list(machine);
+	for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
+		if (players[index] == player_index) break;
+	if (index == MAXIMUM_LOCAL_PLAYERS) return -1;
+	if (global_network_game_server_get())
+	{
+		unsigned long addresses[HALO_PORT_MAXIMUM_NETWORK_MACHINES] = { 0 };
+		network_game_server_migration_routes(addresses, NUMBEROF(addresses));
+		address = addresses[machine];
+		host_address = addresses[host_machine];
+	}
+	else
+	{
+		address = network_game_client_migration_owner_address(machine);
+		host_address = network_game_client_migration_owner_address(host_machine);
+	}
+	return web_net_host_ping(address, host_address, network_game_migration_epoch());
+}
+#endif
+
 static long select_players_to_display(
 	enum postgame_statistic statistic,
 	long player_index,
@@ -1566,6 +1654,9 @@ static long select_players_to_display(
 	boolean debug = rasterizer_debug_options.pad3 == 'E';
 	long local_player_count = 0;
 	long statistic_index;
+#ifdef HALO_WEB
+	long host_player_index = game_engine_score_host_player();
+#endif
 
 	if (debug)
 	{
@@ -1587,14 +1678,22 @@ static long select_players_to_display(
 	if (player_count > maximum_count)
 	{
 		long outside_range_count = 0;
-		struct statistic_buffer outside_range[MAXIMUM_LOCAL_PLAYERS];
+		struct statistic_buffer outside_range[MAXIMUM_LOCAL_PLAYERS
+#ifdef HALO_WEB
+			+ 1
+#endif
+		];
 		long outside_range_index;
 
 		for (statistic_index = maximum_count; statistic_index < player_count; statistic_index++)
 		{
 			struct player_datum *player = player_get(statistic_buffer[statistic_index].player_index);
 
-			if (player && player->local_player_index != NONE)
+			if (player && (player->local_player_index != NONE
+#ifdef HALO_WEB
+				|| statistic_buffer[statistic_index].player_index == host_player_index
+#endif
+				))
 			{
 				if (debug)
 				{
@@ -1616,7 +1715,11 @@ static long select_players_to_display(
 			{
 				struct player_datum *player = player_get(statistic_buffer[insertion_index].player_index);
 
-				if (player->local_player_index == NONE)
+				if (player->local_player_index == NONE
+#ifdef HALO_WEB
+					&& statistic_buffer[insertion_index].player_index != host_player_index
+#endif
+					)
 				{
 					csmemmove(
 						&statistic_buffer[insertion_index],
@@ -2024,13 +2127,15 @@ static void game_engine_rasterize_scoreboard(
 			else
 				usprintf(ping_string, L"%ld", ping);
 		}
-		usprintf(
-			row_string,
-			L"\t%s\t%s\t%s\t%s",
-			get_place_string(entry),
-			player->name,
-			status_string,
-			ping_string);
+#ifdef HALO_WEB
+		usnprintf(row_string, NUMBEROF(row_string), L"\t%s\t%s%s\t%s\t%s",
+			get_place_string(entry), player->name,
+			entry->player_index == game_engine_score_host_player() ? L" (HOST)" : L"",
+			status_string, ping_string);
+#else
+		usprintf(row_string, L"\t%s\t%s\t%s\t%s",
+			get_place_string(entry), player->name, status_string, ping_string);
+#endif
 		row_color = has_teams ? &team_colors[PIN(player->team_index, 0, 1)] : &color;
 		scoreboard_draw_row(
 			row_string,
@@ -2075,6 +2180,9 @@ static void game_engine_rasterize_in_game_score(
 	long string_list_index;
 	wchar_t *column_name;
 	wchar_t *score_name;
+#ifdef HALO_WEB
+	long host_player_index = game_engine_score_host_player();
+#endif
 
 	/* port: a full-screen view's its own (game_engine_rasterize_scoreboard) */
 	if (local_player_count() <= 1)
@@ -2113,7 +2221,11 @@ static void game_engine_rasterize_in_game_score(
 		score_name = L"";
 
 	game_engine->format_score_name(score_string);
+#ifdef HALO_WEB
+	usnprintf(row_string, NUMBEROF(row_string), L"\t%s\t%s\t%s\tPing", column_name, score_name, score_string);
+#else
 	usprintf(row_string, L"\t%s\t%s\t%s", column_name, score_name, score_string);
+#endif
 	rasterize_in_game_score_draw_line(row_string, FALSE, &color, 1);
 
 	for (entry_index = 0; entry_index < entry_count; entry_index++)
@@ -2170,12 +2282,23 @@ static void game_engine_rasterize_in_game_score(
 
 			place_string = get_place_string(&entries[entry_index]);
 
-			usprintf(
-				row_string,
-				L"\t%s\t%s\t%s",
-				place_string,
-				player->name,
-				status_string);
+#ifdef HALO_WEB
+			{
+				wchar_t ping_string[16];
+				int ping = game_engine_score_host_ping(entry_player_index);
+				if (ping >= 0)
+					usnprintf(ping_string, NUMBEROF(ping_string), L"%d", ping);
+				else
+					usnprintf(ping_string, NUMBEROF(ping_string), L"--");
+				usnprintf(row_string, NUMBEROF(row_string), L"\t%s\t%s%s\t%s\t%s",
+					place_string, player->name,
+					entry_player_index == host_player_index ? L" (HOST)" : L"",
+					status_string, ping_string);
+			}
+#else
+			usprintf(row_string, L"\t%s\t%s\t%s",
+				place_string, player->name, status_string);
+#endif
 
 			if (has_teams)
 				row_color = &team_colors[PIN(player->team_index, 0, 1)];
@@ -4756,6 +4879,19 @@ boolean game_engine_should_end_game(
 	void)
 {
 	boolean should_end_game = FALSE;
+
+#ifdef HALO_WEB
+	/* A browser Slayer host starts alone and stays open for late joiners.
+	Departed players retain their score datums, so the legacy last-team
+	check would end that match when its first opponent leaves. Score and
+	other explicit end conditions still end the game through their own paths. */
+	if (game_engine && global_network_game_server_get() && network_game_distributed() &&
+		game_engine->type == game_engine_slayer && !global_variant.universal_variant.teams &&
+		global_variant.universal_variant.lives == 0)
+	{
+		return FALSE;
+	}
+#endif
 
 	if (game_engine && !multiple_teams_alive())
 		should_end_game = TRUE;
@@ -7938,6 +8074,16 @@ static void handle_custom_starting_equipment(
 					long weapon_index;
 					struct object_placement_data placement_data;
 
+#ifdef HALO_WEB
+					/* Change only the automatic lobby's plasma-pistol start. */
+					if (web_quick_play_pistol_starts() && definition_index != NONE &&
+						definition_index == tag_loaded('weap', "weapons\\plasma pistol\\plasma pistol"))
+					{
+						long pistol = tag_loaded('weap', "weapons\\pistol\\pistol");
+						if (pistol != NONE)
+							definition_index = pistol;
+					}
+#endif
 					object_placement_data_new(
 						&placement_data,
 						definition_index,
@@ -8509,4 +8655,72 @@ void game_engine_read_network_state(
 	shows it) */
 	if (postgame_state != 0 && game_engine_globals.postgame_state == 0)
 		game_engine_end_game();
+}
+
+/* Unlike the regular game-state update this also preserves the authority's
+postgame clock and team allocator. HUD timers belong to the local machine. */
+struct game_engine_migration_state
+{
+	long type;
+	unsigned long flags;
+	long next_team_index;
+	real postgame_timer;
+	real postgame_progress;
+	long postgame_state;
+	long state_size;
+};
+
+long game_engine_write_migration_state(byte *buffer, long size)
+{
+	struct game_engine_migration_state state;
+	long written;
+	if (size < (long)sizeof(state))
+		return 0;
+	memset(&state, 0, sizeof(state));
+	state.type = game_engine_get_type();
+	state.flags = game_engine_globals.flags;
+	state.next_team_index = game_engine_globals.next_team_index;
+	state.postgame_timer = game_engine_globals.postgame_timer;
+	state.postgame_progress = game_engine_globals.postgame_progress;
+	state.postgame_state = game_engine_globals.postgame_state;
+	written = game_engine_write_network_state(buffer + sizeof(state), size - sizeof(state));
+	if (written <= 0)
+		return 0;
+	state.state_size = written;
+	memcpy(buffer, &state, sizeof(state));
+	return sizeof(state) + written;
+}
+
+boolean game_engine_validate_migration_state(byte const *buffer, long size)
+{
+	struct game_engine_migration_state state;
+	byte current[0xF00];
+	long expected;
+	if (size < (long)sizeof(state))
+		return FALSE;
+	memcpy(&state, buffer, sizeof(state));
+	expected = game_engine_write_network_state(current, sizeof(current));
+	return game_engine && state.type == game_engine_get_type() && expected > 0 &&
+		state.state_size == expected && state.state_size == size - (long)sizeof(state);
+}
+
+boolean game_engine_read_migration_state(byte const *buffer, long size, boolean restore_game_type)
+{
+	struct game_engine_migration_state state;
+	if (!game_engine_validate_migration_state(buffer, size))
+		return FALSE;
+	memcpy(&state, buffer, sizeof(state));
+	/* Set the postgame state first so restoring it does not announce another
+game end or invoke the end-game callback a second time. */
+	game_engine_globals.flags = state.flags;
+	game_engine_globals.next_team_index = state.next_team_index;
+	if (restore_game_type || game_engine_globals.postgame_state == state.postgame_state)
+	{
+		game_engine_globals.postgame_timer = state.postgame_timer;
+		game_engine_globals.postgame_progress = state.postgame_progress;
+		game_engine_globals.postgame_state = state.postgame_state;
+	}
+	if (restore_game_type)
+		game_engine_read_network_state(buffer + sizeof(state), state.state_size);
+	return TRUE;
 }

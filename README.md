@@ -1,4 +1,4 @@
-# Halo: Combat Evolved for Linux, Windows and Android
+# Halo: Combat Evolved for Linux, Windows, Android and the web (iOS)
 
 [![Join our Discord](https://invidget.switchblade.xyz/9gqcHyr5km)](https://discord.gg/9gqcHyr5km)
 
@@ -38,7 +38,7 @@ an older build from that page.
 
 ## Game data
 
-The port does not include the game data. Download an Xbox disc image
+The port does not include the game data. Use your own Xbox disc image
 (`.xiso` or `.iso`) of Halo: Combat Evolved. All versions of the game
 operate. The maps of the European (PAL) version were made for a slower
 console. The port changes them to play as the North American (NTSC) maps do,
@@ -61,6 +61,10 @@ Each platform has its own instructions:
 | Linux (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/linux/README.md](port/linux/README.md) |
 | Windows (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/windows/README.md](port/windows/README.md) |
 | Android (arm64 app, OpenGL ES 3, SDL3) | [port/android/README.md](port/android/README.md) |
+| Browser (local runner for the published Apollo WASM beta) | [BROWSER_LOCAL.md](BROWSER_LOCAL.md) |
+| Browser (static hosting / GitHub Pages) | [GITHUB_PAGES.md](GITHUB_PAGES.md) |
+| Browser invitations for native multiplayer (relay preview) | [BROWSER_NATIVE_INVITES.md](BROWSER_NATIVE_INVITES.md) |
+| Web: iPhone, iPad and browsers (WebAssembly, WebGL 2, installable web app) | [port/web/README.md](port/web/README.md) |
 
 The Linux README also gives the controls, the settings and the multiplayer
 functions. These are almost the same on all platforms.
@@ -95,6 +99,7 @@ To build the game:
 | `ninja linux` | `build/linux/halo` |
 | `ninja windows` (on Windows) | `build/windows/halo.exe` and `SDL3.dll` |
 | `ninja android_apk` | `port/android/app/build/outputs/apk/debug/app-debug.apk` |
+| `ninja web` (with Emscripten) | `build/web/site` |
 
 If you enter `ninja` without a target, ninja builds the game for the
 computer that you use.

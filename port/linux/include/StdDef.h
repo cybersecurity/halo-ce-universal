@@ -1,2 +1,3 @@
-/* the game includes <StdDef.h>; Linux file names are case sensitive */
-#include <stddef.h>
+/* The game includes <StdDef.h>. Skip this directory so case-insensitive
+   host filesystems do not resolve <stddef.h> back to this shim. */
+#include_next <stddef.h>

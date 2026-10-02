@@ -62,26 +62,57 @@ struct bitmap_data *bitmap_group_try_and_get_bitmap(
 	long bitmap_group_index,
 	short bitmap_index);
 
+void *_texture_cache_bitmap_get_hardware_format(
+	struct bitmap_data *bitmap,
+	boolean block,
+	boolean load);
+
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+void rasterizer_set_target(
+	short target,
+	short use_depth_buffer,
+	unsigned long clear_color,
+	boolean clear_depth,
+	boolean clear_stencil);
+#else
 void rasterizer_set_target(
 	word target,
 	boolean use_depth_buffer,
 	boolean clear_color,
 	boolean clear_depth,
 	boolean clear_stencil);
+#endif
 
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+void rasterizer_set_target_as_texture(
+	short stage,
+	short target,
+	short filtered);
+#else
 void rasterizer_set_target_as_texture(
 	short stage,
 	long target,
 	boolean filtered);
+#endif
 
 void rasterizer_set_texture_bitmap_data(
 	short stage,
 	struct bitmap_data const *bitmap);
 
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+void rasterizer_set_vertex_shader_permutation(
+	short vertex_type,
+	short permutation,
+	short one_node);
+#else
 void rasterizer_set_vertex_shader_permutation(
 	short vertex_type,
 	short permutation,
 	boolean one_node);
+#endif
 
 void rasterizer_set_pixel_shader(
 	struct pixel_shader_definition const *definition);
