@@ -67,10 +67,12 @@ void xgpu_text_append(struct xgpu_text *text, const char *format, ...) __attribu
 
 /* GLSL for an NV2A vertex program (the instruction words after the program
 header). Attributes whose bit is set in packed_attribute_mask are fed as
-NORMPACKED3 32-bit integers and unpacked in the shader. Returns a malloc'd
-string. */
+NORMPACKED3 32-bit integers and unpacked in the shader. With
+capture_lighting, the program is one of the game's model lighting programs
+(d3d8_gl.c halo_vertex_shader_lighting), and its world position and normal
+go to the pixel shader too. Returns a malloc'd string. */
 char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instruction_count,
-	unsigned long packed_attribute_mask);
+	unsigned long packed_attribute_mask, BOOL capture_lighting);
 
 /* ---------- pixel shaders */
 
@@ -106,6 +108,10 @@ struct nv2a_pixel_shader_key
 	behind it only where it covers it (the Xbox's point-sampled meters stop
 	at their texels' edges; filtered ones have a fringe of faint texels) */
 	unsigned char coverage_alpha;
+	/* a model lighting program's draw lit for each pixel
+	(display.per_pixel_lighting): 1 by the ambient and distant lights, 2 by
+	the point lights too; 0 lit as the vertex shader lit it */
+	unsigned char per_pixel_lighting;
 };
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);

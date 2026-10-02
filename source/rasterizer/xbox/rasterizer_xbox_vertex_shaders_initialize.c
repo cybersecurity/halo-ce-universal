@@ -181,6 +181,16 @@ boolean rasterizer_vertex_shaders_initialize(
 	if (!success)
 		error(2, "### ERROR rasterizer_vertex_shaders_initialize failed");
 
+	/* port: the model lighting programs, which can be lit for each pixel
+	(d3d8_gl.c); 10 and 17 also light by the two point lights. 27, for
+	single-node models, is laid out otherwise and stays lit for each vertex */
+	if (success)
+	{
+		halo_vertex_shader_lighting(vertex_shader_table[9].handle, FALSE);
+		halo_vertex_shader_lighting(vertex_shader_table[10].handle, TRUE);
+		halo_vertex_shader_lighting(vertex_shader_table[17].handle, TRUE);
+	}
+
 	return success;
 }
 

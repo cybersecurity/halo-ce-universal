@@ -173,6 +173,9 @@ struct vertex_shader_object
 	unsigned long packed_mask;
 	/* [0] streams per the declaration, [1] immediate mode (all floats) */
 	GLuint shader[2];
+	/* one of the game's model lighting programs (halo_vertex_shader_lighting):
+	1 by the ambient and distant lights, 2 by the point lights too; else 0 */
+	unsigned char lighting;
 };
 
 /* ---------- programs */
@@ -345,6 +348,9 @@ struct gl_device
 	GLuint index_buffer;
 	unsigned long index_offset;
 	GLuint samplers[D3DTSS_MAXSTAGES];
+	/* display.per_pixel_lighting: the model lighting programs' draws are lit
+	for each pixel (nv2a_psh.c model_lighting) */
+	BOOL per_pixel_lighting;
 
 	GLuint queries[VISIBILITY_TEST_SLOTS];
 	BOOL query_pending[VISIBILITY_TEST_SLOTS];
@@ -920,6 +926,7 @@ static void gl_initialize(void)
 	glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
 	glEnable(GL_PROGRAM_POINT_SIZE);
 #endif
+	device.per_pixel_lighting = config_boolean("display.per_pixel_lighting");
 	glGenVertexArrays(1, &device.vertex_array);
 	glBindVertexArray(device.vertex_array);
 #ifdef HALO_ANDROID
@@ -1724,6 +1731,17 @@ static struct vertex_shader_object *vertex_shader_from_handle(DWORD handle)
 	return object;
 }
 
+/* the game names its model lighting programs as it creates them
+(rasterizer_xbox_vertex_shaders_initialize.c), so that their draws can be lit
+for each pixel (nv2a_psh.c model_lighting) */
+void halo_vertex_shader_lighting(unsigned long handle, int point_lights)
+{
+	struct vertex_shader_object *object = vertex_shader_from_handle((DWORD)handle);
+
+	if (object)
+		object->lighting = point_lights ? 2 : 1;
+}
+
 void WINAPI D3DDevice_DeleteVertexShader(DWORD handle)
 {
 	/* programs stay cached; the object is small */
@@ -1805,7 +1823,7 @@ static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immed
 	if (!program->shader[variant])
 	{
 		char *source = nv2a_vertex_shader_to_glsl(program->instructions, program->instruction_count,
-			immediate ? 0 : device.vertex_shader->packed_mask);
+			immediate ? 0 : device.vertex_shader->packed_mask, program->lighting != 0);
 
 		program->shader[variant] = compile_shader(GL_VERTEX_SHADER, source, "vertex");
 		if (debug_settings.dump_shaders)
@@ -2532,6 +2550,7 @@ static struct program_entry *prepare_draw(BOOL immediate)
 #ifdef HALO_ANDROID
 	key.count_samples = device.visibility_test_active && xgpu_capabilities.atomic_counters;
 #endif
+	key.per_pixel_lighting = device.per_pixel_lighting ? program->lighting : 0;
 
 	entry = program_get(vertex_shader_get(program, immediate), fragment_shader_get(&key));
 	if (!entry)

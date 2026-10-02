@@ -195,7 +195,7 @@ static const char shader_prologue[] =
 	"}\n";
 
 char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instruction_count,
-	unsigned long packed_attribute_mask)
+	unsigned long packed_attribute_mask, BOOL capture_lighting)
 {
 	struct xgpu_text text = { 0 };
 	unsigned long index;
@@ -204,6 +204,8 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 	xgpu_text_append(&text, "#version %s\n", xgpu_capabilities.shading_language);
 #endif
 	xgpu_text_append(&text, "%s", shader_prologue);
+	if (capture_lighting)
+		xgpu_text_append(&text, "out vec3 xWorldPosition;\nout vec3 xWorldNormal;\n");
 	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
 	{
 		if (packed_attribute_mask & (1UL << index))
@@ -328,6 +330,13 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 				xgpu_text_append(&text, "\t%s.%s = %s.%s;\n", output_name(output_address), mask, source, mask);
 			/* writes to constant memory are not used by Halo's shaders */
 		}
+		/* the model lighting programs have skinned the world position into
+		r10 by instruction 12, and the normal (turned for the back faces'
+		pass) into r0 by 17, before they reuse both */
+		if (capture_lighting && index == 12)
+			xgpu_text_append(&text, "\txWorldPosition = r10.xyz;\n");
+		if (capture_lighting && index == 17)
+			xgpu_text_append(&text, "\txWorldNormal = r0.xyz;\n");
 		if (field(instruction, 3, 0, 1))
 			break;
 	}

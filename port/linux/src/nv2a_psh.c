@@ -518,6 +518,56 @@ static const char *comparison_operator(unsigned long function)
 	}
 }
 
+/* ---------- per-pixel model lighting
+
+The game lights its models for each vertex: model lighting programs 9, 10 and
+17 (rasterizer_xbox_vertex_shaders_data.inc) sum the ambient light, two
+distant lights and, in 10 and 17, two point lights from the constants
+rasterizer_set_model_lighting sets (c[-79] to c[-69]), into the diffuse color
+v0. Halo's models have few vertices, so a light across a curved surface came
+out in facets, and a point light passing close lit only the vertices it
+reached. model_lighting computes the same sum for each pixel, from the world
+position and normal the vertex program hands on (nv2a_vsh.c): the same
+falloff, facing, cone and translucency terms, clamped where the programs
+clamp them. */
+
+static void model_lighting(struct xgpu_text *text, BOOL point_lights)
+{
+	int bias = XGPU_VERTEX_CONSTANT_BIAS;
+	int light;
+
+	xgpu_text_append(text,
+		"uniform vec4 c[%d];\n"
+		"in vec3 xWorldPosition;\n"
+		"in vec3 xWorldNormal;\n"
+		"vec3 model_lighting()\n"
+		"{\n"
+		"\tvec3 n = xWorldNormal * inversesqrt(max(dot(xWorldNormal, xWorldNormal), 1.0e-12));\n"
+		/* the ambient light, the first distant light, which also lights the
+		back by the translucency (c[-82].z), and the second */
+		"\tfloat facing = dot(n, -c[%d].xyz);\n"
+		"\tvec3 light = c[%d].xyz + max(max(facing, -facing * c[%d].z), 0.0) * c[%d].xyz +\n"
+		"\t\tmax(dot(n, -c[%d].xyz), 0.0) * c[%d].xyz;\n",
+		XGPU_VERTEX_CONSTANT_COUNT, bias - 73, bias - 69, bias - 82, bias - 72, bias - 71, bias - 70);
+	/* each point light: position and 1 / radius squared, the cone's axis
+	and falloff scale, the color and falloff offset */
+	for (light = 0; point_lights && light < 2; light++)
+	{
+		int first = bias - 79 + light * 3;
+
+		xgpu_text_append(text,
+			"\t{\n"
+			"\t\tvec3 to_light = c[%d].xyz - xWorldPosition;\n"
+			"\t\tfloat distance_squared = dot(to_light, to_light);\n"
+			"\t\tvec3 l = to_light * inversesqrt(max(distance_squared, 1.0e-12));\n"
+			"\t\tlight += max(1.0 - distance_squared * c[%d].w, 0.0) * clamp(dot(l, n), 0.0, 1.0) *\n"
+			"\t\t\tclamp(dot(l, -c[%d].xyz) * c[%d].w + c[%d].w, 0.0, 1.0) * c[%d].xyz;\n"
+			"\t}\n",
+			first, first, first + 1, first + 1, first + 2, first + 2);
+	}
+	xgpu_text_append(text, "\treturn clamp(light, 0.0, 1.0);\n}\n");
+}
+
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 {
 	const DWORD *state = key->combiner_state;
@@ -556,6 +606,8 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		XGPU_PIXEL_UNIFORMS);
 	for (stage = 0; stage < 4; stage++)
 		xgpu_text_append(&text, "uniform %s tex%d;\n", sampler_declaration(key->sampler_type[stage]), stage);
+	if (key->per_pixel_lighting)
+		model_lighting(&text, key->per_pixel_lighting == 2);
 	xgpu_text_append(&text,
 		"float signed_byte(float x)\n"
 		"{\n"
@@ -572,6 +624,8 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		"\tvec4 v1 = xD1;\n"
 		"\tvec4 t0 = vec4(0.0), t1 = vec4(0.0), t2 = vec4(0.0), t3 = vec4(0.0);\n"
 		"\tfloat dot0 = 0.0, dot1 = 0.0, dot2 = 0.0, dot3 = 0.0;\n");
+	if (key->per_pixel_lighting)
+		xgpu_text_append(&text, "\tv0.rgb = model_lighting();\n");
 
 	for (stage = 0; stage < 4; stage++)
 		texture_stage(&text, key, stage);
