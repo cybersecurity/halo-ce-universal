@@ -345,6 +345,9 @@ struct gl_device
 	GLuint index_buffer;
 	unsigned long index_offset;
 	GLuint samplers[D3DTSS_MAXSTAGES];
+	/* the shadow maps' pixels per unit: display.shadow_resolution over the
+	game's 128 (shadow_resolution_initialize) */
+	float shadow_scale;
 
 	GLuint queries[VISIBILITY_TEST_SLOTS];
 	BOOL query_pending[VISIBILITY_TEST_SLOTS];
@@ -752,6 +755,16 @@ static void surface_dimensions(const D3DSurface *surface, unsigned long *width, 
 		format == D3DFMT_LIN_D24S8 || format == D3DFMT_LIN_F24S8 || format == D3DFMT_LIN_D16 || format == D3DFMT_LIN_F16;
 }
 
+/* the shadow maps: the game's only R5G6B5 render targets, 128x128
+(rasterizer_xbox.c) */
+static BOOL surface_is_shadow_map(const D3DSurface *surface)
+{
+	struct xgpu_texture_description description;
+
+	xgpu_texture_describe(surface->Format, surface->Size, &description);
+	return description.format == D3DFMT_R5G6B5;
+}
+
 static struct render_target_entry *render_target_get(const D3DSurface *surface)
 {
 	struct render_target_entry *entry;
@@ -763,11 +776,17 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	float scale[2] = { 1.0f, 1.0f };
 
 	surface_dimensions(surface, &width, &height, &depth);
-	/* the screen's targets are drawn at the screen's scale */
+	/* the screen's targets are drawn at the screen's scale, and the shadow
+	maps at display.shadow_resolution */
 	if (width == (unsigned long)halo_screen_width() && height == SCREEN_HEIGHT)
 	{
 		scale[0] = screen_scale[0];
 		scale[1] = screen_scale[1];
+	}
+	else if (!depth && surface_is_shadow_map(surface))
+	{
+		scale[0] = device.shadow_scale;
+		scale[1] = device.shadow_scale;
 	}
 	for (entry = *render_target_bucket(surface->Data); entry; entry = entry->next_in_bucket)
 	{
@@ -876,6 +895,32 @@ static BOOL bind_targets(BOOL *has_depth)
 
 /* ---------- device creation */
 
+/* display.shadow_resolution: the size the shadow maps are drawn at.
+
+Each object's shadow is drawn from above into a 128x128 map, blurred into
+another, and projected onto the level under it (rasterizer_xbox_shadows.c).
+On a large screen, a shadow's 128 texels show as blocks along its edge, which
+crawl as the object moves. The maps are drawn larger as the screen's targets
+are (render_target_get): the game's viewports, scissors and clears, in its 128
+units, scale up with them, and the blur's offsets, in texture coordinates,
+keep its softness. 128 draws them as the Xbox did. */
+static void shadow_resolution_initialize(void)
+{
+	long resolution = config_integer("display.shadow_resolution");
+	GLint maximum = 0;
+
+	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maximum);
+	if (resolution > 2048)
+		resolution = 2048;
+	if (maximum > 0 && resolution > maximum)
+		resolution = maximum;
+	if (resolution < 128)
+		resolution = 128;
+	device.shadow_scale = (float)resolution / 128.0f;
+	platform_log("shadow maps: %ldx%ld (setting %ld)", resolution, resolution,
+		config_integer("display.shadow_resolution"));
+}
+
 static void gl_initialize(void)
 {
 	GLint major = 0, minor = 0;
@@ -920,6 +965,7 @@ static void gl_initialize(void)
 	glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
 	glEnable(GL_PROGRAM_POINT_SIZE);
 #endif
+	shadow_resolution_initialize();
 	glGenVertexArrays(1, &device.vertex_array);
 	glBindVertexArray(device.vertex_array);
 #ifdef HALO_ANDROID

@@ -109,6 +109,7 @@ get the default values again, delete the file.
 
 The settings are the settings of Linux, without the window, the mouse and
 the paths. Refer to [port/linux/README.md](../linux/README.md#settings).
+On Android, the default of `display.shadow_resolution` is `256`, not `512`.
 These settings are only for Android:
 
 | Setting | Function |

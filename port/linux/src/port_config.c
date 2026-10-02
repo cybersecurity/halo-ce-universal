@@ -63,6 +63,13 @@ struct config_setting
 	const char *comment;
 };
 
+/* lower on Android, whose GPUs have less fill rate for the larger maps */
+#ifdef HALO_ANDROID
+#define SHADOW_RESOLUTION_DEFAULT "256"
+#else
+#define SHADOW_RESOLUTION_DEFAULT "512"
+#endif
+
 static const struct config_setting config_settings[] =
 {
 	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
@@ -97,6 +104,11 @@ static const struct config_setting config_settings[] =
 	{ "display.player_name_scale", _config_real, "1.0", "HALO_PLAYER_NAME_SCALE", _environment_value, _platform_all,
 		"How large the players' names are drawn: 1.0 the size of the HUD's text,\n"
 		"0.25 to 4." },
+	{ "display.shadow_resolution", _config_integer, SHADOW_RESOLUTION_DEFAULT, "HALO_SHADOW_RESOLUTION",
+		_environment_value, _platform_all,
+		"The size the objects' shadows are drawn at, in pixels each way: 256,\n"
+		"512, 1024 or 2048 keep their edges smooth; 128 draws them as the Xbox\n"
+		"does, blocky on a large screen." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },
