@@ -87,17 +87,46 @@ static Uint64 stick_aimed_ms = 0;
 worn stick's drift */
 #define STICK_AIMING_DEFLECTION 8000
 
-static float mouse_sensitivity(void)
-{
-	static float sensitivity = -1.0f;
+/* input.mouse_sensitivity, input.invert_mouse and input.mouse_aim_assist,
+read once, then as INPUT SETTINGS changes them (game_settings.c) */
+static float mouse_sensitivity = -1.0f;
+static int mouse_inverted = -1;
+static int mouse_aim_assisted = -1;
 
-	if (sensitivity < 0.0f)
-	{
-		sensitivity = (float)config_real("input.mouse_sensitivity");
-		if (sensitivity <= 0.0f)
-			sensitivity = 1.0f;
-	}
-	return sensitivity;
+float input_mouse_sensitivity(void)
+{
+	if (mouse_sensitivity < 0.0f)
+		input_set_mouse_sensitivity((float)config_real("input.mouse_sensitivity"));
+	return mouse_sensitivity;
+}
+
+void input_set_mouse_sensitivity(float sensitivity)
+{
+	mouse_sensitivity = sensitivity > 0.0f ? sensitivity : 1.0f;
+}
+
+int input_mouse_inverted(void)
+{
+	if (mouse_inverted < 0)
+		mouse_inverted = config_boolean("input.invert_mouse");
+	return mouse_inverted;
+}
+
+void input_set_mouse_inverted(int inverted)
+{
+	mouse_inverted = inverted != 0;
+}
+
+int input_mouse_aim_assist(void)
+{
+	if (mouse_aim_assisted < 0)
+		mouse_aim_assisted = config_boolean("input.mouse_aim_assist");
+	return mouse_aim_assisted;
+}
+
+void input_set_mouse_aim_assist(int assisted)
+{
+	mouse_aim_assisted = assisted != 0;
 }
 
 /* radians of yaw and pitch for the mouse motion since the last call; the
@@ -106,15 +135,12 @@ int halo_linux_mouse_look(short gamepad_index, float *yaw, float *pitch)
 {
 	/* radians per pixel of relative motion at sensitivity 1 */
 	const float scale = 0.0022f;
-	static int invert = -1;
 	float x, y;
 
 	*yaw = 0.0f;
 	*pitch = 0.0f;
 	if (gamepad_index != 0)
 		return FALSE;
-	if (invert < 0)
-		invert = config_boolean("input.invert_mouse");
 	pthread_mutex_lock(&mouse_lock);
 	x = mouse_pending_x;
 	y = mouse_pending_y;
@@ -124,8 +150,8 @@ int halo_linux_mouse_look(short gamepad_index, float *yaw, float *pitch)
 	pthread_mutex_unlock(&mouse_lock);
 	if (x == 0.0f && y == 0.0f)
 		return FALSE;
-	*yaw = -x * scale * mouse_sensitivity();
-	*pitch = (invert ? y : -y) * scale * mouse_sensitivity();
+	*yaw = -x * scale * input_mouse_sensitivity();
+	*pitch = (input_mouse_inverted() ? y : -y) * scale * input_mouse_sensitivity();
 	return TRUE;
 }
 
@@ -134,14 +160,11 @@ right stick last did) and input.mouse_aim_assist is off: then the view's
 magnetism leaves them be (player_control.c); the bullets' autoaim stays */
 int halo_linux_mouse_aiming(short gamepad_index)
 {
-	static int aim_assist = -1;
 	int aiming;
 
 	if (gamepad_index != 0)
 		return FALSE;
-	if (aim_assist < 0)
-		aim_assist = config_boolean("input.mouse_aim_assist");
-	if (aim_assist)
+	if (input_mouse_aim_assist())
 		return FALSE;
 	pthread_mutex_lock(&mouse_lock);
 	aiming = mouse_aimed_ms != 0 && mouse_aimed_ms >= stick_aimed_ms;

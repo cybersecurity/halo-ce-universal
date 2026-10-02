@@ -143,12 +143,34 @@ The game reads the file one time, at start-up. If a key is not correct, or
 a value has the wrong type, the game writes the line to the log and uses the
 default value.
 
+SETTINGS in the menus changes settings while the game runs, and writes them
+to the file at once. The main menu's SETTINGS has PROFILE SETTINGS (the
+player profiles, as on the Xbox), VIDEO SETTINGS, AUDIO SETTINGS and INPUT
+SETTINGS. The pause menu of a single-player game has SETTINGS after RESUME
+GAME, with VIDEO SETTINGS, AUDIO SETTINGS and INPUT SETTINGS. Each one of
+these three has the settings of a section of the file:
+
+- VIDEO SETTINGS: `display.fullscreen`, `display.resolution_width` with
+  `display.resolution_height` (one RESOLUTION), `display.vsync`,
+  `display.interpolation`, `display.direct_camera` and
+  `display.window_scale`. A window scale set while the game is fullscreen
+  changes the window when the game leaves fullscreen. A resolution set
+  while the game is in a window applies when the game is fullscreen.
+- AUDIO SETTINGS: `audio.enabled` and `audio.volume`.
+- INPUT SETTINGS: `input.mouse_sensitivity`, `input.mouse_aim_assist` and
+  `input.invert_mouse`.
+
+A changes a setting that is on or off, and steps a number up. Left and right
+step a number. B goes back. The settings are the same for all profiles. F11
+changes fullscreen only until the game stops.
+
 Each setting has an environment variable. The environment variable changes
 the setting for one start of the game. It has priority over the file.
 
 | Setting | Default | Environment variable | Function |
 | --- | --- | --- | --- |
 | `display.fullscreen` | `true` | `HALO_FULLSCREEN` | `true`: fullscreen at the resolution of the display. The picture has 480 lines of the game and the width of the display. `false`: a window with the 640x480 picture of the Xbox. F11 changes between the two. |
+| `display.resolution_width`, `display.resolution_height` | `0`, `0` | `HALO_RESOLUTION_WIDTH`, `HALO_RESOLUTION_HEIGHT` | The resolution of the picture when the game is fullscreen, in pixels: one of the modes of the display, for example `1920` and `1080`. The game draws the picture at this resolution and scales it to the display. The display keeps its own mode. `0`: the resolution of the display. If the display has no room for the resolution, the game uses the resolution of the display. |
 | `display.window_scale` | `2` | `HALO_WINDOW_SCALE` | The size of the window, as a multiple of 640x480. You can change the size of the window. |
 | `display.vsync` | `true` | `HALO_NO_VSYNC=1` sets `false` | `true`: each frame waits for the display. |
 | `display.max_fps` | `0` | `HALO_MAX_FPS` | With vsync off, the most frames each second. `0`: twice the display's refresh rate. `-1`: no limit, which can hang some Intel graphics (Raptor Lake), resetting the desktop's graphics too. |

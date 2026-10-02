@@ -45,5 +45,7 @@ long halo_screen_commit(void);
 void halo_screen_ui_offset(unsigned char centered);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
+/* the settings of the menus' SETTINGS (source/interface/ui_widget.c) */
+#include "game_settings.h"
 
 #endif
