@@ -54,6 +54,8 @@ symbols in this file:
 #include "cache/cache_files.h"
 #include "camera/director.h"
 #include "camera/observer.h"
+#include "game/game.h"
+#include "game/game_engine.h"
 #include "game/game_globals.h"
 #include "game/players.h"
 #include "hs/hs.h"
@@ -62,9 +64,11 @@ symbols in this file:
 #include "items/weapon_definitions.h"
 #include "main/console.h"
 #include "math/real_math.h"
+#include "networking/network_game_globals.h"
 #include "objects/objects.h"
 #include "rasterizer/rasterizer_console_vars.h"
 #include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
 #include "tag_files/tag_groups.h"
 #include "units/units.h"
 
@@ -87,12 +91,35 @@ enum
 
 /* ---------- prototypes */
 
+static boolean cheat_menu_game_allowed(
+	void);
+
 /* ---------- globals */
 
 static char cheat_strings[MAXIMUM_CHEATS][MAXIMUM_CHEAT_LENGTH] = {0};
 /* January emits this otherwise unreferenced byte after cheat_strings.
  * Its original name and purpose are unknown; the name is descriptive only. */
 static boolean cheats_unused_flag = FALSE;
+
+/* port: the pause menu's cheats (ui_widget.c): a cheat global it toggles, or
+a cheat function it calls */
+static struct
+{
+	char const *name;
+	boolean *enabled;
+	void (*action)(void);
+} const cheat_menu_items[NUMBER_OF_CHEAT_MENU_ITEMS] =
+{
+	{ "GOD MODE", &cheat.deathless_player, NULL },
+	{ "INFINITE AMMO", &cheat.infinite_ammo, NULL },
+	{ "NO RELOAD", &cheat.bottomless_clip, NULL },
+	{ "SUPER JUMP", &cheat.super_jump, NULL },
+	{ "ACTIVE CAMOUFLAGE", NULL, cheat_active_camouflage },
+	{ "GIVE ALL WEAPONS", NULL, cheat_all_weapons },
+};
+
+/* port: the toggles the pause menu has turned on */
+static unsigned long cheat_menu_enabled_toggles = 0;
 
 /* ---------- code */
 
@@ -310,6 +337,19 @@ void cheats_initialize_for_new_map(
 	void)
 {
 	cheats_load();
+	/* port: what the pause menu turned on goes off on a map it is not for
+	(multiplayer, the main menu), so that none reaches a multiplayer game */
+	if (cheat_menu_enabled_toggles && !cheat_menu_game_allowed())
+	{
+		short item;
+
+		for (item = 0; item<NUMBER_OF_CHEAT_MENU_TOGGLES; item++)
+		{
+			if (TEST_FLAG(cheat_menu_enabled_toggles, item))
+				*cheat_menu_items[item].enabled = FALSE;
+		}
+		cheat_menu_enabled_toggles = 0;
+	}
 
 	return;
 }
@@ -469,4 +509,70 @@ void cheat_all_vehicles(
 	}
 
 	return;
+}
+
+/* port: whether the pause menu's cheats may be used now */
+boolean cheat_menu_available(
+	void)
+{
+	return game_in_progress() && cheat_menu_game_allowed();
+}
+
+/* port: a cheat's name in the pause menu, with ON or OFF for a toggle */
+void cheat_menu_item_get_label(
+	short item,
+	char label[MAXIMUM_CHEAT_MENU_LABEL_LENGTH+1])
+{
+	label[0] = 0;
+	if (item>=0 && item<NUMBER_OF_CHEAT_MENU_ITEMS)
+	{
+		csstrncpy(label, cheat_menu_items[item].name, MAXIMUM_CHEAT_MENU_LABEL_LENGTH);
+		label[MAXIMUM_CHEAT_MENU_LABEL_LENGTH] = 0;
+		if (cheat_menu_items[item].enabled)
+		{
+			csstrncat(label, *cheat_menu_items[item].enabled ? ": ON" : ": OFF",
+				MAXIMUM_CHEAT_MENU_LABEL_LENGTH-csstrlen(label));
+		}
+	}
+
+	return;
+}
+
+/* port: toggles or calls a cheat from the pause menu, only in a game the menu
+is for, whatever it shows */
+boolean cheat_menu_item_select(
+	short item)
+{
+	boolean selected = FALSE;
+
+	if (item>=0 && item<NUMBER_OF_CHEAT_MENU_ITEMS && cheat_menu_available())
+	{
+		if (cheat_menu_items[item].enabled)
+		{
+			*cheat_menu_items[item].enabled = !*cheat_menu_items[item].enabled;
+			SET_FLAG(cheat_menu_enabled_toggles, item, *cheat_menu_items[item].enabled);
+		}
+		else
+		{
+			cheat_menu_items[item].action();
+		}
+		selected = TRUE;
+	}
+
+	return selected;
+}
+
+/* ---------- private code */
+
+/* port: a campaign played by one player on this machine alone: not a network
+game (whose netcode trusts each machine with its own player), a multiplayer
+game type, a film or cooperative play */
+static boolean cheat_menu_game_allowed(
+	void)
+{
+	return game_connection()==_game_connection_local &&
+		!network_game_is_active() &&
+		!game_engine_running() &&
+		!game_is_cooperative() &&
+		global_scenario_get()->type==_scenario_type_solo;
 }

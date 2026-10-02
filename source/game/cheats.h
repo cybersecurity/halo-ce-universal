@@ -10,6 +10,21 @@ header included in hcex build.
 
 /* ---------- constants */
 
+/* port: the pause menu's cheats (ui_widget.c), in its order, toggles first */
+enum
+{
+	_cheat_menu_item_god_mode,
+	_cheat_menu_item_infinite_ammo,
+	_cheat_menu_item_no_reload,
+	_cheat_menu_item_super_jump,
+	_cheat_menu_item_active_camouflage,
+	_cheat_menu_item_all_weapons,
+	NUMBER_OF_CHEAT_MENU_ITEMS,
+
+	NUMBER_OF_CHEAT_MENU_TOGGLES = _cheat_menu_item_active_camouflage,
+	MAXIMUM_CHEAT_MENU_LABEL_LENGTH = 31
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -56,6 +71,13 @@ void cheats_load(
 	void);
 void cheat_active_camouflage_local_player(
 	short player_index);
+boolean cheat_menu_available(
+	void);
+void cheat_menu_item_get_label(
+	short item,
+	char label[MAXIMUM_CHEAT_MENU_LABEL_LENGTH+1]);
+boolean cheat_menu_item_select(
+	short item);
 
 /* ---------- globals */
 

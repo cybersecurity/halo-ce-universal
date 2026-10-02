@@ -638,6 +638,7 @@ struct widget_instance;
 #include "cseries/cseries_windows.h"
 #include "cutscene/cinematics.h"
 #include "event_manager.h"
+#include "game/cheats.h"
 #include "game/game_engine.h"
 #include "game/game_globals.h"
 #include "game/players.h"
@@ -873,6 +874,7 @@ enum
 {
 	/* the button event types are the gamepad button indices; the enumeration
 	runs 0..33 and only the types this file names are listed */
+	_widget_event_a_button = _gamepad_analog_button_a,
 	_widget_event_b_button = _gamepad_analog_button_b,
 	_widget_event_dpad_up = _gamepad_binary_button_dpad_up,
 	_widget_event_dpad_down = _gamepad_binary_button_dpad_down,
@@ -1419,6 +1421,25 @@ static void widget_instance_process_one_event_recursive(
 	boolean *return_widget_deleted);
 static boolean ui_check_for_pause_game(
 	void);
+static short ui_cheats_widget_get(
+	struct widget_instance const *widget);
+static boolean ui_cheats_widget_is_button(
+	struct widget_instance const *widget);
+static boolean ui_cheats_widget_set_text(
+	struct widget_instance *widget);
+static short ui_cheats_button_press(
+	struct widget_instance *button,
+	boolean *widget_deleted);
+static void ui_cheats_pause_menu_loaded(
+	struct widget_instance *root);
+static boolean ui_cheats_render_box_piece(
+	struct widget_instance const *widget,
+	struct bitmap_data *bitmap,
+	rectangle2d const *bounds,
+	rectangle2d *clip,
+	pixel32 color);
+static short ui_cheats_row_widening(
+	struct widget_instance const *widget);
 
 /* ---------- globals */
 
@@ -1620,10 +1641,15 @@ static __inline real compute_offset_coordinate(
 		1.0);
 }
 
-void draw_bitmap_in_rect(
+/* port: draw_bitmap_in_rect from the bitmap's row source_y0 down, and its
+column source_x0 across, not its top left (the cheats menu's taller boxes and
+wider rows, ui_cheats_render_box_piece) */
+static void draw_bitmap_rows_in_rect(
 	struct bitmap_data *bitmap,
 	rectangle2d *rect,
 	rectangle2d *bitmap_rect,
+	short source_x0,
+	short source_y0,
 	rectangle2d *clip_rect,
 	pixel32 argb,
 	struct rasterizer_dynamic_screen_geometry_parameters *multitexture_params,
@@ -1642,6 +1668,8 @@ void draw_bitmap_in_rect(
 		real bitmap_height;
 		real texture_width;
 		real texture_height;
+		real texture_x0;
+		real texture_y0;
 		real_point2d map0_offset;
 		real_point2d map1_offset;
 		short rectangle_x0;
@@ -1697,23 +1725,25 @@ void draw_bitmap_in_rect(
 		}
 
 		bitmap_width = MAX(1.0f, (real)bitmap->width);
+		texture_x0 = (real)source_x0 / bitmap_width;
 		texture_width = MIN(
 			(real)source_width / bitmap_width,
-			1.0f);
+			1.0f - texture_x0);
 		bitmap_height = MAX(1.0f, (real)bitmap->height);
+		texture_y0 = (real)source_y0 / bitmap_height;
 		texture_height = MIN(
 			(real)source_height / bitmap_height,
-			1.0f);
+			1.0f - texture_y0);
 
 		for (vertex_index = 0;
 			vertex_index < NUMBER_OF_POINTS_PER_RECTANGLE;
 			vertex_index++)
 		{
 			vertices[vertex_index].color = argb;
-			vertices[vertex_index].texture_coordinates.x =
-				(vertex_index % 3) ? texture_width : 0.0f;
-			vertices[vertex_index].texture_coordinates.y =
-				(vertex_index > 1) ? texture_height : 0.0f;
+			vertices[vertex_index].texture_coordinates.x = texture_x0 +
+				((vertex_index % 3) ? texture_width : 0.0f);
+			vertices[vertex_index].texture_coordinates.y = texture_y0 +
+				((vertex_index > 1) ? texture_height : 0.0f);
 			vertices[vertex_index].position = points[vertex_index];
 		}
 
@@ -1783,6 +1813,29 @@ void draw_bitmap_in_rect(
 		parameters.framebuffer_blend_function = 0;
 		rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
 	}
+
+	return;
+}
+
+void draw_bitmap_in_rect(
+	struct bitmap_data *bitmap,
+	rectangle2d *rect,
+	rectangle2d *bitmap_rect,
+	rectangle2d *clip_rect,
+	pixel32 argb,
+	struct rasterizer_dynamic_screen_geometry_parameters *multitexture_params,
+	boolean no_plasma)
+{
+	draw_bitmap_rows_in_rect(
+		bitmap,
+		rect,
+		bitmap_rect,
+		0,
+		0,
+		clip_rect,
+		argb,
+		multitexture_params,
+		no_plasma);
 
 	return;
 }
@@ -2628,7 +2681,14 @@ boolean widget_event_function_list_widget_goto_next_item(
 				child = widget->child;
 				item_index = 0;
 			}
-			if (child)
+			/* port: a row of the cheats menu shares its tag with another row,
+			which a lookup by tag would find instead */
+			if (child && ui_cheats_widget_get(child) != NONE)
+			{
+				widget_instance_give_focus_directly(widget, child);
+				widget->parameters.list.selected_index = (short)item_index;
+			}
+			else if (child)
 			{
 				widget_instance_give_focus_by_tag(
 					widget,
@@ -2754,10 +2814,18 @@ boolean widget_event_function_list_widget_goto_previous_item(
 					item_index++;
 				}
 			}
-			widget_instance_give_focus_by_tag(
-				widget,
-				child->definition_tag_index,
-				widget->local_player_index);
+			/* port: as in widget_event_function_list_widget_goto_next_item */
+			if (ui_cheats_widget_get(child) != NONE)
+			{
+				widget_instance_give_focus_directly(widget, child);
+			}
+			else
+			{
+				widget_instance_give_focus_by_tag(
+					widget,
+					child->definition_tag_index,
+					widget->local_player_index);
+			}
 			widget->parameters.list.selected_index = (short)item_index;
 		}
 	}
@@ -3754,6 +3822,10 @@ struct widget_instance *ui_widget_load_by_name_or_tag(
 				tag_index,
 				local_player_index,
 				widget_stack);
+			/* port: CHEATS in the single-player pause menu, unless a created
+			handler closed the widget */
+			if (!parent && widget_globals.active_widgets[widget_stack] == widget)
+				ui_cheats_pause_menu_loaded(widget);
 		}
 		else
 		{
@@ -4905,7 +4977,9 @@ static void widget_instance_render_text_box(
 	rectangle2d bounds;
 	rectangle2d clip;
 
-	if (definition->text_label_string_list.index != NONE)
+	/* port: the cheats menu's text boxes have the code's text */
+	if (!ui_cheats_widget_set_text(widget) &&
+		definition->text_label_string_list.index != NONE)
 	{
 		short string_list_index;
 		wchar_t *string;
@@ -4992,6 +5066,9 @@ static void widget_instance_render_text_box(
 	bounds.y0 += offset.y;
 	bounds.x0 += definition->horizontal_offset;
 	bounds.y0 += definition->vertical_offset;
+	/* port: the cheats menu's wider rows */
+	bounds.x0 -= ui_cheats_row_widening(widget);
+	bounds.x1 += ui_cheats_row_widening(widget);
 	if (focus)
 	{
 		color = get_ui_argb_white();
@@ -5236,6 +5313,575 @@ static void widget_instance_render_spinner_list(
 	return;
 }
 
+/* ---------- the cheats menu (port)
+
+/*
+ * Adds a native single-player Cheats menu at runtime without modifying
+ * campaign map tags, reusing the existing Halo pause-menu widgets
+ */
+
+enum
+{
+	_ui_cheats_widget_button,	/* the pause menu's CHEATS */
+	_ui_cheats_widget_menu,		/* the cheats menu's screen */
+	_ui_cheats_widget_caption,
+	_ui_cheats_widget_return,
+	_ui_cheats_widget_resume,
+	_ui_cheats_widget_pause_box,	/* a piece of the pause screen's boxes' art */
+	_ui_cheats_widget_help_box,	/* a piece of the help screens' box's art */
+	_ui_cheats_widget_first_cheat,	/* cheats.h's items */
+	NUMBER_OF_UI_CHEATS_WIDGETS = _ui_cheats_widget_first_cheat + NUMBER_OF_CHEAT_MENU_ITEMS,
+	NUMBER_OF_UI_CHEATS_MENU_ROWS = NUMBER_OF_CHEAT_MENU_ITEMS + 2
+};
+
+enum
+{
+	/* where the help screens place their box and its title and key, and
+	the body between the bands of its art (ui\shell\bitmaps\helpbox_*) */
+	UI_CHEATS_BOX_X = 64,
+	UI_CHEATS_BOX_CAPTION_X = 14,
+	UI_CHEATS_BOX_CAPTION_Y = 5,
+	UI_CHEATS_BOX_BODY_TOP = 29,
+	UI_CHEATS_BOX_BODY_BOTTOM = 190,
+	UI_CHEATS_BOX_KEY_Y = 195,
+
+	/* the body of the pause screen's left box between the bands of its art
+	(ui\shell\bitmaps\pausebox2_*), its line above the key at the bottom */
+	UI_CHEATS_PAUSE_BOX_BODY_TOP = 2,
+	UI_CHEATS_PAUSE_BOX_BODY_BOTTOM = 130,
+
+	/* the boxes grow over their art's rows from here to the line above the
+	key, where the borders are straight and the body a smooth gradient (the
+	right pause box, which has no such line, grows over the same rows) */
+	UI_CHEATS_BOX_STRETCH_TOP = 42,
+
+	/* the menu's rows wider on each side than the pause menu's 202: ACTIVE
+	CAMOUFLAGE is 200, and a centered line leaves out of its width the glyphs
+	whose bitmaps reach the right edge (draw_string), so it drew off center */
+	UI_CHEATS_ROW_WIDENING = 12
+};
+
+/* the layout of the pause screen as the maps have it, which the cheats
+menu's screens keep (ui_cheats_pause_menu_loaded) */
+static struct
+{
+	short row_height;	/* from one row of its list to the next */
+	short list_top_margin;	/* the left box's body above the list, and below */
+	short list_bottom_margin;
+	short pause_box_stretch;	/* the rows the boxes grow by */
+	short help_box_stretch;
+} ui_cheats_layout;
+
+static char const ui_cheats_widget_names[NUMBER_OF_UI_CHEATS_WIDGETS][16] =
+{
+	"cheats_button",
+	"cheats_menu",
+	"cheats_caption",
+	"cheats_return",
+	"cheats_resume",
+	"pause_box_piece",
+	"help_box_piece",
+	"cheat_button",
+	"cheat_button",
+	"cheat_button",
+	"cheat_button",
+	"cheat_button",
+	"cheat_button"
+};
+
+/* the pause screen's widgets the menu changes, and the help screens' box */
+struct ui_cheats_pause_screen
+{
+	struct widget_instance *background;
+	struct widget_instance *list;
+	struct widget_instance *caption;
+	struct widget_instance *objective;
+	struct widget_instance *key;
+	long box_tag_index;
+};
+
+static short ui_cheats_widget_get(
+	struct widget_instance const *widget)
+{
+	short index;
+
+	for (index = 0; index < NUMBER_OF_UI_CHEATS_WIDGETS; index++)
+	{
+		if (widget->name == ui_cheats_widget_names[index])
+			return index;
+	}
+
+	return NONE;
+}
+
+static boolean ui_cheats_widget_is_button(
+	struct widget_instance const *widget)
+{
+	short cheats_widget = ui_cheats_widget_get(widget);
+
+	return cheats_widget == _ui_cheats_widget_button ||
+		cheats_widget == _ui_cheats_widget_return ||
+		cheats_widget >= _ui_cheats_widget_first_cheat;
+}
+
+/* the code's text for a text box of the menu's; FALSE for any other widget */
+static boolean ui_cheats_widget_set_text(
+	struct widget_instance *widget)
+{
+	short cheats_widget = ui_cheats_widget_get(widget);
+	char label[MAXIMUM_CHEAT_MENU_LABEL_LENGTH + 1];
+	long length;
+
+	if (cheats_widget == NONE ||
+		cheats_widget == _ui_cheats_widget_menu ||
+		cheats_widget == _ui_cheats_widget_resume ||
+		cheats_widget == _ui_cheats_widget_pause_box ||
+		cheats_widget == _ui_cheats_widget_help_box)
+	{
+		return FALSE;
+	}
+	if (cheats_widget >= _ui_cheats_widget_first_cheat)
+		cheat_menu_item_get_label(cheats_widget - _ui_cheats_widget_first_cheat, label);
+	else if (cheats_widget == _ui_cheats_widget_return)
+		csstrcpy(label, "RETURN");
+	else
+		csstrcpy(label, "CHEATS");
+	length = csstrlen(label);
+	widget->parameters.text_box.text = pool_resize_pointer(
+		widget_memory_pool,
+		widget->parameters.text_box.text,
+		2 * length + 2,
+		__FILE__,
+		__LINE__);
+	if (widget->parameters.text_box.text)
+		ascii_to_wide(label, widget->parameters.text_box.text, 2 * length + 2);
+
+	return TRUE;
+}
+
+/* a child of the widget drawn from the tag of that name, or NULL */
+static struct widget_instance *ui_cheats_find_child(
+	struct widget_instance *widget,
+	char const *tag_name)
+{
+	struct widget_instance *child;
+
+	for (child = widget->child; child; child = child->next)
+	{
+		char const *name = tag_get_name(child->definition_tag_index);
+
+		if (name && !csstrcmp(name, tag_name))
+			break;
+	}
+
+	return child;
+}
+
+/* whether the widget is the single-player pause screen as the campaign maps
+have it, with the help screens' box loaded (another map's could differ) */
+static boolean ui_cheats_pause_screen_get(
+	struct widget_instance *root,
+	struct ui_cheats_pause_screen *screen)
+{
+	char const *name = tag_get_name(root->definition_tag_index);
+
+	if (!name || csstrcmp(name, "ui\\shell\\solo_game\\pause_game\\pause_game"))
+		return FALSE;
+	screen->background = ui_cheats_find_child(root, "ui\\shell\\solo_game\\pause_game\\pause_dialog_bkd");
+	screen->list = ui_cheats_find_child(root, "ui\\shell\\solo_game\\pause_game\\pause_list");
+	screen->caption = ui_cheats_find_child(root, "ui\\shell\\solo_game\\pause_game\\mission_objectives_caption");
+	screen->objective = ui_cheats_find_child(root, "ui\\shell\\solo_game\\pause_game\\mission_objective_text");
+	screen->key = ui_cheats_find_child(root, "ui\\shell\\main_menu\\button_key_sm");
+	screen->box_tag_index = tag_loaded(
+		UI_WIDGET_DEFINITION_TAG,
+		"ui\\shell\\solo_game\\player_help\\help_dialog_bkd");
+
+	return screen->background &&
+		screen->list &&
+		screen->list->type == _ui_widget_type_column_list &&
+		screen->list->child &&
+		screen->list->child == ui_cheats_find_child(
+			screen->list,
+			"ui\\shell\\solo_game\\pause_game\\resume_game_button") &&
+		screen->list->child->next &&
+		screen->caption &&
+		screen->objective &&
+		screen->key &&
+		screen->box_tag_index != NONE;
+}
+
+/* links a widget made for a parent in among its children, after one */
+static void ui_cheats_insert_child_after(
+	struct widget_instance *sibling,
+	struct widget_instance *widget)
+{
+	widget->previous = sibling;
+	widget->next = sibling->next;
+	if (sibling->next)
+		sibling->next->previous = widget;
+	sibling->next = widget;
+
+	return;
+}
+
+/* a row of the menu's in a list, drawn from the tag of one of its items */
+static struct widget_instance *ui_cheats_button_new(
+	struct widget_instance *list,
+	long tag_index,
+	short cheats_widget,
+	short horizontal_offset,
+	short vertical_offset)
+{
+	struct widget_instance *button = ui_widget_load_by_name_or_tag(
+		NULL,
+		tag_index,
+		list,
+		list->local_player_index,
+		NONE,
+		NONE,
+		NONE);
+
+	if (button)
+	{
+		button->name = ui_cheats_widget_names[cheats_widget];
+		button->horizontal_offset = horizontal_offset;
+		button->vertical_offset = vertical_offset;
+	}
+
+	return button;
+}
+
+/* marks the pieces of a box's art to be drawn taller */
+static void ui_cheats_box_stretch(
+	struct widget_instance *box,
+	short cheats_widget)
+{
+	struct widget_instance *piece;
+
+	for (piece = box->child; piece; piece = piece->next)
+		piece->name = ui_cheats_widget_names[cheats_widget];
+
+	return;
+}
+
+static void ui_cheats_pause_menu_loaded(
+	struct widget_instance *root)
+{
+	struct ui_cheats_pause_screen screen;
+	struct widget_instance *resume;
+	struct widget_instance *cheats;
+	struct widget_instance *item;
+	short row_height;
+	short list_y;
+	short list_bottom;
+
+	if (!ui_cheats_pause_screen_get(root, &screen) || !cheat_menu_available())
+		return;
+	resume = screen.list->child;
+	row_height = resume->next->vertical_offset - resume->vertical_offset;
+
+	/* the rows' spacing, and the left box's body around them, as the maps
+	have them for four rows */
+	list_y = screen.list->vertical_offset - screen.background->vertical_offset;
+	for (item = resume; item->next; item = item->next)
+		;
+	list_bottom = list_y + item->vertical_offset +
+		ui_widget_definition_get(item->definition_tag_index)->bounds.y1;
+	ui_cheats_layout.row_height = row_height;
+	ui_cheats_layout.list_top_margin = list_y - UI_CHEATS_PAUSE_BOX_BODY_TOP;
+	ui_cheats_layout.list_bottom_margin = UI_CHEATS_PAUSE_BOX_BODY_BOTTOM - list_bottom;
+
+	cheats = ui_cheats_button_new(
+		screen.list,
+		resume->definition_tag_index,
+		_ui_cheats_widget_button,
+		resume->horizontal_offset,
+		resume->vertical_offset + row_height);
+	if (!cheats)
+		return;
+	ui_cheats_insert_child_after(resume, cheats);
+	for (item = cheats->next; item; item = item->next)
+		item->vertical_offset += row_height;
+
+	/* both boxes a row taller, half of it above and half below, so the fifth
+	row has the four's spacing and the key stays below the rows */
+	ui_cheats_layout.pause_box_stretch = row_height;
+	ui_cheats_box_stretch(screen.background, _ui_cheats_widget_pause_box);
+	screen.background->vertical_offset -= row_height / 2;
+	screen.list->vertical_offset -= row_height / 2;
+	screen.caption->vertical_offset -= row_height / 2;
+	screen.objective->vertical_offset -= row_height / 2;
+	screen.key->vertical_offset += row_height - row_height / 2;
+
+	return;
+}
+
+static boolean ui_cheats_menu_open(
+	struct widget_instance *button,
+	boolean *widget_deleted)
+{
+	struct widget_instance *root = widget_instance_get_topmost_parent(button);
+	long screen_tag_index = root->definition_tag_index;
+	long list_tag_index = button->parent->definition_tag_index;
+	short local_player_index = root->local_player_index;
+	short button_index = (short)widget_instance_get_child_index_from_parent(button);
+	struct ui_cheats_pause_screen screen;
+	struct widget_instance *menu;
+	struct widget_instance *box;
+	struct widget_instance *first;
+	rectangle2d menu_bounds;
+	rectangle2d box_bounds;
+	rectangle2d button_bounds;
+	rectangle2d key_bounds;
+	long button_tag_index;
+	short button_x, button_y, list_height;
+	short box_y;
+	short row;
+
+	if (!cheat_menu_available())
+		return FALSE;
+	/* (this deletes the pause menu, and the button with it) */
+	menu = ui_widget_load_by_name_or_tag(
+		NULL,
+		screen_tag_index,
+		NULL,
+		local_player_index,
+		screen_tag_index,
+		list_tag_index,
+		button_index);
+	*widget_deleted = menu != NULL;
+	if (!menu || !ui_cheats_pause_screen_get(menu, &screen))
+	{
+		error(_error_silent, "failed to load the cheats menu");
+
+		return FALSE;
+	}
+	menu->name = ui_cheats_widget_names[_ui_cheats_widget_menu];
+	screen.caption->name = ui_cheats_widget_names[_ui_cheats_widget_caption];
+	screen.background->visible = FALSE;
+	screen.objective->visible = FALSE;
+
+	/* the help screens' box, grown to hold the rows with the pause menu's
+	spacing and margins, centered on the screen */
+	first = screen.list->child;
+	button_tag_index = first->definition_tag_index;
+	button_x = first->horizontal_offset;
+	button_y = first->vertical_offset;
+	menu_bounds = ui_widget_definition_get(menu->definition_tag_index)->bounds;
+	box_bounds = ui_widget_definition_get(screen.box_tag_index)->bounds;
+	button_bounds = ui_widget_definition_get(button_tag_index)->bounds;
+	key_bounds = ui_widget_definition_get(screen.key->definition_tag_index)->bounds;
+	list_height = (NUMBER_OF_UI_CHEATS_MENU_ROWS - 1) * ui_cheats_layout.row_height +
+		(button_bounds.y1 - button_bounds.y0);
+	ui_cheats_layout.help_box_stretch = MAX(0,
+		ui_cheats_layout.list_top_margin + list_height + ui_cheats_layout.list_bottom_margin -
+		(UI_CHEATS_BOX_BODY_BOTTOM - UI_CHEATS_BOX_BODY_TOP));
+	box_y = ((menu_bounds.y1 - menu_bounds.y0) -
+		(box_bounds.y1 - box_bounds.y0 + ui_cheats_layout.help_box_stretch)) / 2;
+
+	/* the help screens' box in place of the pause menu's two, drawn first */
+	box = ui_widget_load_by_name_or_tag(
+		NULL,
+		screen.box_tag_index,
+		menu,
+		menu->local_player_index,
+		NONE,
+		NONE,
+		NONE);
+	if (box)
+	{
+		box->horizontal_offset = UI_CHEATS_BOX_X;
+		box->vertical_offset = box_y;
+		ui_cheats_box_stretch(box, _ui_cheats_widget_help_box);
+		ui_cheats_insert_child_after(screen.background, box);
+	}
+
+	screen.list->horizontal_offset = UI_CHEATS_BOX_X +
+		((box_bounds.x1 - box_bounds.x0) - (button_bounds.x1 - button_bounds.x0)) / 2;
+	screen.list->vertical_offset = box_y + UI_CHEATS_BOX_BODY_TOP +
+		ui_cheats_layout.list_top_margin;
+	screen.caption->horizontal_offset = UI_CHEATS_BOX_X + UI_CHEATS_BOX_CAPTION_X;
+	screen.caption->vertical_offset = box_y + UI_CHEATS_BOX_CAPTION_Y;
+	screen.key->horizontal_offset = screen.list->horizontal_offset +
+		((button_bounds.x1 - button_bounds.x0) - (key_bounds.x1 - key_bounds.x0)) / 2;
+	screen.key->vertical_offset = box_y + UI_CHEATS_BOX_KEY_Y +
+		ui_cheats_layout.help_box_stretch;
+
+	screen.list->focused_child = NULL;
+	while (screen.list->child)
+		ui_widget_delete(screen.list->child);
+	for (row = 0; row < NUMBER_OF_UI_CHEATS_MENU_ROWS; row++)
+	{
+		short cheats_widget =
+			row < NUMBER_OF_CHEAT_MENU_ITEMS ? _ui_cheats_widget_first_cheat + row :
+			row == NUMBER_OF_CHEAT_MENU_ITEMS ? _ui_cheats_widget_return :
+			_ui_cheats_widget_resume;
+		struct widget_instance *row_button = ui_cheats_button_new(
+			screen.list,
+			button_tag_index,
+			cheats_widget,
+			button_x,
+			button_y + row * ui_cheats_layout.row_height);
+
+		if (row_button)
+			ui_widget_add_child(screen.list, row_button);
+	}
+	if (screen.list->child)
+	{
+		widget_instance_give_focus_directly(menu, screen.list->child);
+		screen.list->parameters.list.selected_index = 0;
+	}
+
+	return TRUE;
+}
+
+/* A on a row of the menu's: the sound it makes */
+static short ui_cheats_button_press(
+	struct widget_instance *button,
+	boolean *widget_deleted)
+{
+	short cheats_widget = ui_cheats_widget_get(button);
+	boolean pressed;
+
+	/* (as B, widget_instance_process_one_event_recursive) */
+	if (cheats_widget == _ui_cheats_widget_return)
+	{
+		widget_instance_go_back_to_previous(button);
+		*widget_deleted = TRUE;
+
+		return _ui_audio_feedback_back;
+	}
+	if (cheats_widget == _ui_cheats_widget_button)
+		pressed = ui_cheats_menu_open(button, widget_deleted);
+	else
+		pressed = cheat_menu_item_select(cheats_widget - _ui_cheats_widget_first_cheat);
+
+	return pressed ? _ui_audio_feedback_forward : _ui_audio_feedback_flag_failure;
+}
+
+/* the columns a row of the cheats menu's is widened by on each side; 0 for any
+other widget */
+static short ui_cheats_row_widening(
+	struct widget_instance const *widget)
+{
+	short cheats_widget = ui_cheats_widget_get(widget);
+
+	if (cheats_widget == _ui_cheats_widget_return ||
+		cheats_widget == _ui_cheats_widget_resume ||
+		cheats_widget >= _ui_cheats_widget_first_cheat)
+	{
+		return UI_CHEATS_ROW_WIDENING;
+	}
+
+	return 0;
+}
+
+/* a row's art drawn wider: its ends 1:1, its middle over the extra columns
+(the clip, which begins at the widget's left edge, moved left with it) */
+static void ui_cheats_render_row_piece(
+	struct bitmap_data *bitmap,
+	rectangle2d const *bounds,
+	short widening,
+	rectangle2d *clip,
+	pixel32 color)
+{
+	short width = bounds->x1 - bounds->x0;
+	short end = MIN(bounds->y1 - bounds->y0, width / 2);
+	short source_x0[3];
+	short source_x1[3];
+	short x = bounds->x0 - widening;
+	short slice;
+	rectangle2d wide_clip;
+
+	if (clip)
+	{
+		wide_clip = *clip;
+		wide_clip.x0 -= widening;
+		clip = &wide_clip;
+	}
+	source_x0[0] = 0;
+	source_x1[0] = source_x0[1] = end;
+	source_x1[1] = source_x0[2] = width - end;
+	source_x1[2] = width;
+	for (slice = 0; slice < 3; slice++)
+	{
+		rectangle2d rect = *bounds;
+		rectangle2d source = *bounds;
+
+		source.x0 = source_x0[slice];
+		source.x1 = source_x1[slice];
+		rect.x0 = x;
+		rect.x1 = x + (source.x1 - source.x0) + (slice == 1 ? 2 * widening : 0);
+		x = rect.x1;
+		draw_bitmap_rows_in_rect(bitmap, &rect, &source, source.x0, 0, clip, color, NULL, FALSE);
+	}
+
+	return;
+}
+
+/* a piece of a box's art drawn taller: its corners, line and key band 1:1,
+the gradient between them over the extra rows; a row's drawn wider; FALSE for
+any other widget */
+static boolean ui_cheats_render_box_piece(
+	struct widget_instance const *widget,
+	struct bitmap_data *bitmap,
+	rectangle2d const *bounds,
+	rectangle2d *clip,
+	pixel32 color)
+{
+	short cheats_widget = ui_cheats_widget_get(widget);
+	short height = bounds->y1 - bounds->y0;
+	short stretch_bottom;
+	short stretch;
+	short band;
+	short source_y0[3];
+	short source_y1[3];
+	short y;
+
+	if (ui_cheats_row_widening(widget))
+	{
+		ui_cheats_render_row_piece(bitmap, bounds, ui_cheats_row_widening(widget), clip, color);
+
+		return TRUE;
+	}
+	if (cheats_widget == _ui_cheats_widget_pause_box)
+	{
+		stretch_bottom = UI_CHEATS_PAUSE_BOX_BODY_BOTTOM;
+		stretch = ui_cheats_layout.pause_box_stretch;
+	}
+	else if (cheats_widget == _ui_cheats_widget_help_box)
+	{
+		stretch_bottom = UI_CHEATS_BOX_BODY_BOTTOM;
+		stretch = ui_cheats_layout.help_box_stretch;
+	}
+	else
+	{
+		return FALSE;
+	}
+	/* (art other than the campaign maps' is drawn as it is) */
+	if (height <= stretch_bottom)
+		return FALSE;
+	source_y0[0] = 0;
+	source_y1[0] = source_y0[1] = UI_CHEATS_BOX_STRETCH_TOP;
+	source_y1[1] = source_y0[2] = stretch_bottom;
+	source_y1[2] = height;
+	y = bounds->y0;
+	for (band = 0; band < 3; band++)
+	{
+		rectangle2d rect = *bounds;
+		rectangle2d source = *bounds;
+
+		source.y0 = source_y0[band];
+		source.y1 = source_y1[band];
+		rect.y0 = y;
+		rect.y1 = y + (source.y1 - source.y0) + (band == 1 ? stretch : 0);
+		y = rect.y1;
+		draw_bitmap_rows_in_rect(bitmap, &rect, &source, 0, source.y0, clip, color, NULL, FALSE);
+	}
+
+	return TRUE;
+}
+
 /* ---------- the mouse (desktop builds)
 
 The menus were made for a controller: the d-pad moves the focus through a
@@ -5410,8 +6056,8 @@ static void ui_mouse_note_target(
 	{
 		return;
 	}
-	bounds.x0 += offset.x;
-	bounds.x1 += offset.x;
+	bounds.x0 += offset.x - ui_cheats_row_widening(widget);
+	bounds.x1 += offset.x + ui_cheats_row_widening(widget);
 	bounds.y0 += offset.y;
 	bounds.y1 += offset.y;
 	button_index = ui_mouse_key_button(widget);
@@ -5865,14 +6511,18 @@ static void widget_instance_render_recursive(
 				alpha_modifier;
 		}
 		color = modulate_pixel32_by_real_alpha(0xFFFFFFFF, alpha);
-		draw_bitmap_in_rect(
-			bitmap,
-			&bounds,
-			&bounds,
-			clip,
-			color,
-			&multitexture_params,
-			FALSE);
+		/* port: the cheats menu's taller boxes */
+		if (!ui_cheats_render_box_piece(widget, bitmap, &bounds, clip, color))
+		{
+			draw_bitmap_in_rect(
+				bitmap,
+				&bounds,
+				&bounds,
+				clip,
+				color,
+				&multitexture_params,
+				FALSE);
+		}
 		if (use_nifty_plasma_fx)
 		{
 			ui_plasma_effect_color.alpha = 0.0f;
@@ -6406,6 +7056,14 @@ static void widget_instance_process_one_event_recursive(
 			{
 				handled_by_event_handler = TRUE;
 			}
+			/* port: the cheats menu goes back to the pause menu, where the
+			pause screen's tag has B and BACK close every menu */
+			if (ui_cheats_widget_get(widget) == _ui_cheats_widget_menu &&
+				(event->data.button.index == _widget_event_b_button ||
+				event->data.button.index == _widget_event_back_button))
+			{
+				handled_by_event_handler = FALSE;
+			}
 			if (!handled_by_event_handler)
 			{
 				widget_instance_go_back_to_previous(widget);
@@ -6649,7 +7307,20 @@ static void widget_instance_process_one_event_recursive(
 			}
 		}
 	}
-	if (event_for_this_widget)
+	/* port: A on a cheats menu row does the code's part, not the tag's */
+	if (event_for_this_widget &&
+		!widget_deleted &&
+		ui_cheats_widget_is_button(widget))
+	{
+		if (event->type == _event_type_button &&
+			event->data.button.index == _widget_event_a_button &&
+			event->data.button.value == 1)
+		{
+			audio_feedback = ui_cheats_button_press(widget, &widget_deleted);
+			event_handled = TRUE;
+		}
+	}
+	else if (event_for_this_widget)
 	{
 		long handler_index;
 
