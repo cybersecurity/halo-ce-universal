@@ -50,6 +50,10 @@ and entry points used below that ES lacks */
 #ifndef GL_CLAMP_TO_BORDER
 #define GL_CLAMP_TO_BORDER 0x812d
 #endif
+/* GL_EXT_texture_norm16's GL_RGBA16_EXT */
+#ifndef GL_RGBA16
+#define GL_RGBA16 0x805b
+#endif
 
 /* what the context supports (gl_initialize) */
 struct xgpu_capabilities xgpu_capabilities;
@@ -345,6 +349,9 @@ struct gl_device
 	GLuint index_buffer;
 	unsigned long index_offset;
 	GLuint samplers[D3DTSS_MAXSTAGES];
+	/* the format of the screen's color targets: GL_RGBA16 for
+	display.color_bits 16, else GL_RGBA8 (color_bits_initialize) */
+	GLenum screen_color_format;
 
 	GLuint queries[VISIBILITY_TEST_SLOTS];
 	BOOL query_pending[VISIBILITY_TEST_SLOTS];
@@ -756,15 +763,16 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 {
 	struct render_target_entry *entry;
 	unsigned long width, height;
-	BOOL depth;
+	BOOL depth, screen;
 
 	if (!surface || !surface->Data)
 		return NULL;
 	float scale[2] = { 1.0f, 1.0f };
 
 	surface_dimensions(surface, &width, &height, &depth);
+	screen = width == (unsigned long)halo_screen_width() && height == SCREEN_HEIGHT;
 	/* the screen's targets are drawn at the screen's scale */
-	if (width == (unsigned long)halo_screen_width() && height == SCREEN_HEIGHT)
+	if (screen)
 	{
 		scale[0] = screen_scale[0];
 		scale[1] = screen_scale[1];
@@ -793,6 +801,11 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	if (depth)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, (GLsizei)entry->target.gl_width,
 			(GLsizei)entry->target.gl_height, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
+	/* the screen's color targets have the bits of display.color_bits
+	(color_bits_initialize) */
+	else if (screen && device.screen_color_format == GL_RGBA16)
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16, (GLsizei)entry->target.gl_width, (GLsizei)entry->target.gl_height,
+			0, GL_RGBA, GL_UNSIGNED_SHORT, NULL);
 	else
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)entry->target.gl_width, (GLsizei)entry->target.gl_height,
 			0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
@@ -876,6 +889,31 @@ static BOOL bind_targets(BOOL *has_depth)
 
 /* ---------- device creation */
 
+/* display.color_bits: the bits of each color in the screen's targets.
+
+The game draws the level in passes over the same pixels: the lightmap, the
+dynamic lights added to it, the surfaces' colors multiplied in
+(rasterizer_xbox_environment.c), then fog and the transparent geometry. With
+the Xbox's 8 bits, each pass rounds its result, and the roundings add up where
+the light is dim: dark areas and fog band into steps. 16 bits keep each pass's
+result, and only the window blit at Present rounds to the display's 8. The
+values stay within 0..1 as they did, so the picture is otherwise the Xbox's.
+ES draws into the 16-bit format only with GL_EXT_texture_norm16; without it,
+the targets keep 8 bits. */
+static void color_bits_initialize(void)
+{
+	long bits = config_integer("display.color_bits");
+
+	device.screen_color_format = GL_RGBA8;
+#ifdef HALO_ANDROID
+	if (bits >= 16 && xgpu_capabilities.norm16)
+#else
+	if (bits >= 16)
+#endif
+		device.screen_color_format = GL_RGBA16;
+	platform_log("color: %d bits (setting %ld)", device.screen_color_format == GL_RGBA16 ? 16 : 8, bits);
+}
+
 static void gl_initialize(void)
 {
 	GLint major = 0, minor = 0;
@@ -893,6 +931,7 @@ static void gl_initialize(void)
 		xgpu_capabilities.border_clamp = es32 || host_gl_has_extension("GL_EXT_texture_border_clamp") ||
 			host_gl_has_extension("GL_OES_texture_border_clamp");
 		xgpu_capabilities.anisotropy = host_gl_has_extension("GL_EXT_texture_filter_anisotropic");
+		xgpu_capabilities.norm16 = host_gl_has_extension("GL_EXT_texture_norm16");
 		xgpu_capabilities.base_vertex = es32;
 		xgpu_capabilities.shading_language = major > 3 || (major == 3 && minor >= 1) ? "310 es" : "300 es";
 		if (major > 3 || (major == 3 && minor >= 1))
@@ -906,9 +945,11 @@ static void gl_initialize(void)
 			(host_gl_has_extension("GL_EXT_texture_compression_dxt1") &&
 			host_gl_has_extension("GL_ANGLE_texture_compression_dxt3") &&
 			host_gl_has_extension("GL_ANGLE_texture_compression_dxt5"));
-		platform_log("OpenGL ES %d.%d: copy image %d, border clamp %d, anisotropy %d, S3TC %d, sample counting %d",
+		platform_log("OpenGL ES %d.%d: copy image %d, border clamp %d, anisotropy %d, S3TC %d, sample counting %d, "
+			"16-bit color %d",
 			(int)major, (int)minor, xgpu_capabilities.copy_image, xgpu_capabilities.border_clamp,
-			xgpu_capabilities.anisotropy, xgpu_capabilities.s3tc, xgpu_capabilities.atomic_counters);
+			xgpu_capabilities.anisotropy, xgpu_capabilities.s3tc, xgpu_capabilities.atomic_counters,
+			xgpu_capabilities.norm16);
 	}
 #else
 	if (config_boolean("debug.gl_debug"))
@@ -920,6 +961,7 @@ static void gl_initialize(void)
 	glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
 	glEnable(GL_PROGRAM_POINT_SIZE);
 #endif
+	color_bits_initialize();
 	glGenVertexArrays(1, &device.vertex_array);
 	glBindVertexArray(device.vertex_array);
 #ifdef HALO_ANDROID

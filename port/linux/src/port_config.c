@@ -63,6 +63,13 @@ struct config_setting
 	const char *comment;
 };
 
+/* 8 on Android, whose GPUs have less bandwidth for the wider pixels */
+#ifdef HALO_ANDROID
+#define COLOR_BITS_DEFAULT "8"
+#else
+#define COLOR_BITS_DEFAULT "16"
+#endif
+
 static const struct config_setting config_settings[] =
 {
 	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
@@ -97,6 +104,10 @@ static const struct config_setting config_settings[] =
 	{ "display.player_name_scale", _config_real, "1.0", "HALO_PLAYER_NAME_SCALE", _environment_value, _platform_all,
 		"How large the players' names are drawn: 1.0 the size of the HUD's text,\n"
 		"0.25 to 4." },
+	{ "display.color_bits", _config_integer, COLOR_BITS_DEFAULT, "HALO_COLOR_BITS", _environment_value, _platform_all,
+		"Bits of each color of the 3D view as it is drawn: 16 keeps dark areas\n"
+		"and fog from banding into steps; 8 draws as the Xbox does. Android\n"
+		"needs GL_EXT_texture_norm16 for 16." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },

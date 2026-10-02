@@ -20,6 +20,8 @@ struct xgpu_capabilities
 	BOOL copy_image;
 	BOOL border_clamp;
 	BOOL anisotropy;
+	/* GL_EXT_texture_norm16: 16-bit render targets (display.color_bits) */
+	BOOL norm16;
 	BOOL s3tc;
 	/* ES 3.2: glDrawElementsBaseVertex */
 	BOOL base_vertex;

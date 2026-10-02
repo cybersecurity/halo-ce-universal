@@ -109,7 +109,9 @@ get the default values again, delete the file.
 
 The settings are the settings of Linux, without the window, the mouse and
 the paths. Refer to [port/linux/README.md](../linux/README.md#settings).
-These settings are only for Android:
+On Android, the default of `display.color_bits` is `8`, not `16`, and `16`
+needs a GPU with `GL_EXT_texture_norm16`. These settings are only for
+Android:
 
 | Setting | Function |
 | --- | --- |
