@@ -47,6 +47,12 @@ def game_defines_and_includes(config: Dict[str, Any]) -> str:
     )
 
 
+def game_browser_defines(sln: Any) -> List[str]:
+    """configure.py --game-browser: hosted games announced to the game list
+    (port/linux/src/browser.c)"""
+    return ["-DHALO_GAME_BROWSER"] if getattr(sln, "game_browser", False) else []
+
+
 def compile_launcher(sln: Any) -> str:
     """what the native ports' compile commands start with: the
     --compiler-launcher (ccache, say) and a space, or nothing"""
@@ -116,7 +122,8 @@ GAME_FLAGS = [
 TOML_DIR = Path("port/third_party/tomlc17")
 KCP_DIR = Path("port/third_party/kcp")
 MUSL_MATH_DIR = Path("port/third_party/musl-math")
-# the self-updater's TLS (port/linux/src/posix_update.c)
+# the self-updater's and the game list's TLS (port/linux/src/posix_update.c,
+# posix_browser.c)
 MBEDTLS_DIR = Path("port/third_party/mbedtls")
 # internet play's UPnP (port/linux/src/posix_upnp.c)
 MINIUPNPC_DIR = Path("port/third_party/miniupnpc")
@@ -399,6 +406,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             f"-include {semantics_header}",
             f"-I{port_include}",
             game_defines_and_includes(config),
+            *game_browser_defines(sln),
             sdk_flags,
         ])
         for source in game_sources(config):
@@ -419,12 +427,13 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             f"-I{TOML_DIR}",
             f"-I{KCP_DIR}",
             "-Isource -Isource/cseries",
+            *game_browser_defines(sln),
             sdk_flags,
         ])
         posix_cflags = " ".join(POSIX_FLAGS + [march_flag(sln), f"-I{platform_dir}"])
         mbedtls_include = f"-I{MBEDTLS_DIR / 'include'}"
         for source in sorted(platform_dir.glob("*.c")):
-            if source.name == "posix_update.c":
+            if source.name in ("posix_update.c", "posix_browser.c"):
                 add_object(source, f"{posix_cflags} {mbedtls_include}", posix=True)
             elif source.name == "posix_upnp.c":
                 add_object(source, f"{posix_cflags} -I{MINIUPNPC_DIR / 'include'} -DMINIUPNP_STATICLIB", posix=True)

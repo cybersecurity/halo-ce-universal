@@ -26,6 +26,10 @@ int p2p_hand_off_invite(void);
 words around it. Returns nonzero if it held an invite */
 int p2p_join_invite(const char *text);
 
+/* the code of the invite this machine hosts with, for the game list
+(browser.c): 0 while it hosts no internet game */
+int p2p_hosting_invite(char *text, int size);
+
 /* this machine's identifier, which its XNADDR carries (6 bytes) */
 const unsigned char *p2p_identifier(void);
 /* the address the game reaches the machine with this identifier at, if it

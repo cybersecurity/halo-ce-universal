@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .linux_build import (LINUX_PROFILE, MINIUPNPC_DIR, OPTIMISATION, WINDOWS_PROFILE, XDK_INCLUDE, lto_mode,
-                          march_flag, miniupnpc_sources, pgo_mode, compile_launcher, game_defines_and_includes,
+                          march_flag, miniupnpc_sources, game_browser_defines, pgo_mode, compile_launcher, game_defines_and_includes,
                           game_sources, musl_math_cflags, musl_math_sources, pgo_profile, profile_use_flags,
                           xdk_headers)
 from .embed_assets import hud_assets_build, hud_configure_inputs
@@ -337,6 +337,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
             # the Xbox SDK declarations (port/include/xdk) come before the
             # Windows SDK, which has headers of the same names
             f"-I{XDK_INCLUDE}",
+            *game_browser_defines(sln),
         ])
         for source in game_sources(linux_config):
             add_object(source, game_cflags)
@@ -360,6 +361,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
             "-Isource -Isource/cseries",
             f"-I{_quote(sdl_include)}",
             f"-I{XDK_INCLUDE}",
+            *game_browser_defines(sln),
         ])
         win32_cflags = " ".join([
             abi,

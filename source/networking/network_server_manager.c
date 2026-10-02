@@ -472,6 +472,9 @@ symbols in this file:
 #include "text/unicode.h"
 
 #include "cache/cache_files.h"
+#ifdef HALO_GAME_BROWSER
+#include "../../port/linux/src/browser.h"
+#endif
 
 /* port: internet play's Discord presence (port/linux/src/p2p.c) */
 void p2p_set_game_player_counts(int count, int maximum);
@@ -1406,6 +1409,31 @@ boolean network_game_server_idle(
 	{
 		network_event("the server's game is invalid");
 	}
+
+#ifdef HALO_GAME_BROWSER
+	/* the game list (port/linux/src/browser.c): the
+	game as its advertisement describes it
+	(network_server_message_handler.c) */
+	if (success && network_game_server_game_is_valid(server))
+	{
+		struct network_game *game = network_game_server_get_game(server);
+
+		if (game)
+		{
+			browser_host_update(
+				(unsigned short const *)game->name,
+				game->map.name,
+				(short)game->variant.game_engine_index,
+				game->player_count,
+				game->maximum_players,
+				network_game_server_get_state(server, NULL) == _network_game_server_state_ingame
+					? network_game_server_accepts_late_joins(server)
+					: network_game_server_game_is_open(server),
+				(short)game->variant.universal_variant.score_to_win,
+				game->variant.universal_variant.teams == TRUE);
+		}
+	}
+#endif
 
 exit:
 	return success;
