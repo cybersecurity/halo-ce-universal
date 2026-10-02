@@ -63,6 +63,13 @@ struct config_setting
 	const char *comment;
 };
 
+/* lower on Android, whose GPUs have less bandwidth for the extra samples */
+#ifdef HALO_ANDROID
+#define ANISOTROPIC_FILTERING_DEFAULT "4"
+#else
+#define ANISOTROPIC_FILTERING_DEFAULT "16"
+#endif
+
 static const struct config_setting config_settings[] =
 {
 	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
@@ -90,6 +97,11 @@ static const struct config_setting config_settings[] =
 		"Draw the menus' and HUD's text with the fonts in port/assets/fonts\n"
 		"(Overpass) at the display's resolution, and the menus' titles from\n"
 		"port/assets/titles; false draws the maps' bitmap fonts and titles." },
+	{ "display.anisotropic_filtering", _config_integer, ANISOTROPIC_FILTERING_DEFAULT, "HALO_ANISOTROPIC_FILTERING",
+		_environment_value, _platform_all,
+		"Anisotropic filtering: 2, 4, 8 or 16 keeps the textures of floors and\n"
+		"walls seen at an angle sharp (more costs the GPU more); 1 filters as\n"
+		"the Xbox does. The GPU's most is used if this is more." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },

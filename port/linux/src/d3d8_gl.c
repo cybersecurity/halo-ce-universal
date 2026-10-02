@@ -44,6 +44,9 @@ and entry points used below that ES lacks */
 #ifndef GL_TEXTURE_MAX_ANISOTROPY_EXT
 #define GL_TEXTURE_MAX_ANISOTROPY_EXT 0x84fe
 #endif
+#ifndef GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT
+#define GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT 0x84ff
+#endif
 #ifndef GL_TEXTURE_BORDER_COLOR
 #define GL_TEXTURE_BORDER_COLOR 0x1004
 #endif
@@ -345,6 +348,11 @@ struct gl_device
 	GLuint index_buffer;
 	unsigned long index_offset;
 	GLuint samplers[D3DTSS_MAXSTAGES];
+	/* the most anisotropy the GPU filters with (1 if none), and the level
+	display.anisotropic_filtering gives the textures the game filters
+	linearly between mip levels (configure_sampler) */
+	float maximum_anisotropy;
+	float anisotropy;
 
 	GLuint queries[VISIBILITY_TEST_SLOTS];
 	BOOL query_pending[VISIBILITY_TEST_SLOTS];
@@ -876,6 +884,28 @@ static BOOL bind_targets(BOOL *has_depth)
 
 /* ---------- device creation */
 
+/* display.anisotropic_filtering, within what the GPU can do */
+static void anisotropy_initialize(void)
+{
+	long level = config_integer("display.anisotropic_filtering");
+	GLint maximum = 0;
+
+#ifdef HALO_ANDROID
+	if (xgpu_capabilities.anisotropy)
+		glGetIntegerv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maximum);
+#else
+	/* core in OpenGL 4.6, and an extension of the 4.5 drivers; a driver
+	without it fails the query, which leaves maximum at 0 */
+	glGetIntegerv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &maximum);
+#endif
+	device.maximum_anisotropy = maximum > 1 ? (float)maximum : 1.0f;
+	device.anisotropy = level > 1 ? (float)level : 1.0f;
+	if (device.anisotropy > device.maximum_anisotropy)
+		device.anisotropy = device.maximum_anisotropy;
+	platform_log("anisotropic filtering: %.0fx (setting %ld, the GPU's most %.0fx)",
+		device.anisotropy, level, device.maximum_anisotropy);
+}
+
 static void gl_initialize(void)
 {
 	GLint major = 0, minor = 0;
@@ -920,6 +950,7 @@ static void gl_initialize(void)
 	glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
 	glEnable(GL_PROGRAM_POINT_SIZE);
 #endif
+	anisotropy_initialize();
 	glGenVertexArrays(1, &device.vertex_array);
 	glBindVertexArray(device.vertex_array);
 #ifdef HALO_ANDROID
@@ -1997,7 +2028,13 @@ static GLenum address_mode(DWORD mode)
 
 /* hires: a high-res HUD texture (hud_hires.h), drawn smaller than it is, so
 filtered and from its mip levels whatever the game asks: the HUD's meters are
-point sampled for one player, to keep the Xbox bitmaps' texels sharp */
+point sampled for one player, to keep the Xbox bitmaps' texels sharp.
+
+The game never asks for anisotropic filtering, so the textures it filters
+linearly between mip levels (the world's, seen at an angle) get the level of
+display.anisotropic_filtering: without it, the ground a short way ahead
+blurs to the smallest mip level its slant reaches. The high-res HUD and text
+are drawn flat, where it changes nothing. */
 static void configure_sampler(int stage, BOOL mipmapped, BOOL hires)
 {
 	/* the texture stage state each sampler was last configured from */
@@ -2010,9 +2047,17 @@ static void configure_sampler(int stage, BOOL mipmapped, BOOL hires)
 	DWORD mag_filter = hires ? D3DTEXF_LINEAR : state[D3DTSS_MAGFILTER];
 	DWORD maximum_mip_level = hires ? 0 : state[D3DTSS_MAXMIPLEVEL];
 	DWORD lod_bias = hires ? 0 : state[D3DTSS_MIPMAPLODBIAS];
+	float anisotropy = 1.0f;
 	GLenum minification;
 	float border[4];
 	DWORD inputs[11];
+
+	if (min_filter == D3DTEXF_ANISOTROPIC && state[D3DTSS_MAXANISOTROPY] > 1)
+		anisotropy = (float)state[D3DTSS_MAXANISOTROPY];
+	if (!hires && min_filter != D3DTEXF_POINT && mip_filter != D3DTEXF_NONE && anisotropy < device.anisotropy)
+		anisotropy = device.anisotropy;
+	if (anisotropy > device.maximum_anisotropy)
+		anisotropy = device.maximum_anisotropy;
 
 	inputs[0] = min_filter;
 	inputs[1] = mip_filter;
@@ -2022,7 +2067,7 @@ static void configure_sampler(int stage, BOOL mipmapped, BOOL hires)
 	inputs[5] = state[D3DTSS_ADDRESSW];
 	inputs[6] = lod_bias;
 	inputs[7] = maximum_mip_level;
-	inputs[8] = state[D3DTSS_MAXANISOTROPY];
+	inputs[8] = (DWORD)anisotropy;
 	inputs[9] = state[D3DTSS_BORDERCOLOR];
 	inputs[10] = hires;
 	if (configured_valid[stage] && !memcmp(configured[stage], inputs, sizeof(inputs)))
@@ -2045,9 +2090,8 @@ static void configure_sampler(int stage, BOOL mipmapped, BOOL hires)
 	/* ES has no sampler LOD bias; the pixel shader applies it
 	(texture_lod_bias) */
 	glSamplerParameterf(sampler, GL_TEXTURE_MIN_LOD, (float)maximum_mip_level);
-	if (xgpu_capabilities.anisotropy)
-		glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT,
-			(min_filter == D3DTEXF_ANISOTROPIC && state[D3DTSS_MAXANISOTROPY] > 1) ? (float)state[D3DTSS_MAXANISOTROPY] : 1.0f);
+	if (device.maximum_anisotropy > 1.0f)
+		glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
 	if (xgpu_capabilities.border_clamp)
 	{
 		color_to_vec4(state[D3DTSS_BORDERCOLOR], border);
@@ -2056,8 +2100,8 @@ static void configure_sampler(int stage, BOOL mipmapped, BOOL hires)
 #else
 	glSamplerParameterf(sampler, GL_TEXTURE_LOD_BIAS, dword_to_float(lod_bias));
 	glSamplerParameterf(sampler, GL_TEXTURE_MIN_LOD, (float)maximum_mip_level);
-	glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY,
-		(min_filter == D3DTEXF_ANISOTROPIC && state[D3DTSS_MAXANISOTROPY] > 1) ? (float)state[D3DTSS_MAXANISOTROPY] : 1.0f);
+	if (device.maximum_anisotropy > 1.0f)
+		glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY, anisotropy);
 	color_to_vec4(state[D3DTSS_BORDERCOLOR], border);
 	glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, border);
 #endif
