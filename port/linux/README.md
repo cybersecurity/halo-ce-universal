@@ -110,8 +110,9 @@ to 4.
 | left ctrl, C | left stick click | crouch |
 | Z, middle mouse button | right stick click | zoom |
 | arrow keys | D-pad | |
-| escape | start | pause menu |
+| escape | B in the main menu, start in a game | back in the main menu, pause menu in a game |
 | F1 | back | |
+| F2 | start | |
 | \` | | open the developer console |
 | F12 | | release or capture the mouse |
 | F11 | | change between fullscreen and window |

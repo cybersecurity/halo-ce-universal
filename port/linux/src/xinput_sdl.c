@@ -14,7 +14,8 @@ Keyboard and mouse (port 0):
 	E, R             X                   tab, wheel       Y
 	Q                white               X                black
 	left ctrl, C     left stick click    Z, middle button right stick click
-	escape           start               F1               back
+	escape           B in the main menu, start everywhere else
+	F1               back                F2               start
 	F12              release or recapture the mouse
 
 In the menus the mouse is free and drives a pointer instead
@@ -48,6 +49,8 @@ drive the controller.
 
 /* main/console.c */
 extern unsigned char console_is_active(void);
+/* interface/ui_widget.c */
+extern unsigned char main_menu_is_active(void);
 
 /* ---------- device tables */
 
@@ -204,15 +207,18 @@ static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GA
 	if (k[SDL_SCANCODE_DOWN]) pad->wButtons |= XINPUT_GAMEPAD_DPAD_DOWN;
 	if (k[SDL_SCANCODE_LEFT]) pad->wButtons |= XINPUT_GAMEPAD_DPAD_LEFT;
 	if (k[SDL_SCANCODE_RIGHT]) pad->wButtons |= XINPUT_GAMEPAD_DPAD_RIGHT;
-	if (k[SDL_SCANCODE_ESCAPE]) pad->wButtons |= XINPUT_GAMEPAD_START;
+	/* escape backs out of the main menu and its screens (start would accept
+	them); in a game it is start, which opens and closes the pause menu */
+	if (k[SDL_SCANCODE_ESCAPE] && !main_menu_is_active()) pad->wButtons |= XINPUT_GAMEPAD_START;
 	if (k[SDL_SCANCODE_F1]) pad->wButtons |= XINPUT_GAMEPAD_BACK;
+	if (k[SDL_SCANCODE_F2]) pad->wButtons |= XINPUT_GAMEPAD_START;
 	if (k[SDL_SCANCODE_LCTRL] || k[SDL_SCANCODE_C]) pad->wButtons |= XINPUT_GAMEPAD_LEFT_THUMB;
 	if (k[SDL_SCANCODE_Z] || (mouse && m[SDL_BUTTON_MIDDLE])) pad->wButtons |= XINPUT_GAMEPAD_RIGHT_THUMB;
 
 	pad->bAnalogButtons[XINPUT_GAMEPAD_A] |= analog(k[SDL_SCANCODE_SPACE] || k[SDL_SCANCODE_RETURN] ||
 		k[SDL_SCANCODE_KP_ENTER]);
 	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(k[SDL_SCANCODE_F] || k[SDL_SCANCODE_BACKSPACE] ||
-		(mouse && m[SDL_BUTTON_X1]));
+		(k[SDL_SCANCODE_ESCAPE] && main_menu_is_active()) || (mouse && m[SDL_BUTTON_X1]));
 #ifdef HALO_ANDROID
 	/* the system back key (gesture or button) backs out of menus */
 	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(k[SDL_SCANCODE_AC_BACK]);
