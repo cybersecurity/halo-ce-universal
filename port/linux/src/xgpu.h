@@ -47,6 +47,11 @@ must call this afterwards. */
 
 void xgpu_gl_state_invalidate(void);
 
+/* a compiled shader, or a linked program of two, or 0 with the log
+written */
+GLuint xgpu_compile_shader(GLenum type, const char *source, const char *what);
+GLuint xgpu_link_program(GLuint vertex_shader, GLuint fragment_shader, const char *what);
+
 /* ---------- generated source text */
 
 struct xgpu_text
@@ -106,6 +111,11 @@ struct nv2a_pixel_shader_key
 	behind it only where it covers it (the Xbox's point-sampled meters stop
 	at their texels' edges; filtered ones have a fringe of faint texels) */
 	unsigned char coverage_alpha;
+	/* drawn into a multisampled target (display.anti_aliasing "msaa"), its
+	sample count: the alpha test covers samples in proportion to how far
+	alpha is past the reference, not all of the pixel or none of it, so that
+	cut-out edges (foliage, grates) are antialiased too */
+	unsigned char alpha_test_samples;
 };
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
@@ -170,9 +180,37 @@ struct xgpu_render_target
 	targets when the game draws at the display's resolution (d3d8_gl.c) */
 	float scale[2];
 	unsigned long gl_width, gl_height;
+	/* the texture's GL format, which its multisampled renderbuffer and the
+	anti-aliasing passes' copy of its pixels (xgpu_post.c) are made with too:
+	the blits between them copy the pixels exactly only between the same
+	formats */
+	GLenum format;
+	/* with multisampling, the screen's targets' multisampled renderbuffer,
+	which draws go to, and whether it has been drawn into since the texture
+	last had its pixels (render_target_resolve) */
+	GLuint multisample;
+	BOOL unresolved;
 };
 
 /* the GL texture holding a render target with this physical address, or 0 */
 struct xgpu_render_target *xgpu_render_target_find(unsigned long data);
+
+/* level 0 of the bound 2D texture, width by height, made as a render target's
+color texture of this format */
+void xgpu_render_target_image(GLenum format, unsigned long width, unsigned long height);
+
+/* ---------- anti-aliasing
+
+display.anti_aliasing (d3d8_gl.c): FXAA or SMAA antialias each window's 3D
+view in place before the HUD and menus are drawn over it, so that their
+text stays sharp; supersampling draws the screen's targets at twice the
+resolution, scaled down as the frame is shown, and multisampling draws them
+with several samples a pixel. */
+
+/* FXAA, or SMAA, on the corners x0, y0 to x1, y1 (from row 0) of a render
+target's framebuffer, width by height, its color of this format; FALSE if its
+programs do not build */
+BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, GLenum format, unsigned long width,
+	unsigned long height, const GLint corners[4]);
 
 #endif

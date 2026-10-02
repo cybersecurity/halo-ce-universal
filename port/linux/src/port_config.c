@@ -97,6 +97,12 @@ static const struct config_setting config_settings[] =
 	{ "display.player_name_scale", _config_real, "1.0", "HALO_PLAYER_NAME_SCALE", _environment_value, _platform_all,
 		"How large the players' names are drawn: 1.0 the size of the HUD's text,\n"
 		"0.25 to 4." },
+	{ "display.anti_aliasing", _config_string, "\"smaa\"", "HALO_ANTI_ALIASING", _environment_value, _platform_all,
+		"Smoothing of jagged edges: \"smaa\" or \"fxaa\" smooth the 3D view once it\n"
+		"is drawn (the HUD and menus stay sharp), at little cost; \"ssaa2x\" draws\n"
+		"everything at twice the resolution each way (four times the cost);\n"
+		"\"msaa2x\", \"msaa4x\" or \"msaa8x\" draw with that many samples a pixel;\n"
+		"\"off\" for none." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },

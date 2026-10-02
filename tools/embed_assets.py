@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Embeds the high-res HUD textures (port/assets/hud, made by
 tools/hud_assets.py), the menus' titles (port/assets/titles, made by
-tools/title_assets.py) and the fonts the text is drawn with
-(port/assets/fonts) in the game as C data:
+tools/title_assets.py), the fonts the text is drawn with
+(port/assets/fonts) and SMAA's shader and lookup textures
+(port/third_party/smaa) in the game as C data:
 
     python tools/embed_assets.py OUTPUT.c
 
@@ -32,6 +33,10 @@ TITLE_ASSETS = Path("port/assets/titles")
 TITLE_LIST = TITLE_ASSETS / "titles.json"
 FONT_ASSETS = Path("port/assets/fonts")
 FONT_LIST = FONT_ASSETS / "fonts.json"
+# SMAA's files and the names port/linux/src/xgpu_post.c declares them by
+SMAA_ASSETS = Path("port/third_party/smaa")
+SMAA_FILES = (("SMAA.hlsl", "xgpu_smaa_shader"), ("area_tex.zlib", "xgpu_smaa_area_texture"),
+              ("search_tex.zlib", "xgpu_smaa_search_texture"))
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
@@ -59,7 +64,7 @@ def hud_asset_inputs() -> List[Path]:
     if not inputs:
         return []
     return [*inputs, *(folder / f"{asset['name']}.png" for folder, asset, _ in textures()),
-            *(FONT_ASSETS / name for name in font_files())]
+            *(FONT_ASSETS / name for name in font_files()), *(SMAA_ASSETS / name for name, _ in SMAA_FILES)]
 
 
 def hud_configure_inputs() -> List[Path]:
@@ -159,6 +164,18 @@ def main() -> None:
         lines.append("\t{ 0 },")
     lines.append("};")
     lines.append(f"const unsigned int text_hires_embedded_count = {len(fonts)};")
+    lines.append("")
+    # SMAA's shader, as text a GLSL compiler takes (ASCII, ending in a NUL),
+    # and its lookup textures (xgpu_post.c)
+    for name, symbol in SMAA_FILES:
+        data = (ROOT / SMAA_ASSETS / name).read_bytes()
+        if name.endswith(".hlsl"):
+            data = bytes(byte if byte < 0x80 else 0x20 for byte in data) + b"\0"
+        lines.append("")
+        lines.append(f"const unsigned int {symbol}[] = {{")
+        lines.extend(words(data))
+        lines.append("};")
+        lines.append(f"const unsigned long {symbol}_size = {len(data)};")
     output = Path(sys.argv[1])
     output.parent.mkdir(parents=True, exist_ok=True)
     text = "\n".join(lines) + "\n"

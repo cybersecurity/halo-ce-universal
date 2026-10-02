@@ -645,9 +645,27 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		const char *comparison = comparison_operator(key->alpha_test_function);
 
 		if (!comparison)
+		{
 			xgpu_text_append(&text, "\tdiscard;\n");
+		}
+		else if (*comparison && key->alpha_test_samples && comparison[0] != '=' && comparison[0] != '!')
+		{
+			/* multisampled: the samples covered as alpha passes the reference
+			over the pixel (its change across the pixel from fwidth), the rest
+			left as they are; alpha itself is kept, the game keeping values of
+			its own in destination alpha */
+			xgpu_text_append(&text,
+				"\tfloat test_alpha = clamp(result.a, 0.0, 1.0) * 255.0;\n"
+				"\tfloat test_coverage = clamp(%s(test_alpha - alpha_reference) / max(fwidth(test_alpha), 1.0) + 0.5, 0.0, 1.0);\n"
+				"\tint test_samples = int(test_coverage * %d.0 + 0.5);\n"
+				"\tif (test_samples == 0) discard;\n"
+				"\tgl_SampleMask[0] = (1 << test_samples) - 1;\n",
+				comparison[0] == '<' ? "-" : "", (int)key->alpha_test_samples);
+		}
 		else if (*comparison)
+		{
 			xgpu_text_append(&text, "\tif (!(floor(clamp(result.a, 0.0, 1.0) * 255.0 + 0.5) %s alpha_reference)) discard;\n", comparison);
+		}
 	}
 	if (*config_string("debug.gpu_debug_expression"))
 		xgpu_text_append(&text, "\tresult = vec4(vec3(%s), 1.0);\n", config_string("debug.gpu_debug_expression"));

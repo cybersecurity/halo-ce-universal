@@ -408,6 +408,16 @@ static void render_window(
 		rasterizer_transparent_geometry_stop();
 		structure_render_fog_screen();
 		rasterizer_lens_flares_draw();
+		/* port: the 3D view antialiased (display.anti_aliasing), before the
+		HUD and menus are drawn over it */
+		if (rasterizer_target == _render_target_primary)
+		{
+			halo_screen_anti_alias(
+				rasterizer_camera->viewport_bounds.x0,
+				rasterizer_camera->viewport_bounds.y0,
+				rasterizer_camera->viewport_bounds.x1,
+				rasterizer_camera->viewport_bounds.y1);
+		}
 		interface_draw_screen();
 		rasterizer_screen_flash();
 		halo_screen_ui_offset(TRUE);
