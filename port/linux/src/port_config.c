@@ -63,11 +63,26 @@ struct config_setting
 	const char *comment;
 };
 
+/* lower on Android, whose GPUs have less bandwidth for the extra samples */
+#ifdef HALO_ANDROID
+#define ANISOTROPIC_FILTERING_DEFAULT "4"
+#else
+#define ANISOTROPIC_FILTERING_DEFAULT "16"
+#endif
+
 static const struct config_setting config_settings[] =
 {
 	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
-		"Start fullscreen, drawing at the display's resolution and shape; false\n"
-		"starts in a window, which draws the Xbox's 640x480. F11 switches." },
+		"Start fullscreen, drawing the display's shape at its resolution (or the\n"
+		"one below); false starts in a window, which draws the Xbox's 640x480.\n"
+		"F11 switches." },
+	{ "display.resolution_width", _config_integer, "0", "HALO_RESOLUTION_WIDTH", _environment_value, _platform_desktop,
+		"Fullscreen, the resolution the game draws at: the width and height in\n"
+		"pixels of one of the display's modes (1920 and 1080, say), scaled to\n"
+		"fill the display, which keeps its own mode; 0 for the display's own.\n"
+		"A size the display has no room for draws at the display's own." },
+	{ "display.resolution_height", _config_integer, "0", "HALO_RESOLUTION_HEIGHT", _environment_value, _platform_desktop,
+		"The height that goes with resolution_width; 0 for the display's own." },
 	{ "display.window_scale", _config_integer, "2", "HALO_WINDOW_SCALE", _environment_value, _platform_desktop,
 		"The window's size as a multiple of 640x480 (it can be resized)." },
 	{ "display.screen_width", _config_integer, "0", "HALO_SCREEN_WIDTH", _environment_value, _platform_android,
@@ -90,6 +105,11 @@ static const struct config_setting config_settings[] =
 		"Draw the menus' and HUD's text with the fonts in port/assets/fonts\n"
 		"(Overpass) at the display's resolution, and the menus' titles from\n"
 		"port/assets/titles; false draws the maps' bitmap fonts and titles." },
+	{ "display.anisotropic_filtering", _config_integer, ANISOTROPIC_FILTERING_DEFAULT, "HALO_ANISOTROPIC_FILTERING",
+		_environment_value, _platform_all,
+		"Anisotropic filtering: 2, 4, 8 or 16 keeps the textures of floors and\n"
+		"walls seen at an angle sharp (more costs the GPU more); 1 filters as\n"
+		"the Xbox does. The GPU's most is used if this is more." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },
@@ -805,28 +825,29 @@ static int config_line_section(const char *line, const char *end, char *section,
 	return 1;
 }
 
-/* sets a boolean setting, for now and in config.toml: its line there is
-changed (or added), the rest of the file kept as it is */
-int config_write_boolean(const char *name, int value)
+/* sets a setting of the type to the value as the file writes it, for now and
+in config.toml: its line there is changed (or added), the rest of the file
+kept as it is */
+static int config_write(const char *name, enum config_type type, const char *value)
 {
 	const char *dot = strchr(name, '.');
 	long index = config_setting_index(name);
-	char section[64], key[64], wanted[80], current[64] = "", line_text[96], path[1024];
+	char section[64], key[64], wanted[80], current[64] = "", line_text[128], path[1024];
 	struct config_text out = { 0 };
 	size_t size = 0;
 	char *text;
 	const char *line;
 	int written = 0, in_section = 0, succeeded;
 
-	if (index < 0 || config_settings[index].type != _config_boolean || !dot || (size_t)(dot - name) >= sizeof(section))
+	if (index < 0 || config_settings[index].type != type || !dot || (size_t)(dot - name) >= sizeof(section))
 		return 0;
 	/* (the file read first, as the other settings are) */
-	config_boolean(name);
+	config_value(name, type);
 	pthread_mutex_lock(&config_lock);
-	config_values[index].boolean = value != 0;
+	config_set_from_text(&config_values[index], type, value);
 	snprintf(section, sizeof(section), "%.*s", (int)(dot - name), name);
 	snprintf(key, sizeof(key), "%s", dot + 1);
-	snprintf(line_text, sizeof(line_text), "%s = %s\n", key, value ? "true" : "false");
+	snprintf(line_text, sizeof(line_text), "%s = %s\n", key, value);
 	snprintf(wanted, sizeof(wanted), "%s", section);
 	config_path(path, sizeof(path));
 	text = config_read_file(path, &size);
@@ -881,6 +902,32 @@ int config_write_boolean(const char *name, int value)
 	free(out.buffer);
 	free(text);
 	return succeeded;
+}
+
+int config_write_boolean(const char *name, int value)
+{
+	return config_write(name, _config_boolean, value ? "true" : "false");
+}
+
+int config_write_integer(const char *name, long value)
+{
+	char text[32];
+
+	snprintf(text, sizeof(text), "%ld", value);
+	return config_write(name, _config_integer, text);
+}
+
+int config_write_real(const char *name, double value)
+{
+	char text[32];
+	size_t length;
+
+	/* as few decimals as it takes, but one: "0.8", "1.0", "1.25" */
+	snprintf(text, sizeof(text), "%.3f", value);
+	length = strlen(text);
+	while (length > 2 && text[length - 1] == '0' && text[length - 2] != '.')
+		text[--length] = 0;
+	return config_write(name, _config_real, text);
 }
 
 /* ---------- public code */

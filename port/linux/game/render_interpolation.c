@@ -652,6 +652,21 @@ void render_interpolation_correct_object(long object_index, real_vector3d const 
 /* ---------- camera */
 
 static struct observer_result direct_cameras[MAXIMUM_LOCAL_PLAYERS];
+/* display.direct_camera, read once, then as VIDEO SETTINGS changes it
+(port/linux/src/game_settings.c) */
+static int direct_camera_enabled = -1;
+
+int render_interpolation_direct_camera_enabled(void)
+{
+	if (direct_camera_enabled < 0)
+		direct_camera_enabled = config_boolean("display.direct_camera");
+	return direct_camera_enabled;
+}
+
+void render_interpolation_set_direct_camera(int enabled)
+{
+	direct_camera_enabled = enabled != 0;
+}
 
 static struct observer_result const *render_interpolation_blended_camera(
 	short local_player_index,
@@ -672,13 +687,10 @@ static struct observer_result const *render_interpolation_direct_camera(
 	(void)local_player_index;
 	return observer;
 #else
-	static int enabled = -1;
 	struct observer_result *direct;
 	long unit_index;
 
-	if (enabled < 0)
-		enabled = config_boolean("display.direct_camera");
-	if (!enabled || !observer ||
+	if (!render_interpolation_direct_camera_enabled() || !observer ||
 		director_get_perspective(local_player_index) != _director_perspective_first_person ||
 		director_inhibited_facing(local_player_index) ||
 		cinematic_in_progress())

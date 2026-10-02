@@ -143,18 +143,43 @@ The game reads the file one time, at start-up. If a key is not correct, or
 a value has the wrong type, the game writes the line to the log and uses the
 default value.
 
+SETTINGS in the menus changes settings while the game runs, and writes them
+to the file at once. The main menu's SETTINGS has PROFILE SETTINGS (the
+player profiles, as on the Xbox), VIDEO SETTINGS, AUDIO SETTINGS and INPUT
+SETTINGS. The pause menu of a single-player game has SETTINGS after RESUME
+GAME, with VIDEO SETTINGS, AUDIO SETTINGS and INPUT SETTINGS. Each one of
+these three has the settings of a section of the file:
+
+- VIDEO SETTINGS: `display.fullscreen`, `display.resolution_width` with
+  `display.resolution_height` (one RESOLUTION), `display.vsync`,
+  `display.interpolation`, `display.direct_camera`,
+  `display.window_scale` and `display.anisotropic_filtering` (ANISOTROPIC
+  FILTER: OFF, 2X, 4X, 8X or 16X, up to the maximum of the GPU). A window
+  scale set while the game is fullscreen changes the window when the game
+  leaves fullscreen. A resolution set while the game is in a window
+  applies when the game is fullscreen.
+- AUDIO SETTINGS: `audio.enabled` and `audio.volume`.
+- INPUT SETTINGS: `input.mouse_sensitivity`, `input.mouse_aim_assist` and
+  `input.invert_mouse`.
+
+A changes a setting that is on or off, and steps a number up. Left and right
+step a number. B goes back. The settings are the same for all profiles. F11
+changes fullscreen only until the game stops.
+
 Each setting has an environment variable. The environment variable changes
 the setting for one start of the game. It has priority over the file.
 
 | Setting | Default | Environment variable | Function |
 | --- | --- | --- | --- |
 | `display.fullscreen` | `true` | `HALO_FULLSCREEN` | `true`: fullscreen at the resolution of the display. The picture has 480 lines of the game and the width of the display. `false`: a window with the 640x480 picture of the Xbox. F11 changes between the two. |
+| `display.resolution_width`, `display.resolution_height` | `0`, `0` | `HALO_RESOLUTION_WIDTH`, `HALO_RESOLUTION_HEIGHT` | The resolution of the picture when the game is fullscreen, in pixels: one of the modes of the display, for example `1920` and `1080`. The game draws the picture at this resolution and scales it to the display. The display keeps its own mode. `0`: the resolution of the display. If the display has no room for the resolution, the game uses the resolution of the display. |
 | `display.window_scale` | `2` | `HALO_WINDOW_SCALE` | The size of the window, as a multiple of 640x480. You can change the size of the window. |
 | `display.vsync` | `true` | `HALO_NO_VSYNC=1` sets `false` | `true`: each frame waits for the display. |
 | `display.interpolation` | `true` | `HALO_INTERPOLATION` | `true`: one frame for each refresh of the display. `false`: 30 frames each second, as on the Xbox. Refer to "Frame rate". |
 | `display.direct_camera` | `true` | `HALO_DIRECT_CAMERA` | `true`: in first person, on foot, the view points where the player aims in each frame, not where the last tick left it. Refer to "Frame rate". |
 | `display.high_res_hud` | `true` | `HALO_HIGH_RES_HUD` | `true`: the HUD (meters, counters, panels and their outlines, the motion sensor, reticles, waypoints, scopes) is drawn from the high-res assets in `port/assets/hud`, 8x the size of the maps' bitmaps. The bitmaps with English text keep the maps' own. `false`: the maps' own bitmaps. |
 | `display.high_res_text` | `true` | `HALO_HIGH_RES_TEXT` | `true`: the menus' and HUD's text is drawn with the fonts in `port/assets/fonts` (Overpass, in place of the maps' Interstate) at the display's resolution, laid out as before, and the menus' titles are drawn from the high-res pictures in `port/assets/titles`. `false`: the maps' bitmap fonts and titles. |
+| `display.anisotropic_filtering` | `16` | `HALO_ANISOTROPIC_FILTERING` | The level of anisotropic filtering: `2`, `4`, `8` or `16`. The textures of floors and walls that are at an angle to the view stay sharp. A higher level uses more of the GPU. `1`: the filtering of the Xbox, which blurs these textures. If the value is more than the GPU's maximum, the game uses the maximum. |
 | `audio.enabled` | `true` | `HALO_NO_AUDIO=1` sets `false` | `false`: no audio device. The sound continues without output. |
 | `audio.volume` | `1.0` | `HALO_VOLUME` | The master volume. |
 | `input.mouse_sensitivity` | `1.0` | `HALO_MOUSE_SENSITIVITY` | The multiplier for the mouse aim. |

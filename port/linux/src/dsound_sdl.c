@@ -27,7 +27,8 @@ Without an audio device, a clock thread runs the same mixer into a scratch
 buffer, so streams still drain at their real rate.
 
 audio.volume sets the master volume (default 1.0); audio.enabled = false
-skips opening a device (port_config.c).
+skips opening a device (port_config.c). AUDIO SETTINGS changes both while the
+game runs: off then silences the device's output, the mixer still running.
 */
 
 #include "platform.h"
@@ -429,6 +430,10 @@ static void mix(float *output, unsigned long frames)
 
 static SDL_AudioStream *audio_stream;
 static BOOL audio_started = FALSE;
+/* a device opened (the silent clock then stops), and its output silenced:
+AUDIO SETTINGS' AUDIO, which keeps the voices draining (game_settings.c) */
+static SDL_AtomicInt audio_device_open;
+static SDL_AtomicInt audio_muted;
 
 static void SDLCALL audio_callback(void *userdata, SDL_AudioStream *stream, int additional_amount, int total_amount)
 {
@@ -445,12 +450,14 @@ static void SDLCALL audio_callback(void *userdata, SDL_AudioStream *stream, int 
 		if (!frames)
 			frames = 1;
 		mix(buffer, frames);
+		if (SDL_GetAtomicInt(&audio_muted))
+			memset(buffer, 0, frames * OUTPUT_CHANNELS * sizeof(float));
 		SDL_PutAudioStreamData(stream, buffer, (int)(frames * OUTPUT_CHANNELS * sizeof(float)));
 		additional_amount -= (int)(frames * OUTPUT_CHANNELS * sizeof(float));
 	}
 }
 
-/* without a device, drain voices in real time */
+/* without a device, drain voices in real time, until one opens */
 static void *silent_clock_thread(void *parameter)
 {
 	float buffer[480 * OUTPUT_CHANNELS];
@@ -458,7 +465,7 @@ static void *silent_clock_thread(void *parameter)
 
 	(void)parameter;
 	clock_gettime(CLOCK_MONOTONIC, &next);
-	for (;;)
+	while (!SDL_GetAtomicInt(&audio_device_open))
 	{
 		mix(buffer, 480);
 		next.tv_nsec += 10000000L;
@@ -472,35 +479,73 @@ static void *silent_clock_thread(void *parameter)
 	return NULL;
 }
 
-static void audio_start(void)
+static BOOL audio_open_device(void)
 {
 	SDL_AudioSpec spec;
 
+	spec.format = SDL_AUDIO_F32;
+	spec.channels = OUTPUT_CHANNELS;
+	spec.freq = OUTPUT_RATE;
+	SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "512");
+	audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, audio_callback, NULL);
+	if (!audio_stream)
+	{
+		platform_log("cannot open an audio device (%s); sound is silent", SDL_GetError());
+		return FALSE;
+	}
+	SDL_SetAtomicInt(&audio_device_open, 1);
+	SDL_ResumeAudioStreamDevice(audio_stream);
+	return TRUE;
+}
+
+static void audio_start(void)
+{
 	if (audio_started)
 		return;
 	audio_started = TRUE;
 	master_volume = (float)config_real("audio.volume");
 
-	if (config_boolean("audio.enabled") && platform_sdl_initialize())
-	{
-		spec.format = SDL_AUDIO_F32;
-		spec.channels = OUTPUT_CHANNELS;
-		spec.freq = OUTPUT_RATE;
-		SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "512");
-		audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, audio_callback, NULL);
-		if (audio_stream)
-		{
-			SDL_ResumeAudioStreamDevice(audio_stream);
-			return;
-		}
-		platform_log("cannot open an audio device (%s); sound is silent", SDL_GetError());
-	}
+	if (config_boolean("audio.enabled") && platform_sdl_initialize() && audio_open_device())
+		return;
 	{
 		pthread_t thread;
 
 		pthread_create(&thread, NULL, silent_clock_thread, NULL);
 		pthread_detach(thread);
 	}
+}
+
+/* ---------- AUDIO SETTINGS (game_settings.c) */
+
+BOOL audio_output_enabled(void)
+{
+	audio_start();
+	return audio_stream && !SDL_GetAtomicInt(&audio_muted);
+}
+
+/* on: a device opened if there is none yet (audio.enabled was false at the
+start, or none would open); off: its output silenced */
+BOOL audio_set_output_enabled(BOOL enabled)
+{
+	audio_start();
+	if (enabled && !audio_stream && !audio_open_device())
+		return FALSE;
+	SDL_SetAtomicInt(&audio_muted, !enabled);
+	return TRUE;
+}
+
+float audio_master_volume(void)
+{
+	audio_start();
+	return master_volume;
+}
+
+void audio_set_master_volume(float volume)
+{
+	audio_start();
+	pthread_mutex_lock(&mixer_lock);
+	master_volume = volume;
+	pthread_mutex_unlock(&mixer_lock);
 }
 
 /* ---------- completion */

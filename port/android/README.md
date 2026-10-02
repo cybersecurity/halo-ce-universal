@@ -109,7 +109,8 @@ get the default values again, delete the file.
 
 The settings are the settings of Linux, without the window, the mouse and
 the paths. Refer to [port/linux/README.md](../linux/README.md#settings).
-These settings are only for Android:
+On Android, the default of `display.anisotropic_filtering` is `4`, not
+`16`. These settings are only for Android:
 
 | Setting | Function |
 | --- | --- |
