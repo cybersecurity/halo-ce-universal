@@ -17,10 +17,11 @@ typedef unsigned int posix_ulong;
 
 /* ---------- internet play (p2p.c) */
 
-int posix_upnp_forward_udp(unsigned short port, posix_ulong *external_address, unsigned short *external_port,
+int posix_upnp_forward_udp(unsigned short port, unsigned short preferred_port, posix_ulong *external_address, unsigned short *external_port,
 	char *error, int error_size)
 {
 	(void)port;
+	(void)preferred_port;
 	(void)external_address;
 	(void)external_port;
 	if (error && error_size > 0)

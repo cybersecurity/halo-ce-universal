@@ -140,6 +140,8 @@ static void initialize_peer(void)
     udp[1] = make_socket(SOCK_DGRAM, htons(5151));
     if (udp[0] < 0 || udp[1] < 0) fail("local_socket_unavailable");
     p2p_initialize(local_ip);
+    p2p_socket_port(udp[0], 0, 0, htons(5150));
+    p2p_socket_port(udp[1], 0, 0, htons(5151));
     hex_identifier(identifier, id);
     snprintf(message, sizeof(message),
         "{\"type\":\"ready\",\"protocol\":1,\"identifier\":\"%s\",\"address\":%u}", id, browser_ip);
@@ -207,7 +209,7 @@ static void game_packet(const unsigned char *frame, size_t size)
             (destination_number != 5150 && destination_number != 5151)) fail("invalid_datagram");
         /* There is one permitted peer: native broadcasts are sent only there. */
         translated = host_ip; translated_port = destination_port;
-        if (!p2p_outgoing(0, &translated, &translated_port)) fail("peer_unavailable");
+        if (p2p_outgoing(0, -1, &translated, &translated_port) <= 0) fail("peer_unavailable");
         target.sin_addr.s_addr = (uint32_t)translated; target.sin_port = translated_port;
         sendto(udp[source_index], frame + HEADER, length, 0, (struct sockaddr *)&target, sizeof(target));
         return;
@@ -220,7 +222,7 @@ static void game_packet(const unsigned char *frame, size_t size)
         for (int i = 0; i < MAX_STREAMS; i++) if (!streams[i].used) { s = &streams[i]; break; }
         if (!s) fail("stream_limit");
         translated = destination; translated_port = destination_port;
-        if (!p2p_outgoing(1, &translated, &translated_port)) fail("peer_unavailable");
+        if (p2p_outgoing(1, -1, &translated, &translated_port) <= 0) fail("peer_unavailable");
         target.sin_addr.s_addr = (uint32_t)translated; target.sin_port = translated_port;
         int fd = make_socket(SOCK_STREAM, 0);
         if (fd < 0 || (connect(fd, (struct sockaddr *)&target, sizeof(target)) < 0 && errno != EINPROGRESS)) {
@@ -314,7 +316,7 @@ int main(int argc, char **argv)
         initialize_peer();
         host_listener = make_socket(SOCK_STREAM, htons(5150));
         if (host_listener < 0 || listen(host_listener, MAX_STREAMS)) fail("test_listener");
-        p2p_socket_listening(host_listener); joined = 1;
+        p2p_socket_port(host_listener, 1, 1, htons(5150)); joined = 1;
     } else
 #endif
     if (argc != 1) return 2;

@@ -62,10 +62,10 @@ int relay_candidate_allowed(unsigned long address, unsigned short port)
         (ip & 0xffffff00u) == 0xc6336400u || (ip & 0xffffff00u) == 0xcb007100u ||
         ip >= 0xe0000000u);
 }
-int posix_upnp_forward_udp(unsigned short port, posix_ulong *address, unsigned short *external,
+int posix_upnp_forward_udp(unsigned short port, unsigned short preferred_port, posix_ulong *address, unsigned short *external,
     char *error, int size)
 {
-    (void)port; (void)address; (void)external;
+    (void)port; (void)preferred_port; (void)address; (void)external;
     if (size) snprintf(error, (size_t)size, "UPnP is disabled in the relay");
     return 0;
 }
@@ -73,3 +73,11 @@ void posix_upnp_stop_forwarding_udp(unsigned short port) { (void)port; }
 void p2p_discord_update(void) {}
 void p2p_discord_set_hosting(const char *secret, int count, int maximum)
 { (void)secret; (void)count; (void)maximum; }
+
+void p2p_discord_user(char *id, int id_size, char *name, int name_size)
+{ if (id_size > 0) id[0] = 0; if (name_size > 0) name[0] = 0; }
+void Sleep(unsigned long milliseconds)
+{
+    struct timespec delay = {milliseconds / 1000, (long)(milliseconds % 1000) * 1000000};
+    while (nanosleep(&delay, &delay) && errno == EINTR) {}
+}

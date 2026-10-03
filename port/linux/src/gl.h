@@ -28,6 +28,7 @@ Windows it is __stdcall too, and SDL would include windows.h without it) */
 #ifdef HALO_ILP32
 /* OpenGL ES 3.2 (port/ios/README.md); tools/guest_gl_stubs.py reads
 this list to generate the guest's entry points */
+/* ANDROID_GL_FUNCTIONS_BEGIN */
 /* GLES_FUNCTIONS_BEGIN */
 #define GL_FUNCTIONS(X) \
 	X(glGetString) \
@@ -130,6 +131,7 @@ this list to generate the guest's entry points */
 	X(glEndQuery) \
 	X(glGetQueryObjectuiv)
 /* GLES_FUNCTIONS_END */
+/* ANDROID_GL_FUNCTIONS_END */
 #else
 #define GL_FUNCTIONS(X) \
 	X(glGetString) \

@@ -29,8 +29,9 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .linux_build import MUSL_MATH_DIR, XDK_INCLUDE, compile_launcher, musl_math_sources, xdk_headers
+from .linux_build import MUSL_MATH_DIR, XDK_INCLUDE, compile_launcher, game_defines_and_includes, game_sources, musl_math_sources, xdk_headers
 from .ninja_syntax import Writer
+from .embed_assets import hud_assets_build
 
 PORT_DIR = Path("port/web")
 LINUX_DIR = Path("port/linux")
@@ -237,36 +238,24 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         objects.append(obj)
 
     # the game
-    excluded = set(config.get("exclude_sources", []))
-    for proj in sln.projects:
-        if proj.name not in config["projects"]:
-            continue
-        options = proj.options
-        defines = " ".join(f"-D{d}" for d in options.get("defines") or [])
-        includes = " ".join(
-            f"-I{_quote(d)}" for d in options.get("include_dirs") or [] if Path(d) != Path("xbox/include")
-        )
-        game_cflags = " ".join([
-            abi, code, " ".join(GAME_FLAGS),
-            f"-include {prefix_header}", f"-include {semantics_header}", defines,
-            f"-I{PORT_DIR}/include", f"-I{LINUX_DIR}/include", includes, f"-idirafter {XDK_INCLUDE}",
-        ])
-        for obj in proj.objects:
-            name = str(obj.file_path).replace(os.sep, "/")
-            if obj.status.name == "Missing" or name in excluded or obj.file_path.suffix.lower() != ".c":
-                continue
-            cflags = game_cflags
-            if name in VARIADIC_PROTOTYPE_FILES:
-                cflags += f" -include {ANDROID_DIR}/include/halo_android_variadic_prototypes.h"
-            if name in PROTOTYPE_FILES:
-                cflags += f" -include {PROTOTYPE_FILES[name]}"
-            if name == "source/shell/shell_xbox.c":
-                # port/web/src/web_main.c starts the game once the browser's
-                # storage is mounted
-                cflags += " -Dmain=halo_game_main"
-            add_object(obj.file_path, cflags)
-        for source in sorted(Path(config["game_sources"]).glob("*.c")):
-            add_object(source, game_cflags)
+    game_cflags = " ".join([
+        abi, code, " ".join(GAME_FLAGS),
+        f"-include {prefix_header}", f"-include {semantics_header}",
+        f"-I{PORT_DIR}/include", f"-I{LINUX_DIR}/include",
+        game_defines_and_includes(config), f"-idirafter {XDK_INCLUDE}",
+    ])
+    for source in game_sources(config):
+        name = source.as_posix()
+        cflags = game_cflags
+        if name in VARIADIC_PROTOTYPE_FILES:
+            cflags += f" -include {ANDROID_DIR}/include/halo_android_variadic_prototypes.h"
+        if name in PROTOTYPE_FILES:
+            cflags += f" -include {PROTOTYPE_FILES[name]}"
+        if name == "source/shell/shell_xbox.c":
+            cflags += " -Dmain=halo_game_main"
+        add_object(source, cflags)
+    for source in sorted(Path(config["game_sources"]).glob("*.c")):
+        add_object(source, game_cflags)
 
     # the platform layer shared with Linux, and the web runtime
     platform_cflags = " ".join([
@@ -286,6 +275,8 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         if source.name in PLATFORM_EXCLUDE:
             continue
         add_object(source, posix_cflags if source.name.startswith("posix_") else platform_cflags)
+    for source in hud_assets_build(n, "web", BUILD / "gen" / "hud_hires_assets.c"):
+        add_object(source, platform_cflags)
     for source in sorted((PORT_DIR / "src").glob("*.c")):
         add_object(source, posix_cflags if source.name in ("web_stubs.c", "web_net.c") else platform_cflags)
     add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))

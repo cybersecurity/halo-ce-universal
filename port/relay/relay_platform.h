@@ -16,6 +16,7 @@ _Static_assert(sizeof(unsigned long) == 4, "Build the relay with the native 32-b
 #define SO_SNDBUF 0x1001
 #define SO_RCVBUF 0x1002
 unsigned long GetTickCount(void);
+void Sleep(unsigned long milliseconds);
 void platform_log(const char *format, ...) __attribute__((format(printf, 1, 2)));
 int relay_candidate_allowed(unsigned long address, unsigned short port);
 #endif
