@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Embeds the high-res HUD textures (port/assets/hud, made by
 tools/hud_assets.py), the menus' titles (port/assets/titles, made by
-tools/title_assets.py) and the fonts the text is drawn with
-(port/assets/fonts) in the game as C data:
+tools/title_assets.py), the profile screens' Spartan pictures
+(port/assets/spartans, made by tools/spartan_assets.py) and the fonts the
+text is drawn with (port/assets/fonts) in the game as C data:
 
     python tools/embed_assets.py OUTPUT.c
 
 writes OUTPUT.c with each PNG and the bitmap it stands for (its tag, index
-and the checksum of its pixels, from port/assets/hud/layout.json and
-port/assets/titles/titles.json), as
-port/linux/src/hud_hires.h declares them. The builds generate it
+and the checksum of its pixels, from port/assets/hud/layout.json,
+port/assets/titles/titles.json and port/assets/spartans/spartans.json), as
+port/linux/src/hud_hires.h declares them, failing to compile with more
+than its HUD_HIRES_MAXIMUM_TEXTURES. The builds generate it
 (hud_assets_build, called by tools/linux_build.py, windows_build.py and
 android_build.py), so the PNGs are the committed source and Android needs
 no files beside its guest image.
@@ -30,6 +32,8 @@ HUD_ASSETS = Path("port/assets/hud")
 LAYOUT = HUD_ASSETS / "layout.json"
 TITLE_ASSETS = Path("port/assets/titles")
 TITLE_LIST = TITLE_ASSETS / "titles.json"
+SPARTAN_ASSETS = Path("port/assets/spartans")
+SPARTAN_LIST = SPARTAN_ASSETS / "spartans.json"
 FONT_ASSETS = Path("port/assets/fonts")
 FONT_LIST = FONT_ASSETS / "fonts.json"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -45,9 +49,11 @@ def font_files() -> List[str]:
 
 def textures() -> List[tuple]:
     """The textures: each one's folder, its entry in its list, and whether
-    it is a title."""
+    it is the menus' (a title or a Spartan picture, drawn with the high-res
+    text)."""
     result = []
-    for folder, listing, title in ((HUD_ASSETS, LAYOUT, False), (TITLE_ASSETS, TITLE_LIST, True)):
+    for folder, listing, title in ((HUD_ASSETS, LAYOUT, False), (TITLE_ASSETS, TITLE_LIST, True),
+                                   (SPARTAN_ASSETS, SPARTAN_LIST, True)):
         if (ROOT / listing).is_file():
             result += [(folder, asset, title) for asset in json.loads((ROOT / listing).read_text())["assets"]]
     return result
@@ -55,7 +61,7 @@ def textures() -> List[tuple]:
 
 def hud_asset_inputs() -> List[Path]:
     """The files the generated source is made from."""
-    inputs = [listing for listing in (LAYOUT, TITLE_LIST, FONT_LIST) if (ROOT / listing).is_file()]
+    inputs = [listing for listing in (LAYOUT, TITLE_LIST, SPARTAN_LIST, FONT_LIST) if (ROOT / listing).is_file()]
     if not inputs:
         return []
     return [*inputs, *(folder / f"{asset['name']}.png" for folder, asset, _ in textures()),
@@ -67,7 +73,8 @@ def hud_configure_inputs() -> List[Path]:
     folders, for files added or removed), not each file, which a change of a
     list may rename or remove."""
     inputs = []
-    for folder, listing in ((HUD_ASSETS, LAYOUT), (TITLE_ASSETS, TITLE_LIST), (FONT_ASSETS, FONT_LIST)):
+    for folder, listing in ((HUD_ASSETS, LAYOUT), (TITLE_ASSETS, TITLE_LIST), (SPARTAN_ASSETS, SPARTAN_LIST),
+                            (FONT_ASSETS, FONT_LIST)):
         if (ROOT / listing).is_file():
             inputs += [folder, listing]
     return inputs
@@ -137,6 +144,9 @@ def main() -> None:
     lines.extend(table)
     lines.append("};")
     lines.append(f"const unsigned int hud_hires_embedded_count = {len(table)};")
+    lines.append("/* (more than hud_hires.c keeps: raise HUD_HIRES_MAXIMUM_TEXTURES) */")
+    lines.append(f"typedef char verify_hud_hires_embedded_count_within_maximum_textures["
+                 f"{len(table)} <= HUD_HIRES_MAXIMUM_TEXTURES ? 1 : -1];")
     lines.append("")
     # the fonts, and which draws each font tag (text_hires.h)
     lines.append('#include "text_hires.h"')

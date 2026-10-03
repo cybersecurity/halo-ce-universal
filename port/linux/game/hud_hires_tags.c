@@ -33,7 +33,8 @@ long hud_hires_asset_at(unsigned long address, long width, long height);
 
 enum
 {
-	MAXIMUM_HIRES_BITMAPS = 128,
+	/* (hud_hires.h's HUD_HIRES_MAXIMUM_TEXTURES: a bitmap for each texture) */
+	MAXIMUM_HIRES_BITMAPS = 256,
 };
 
 /* ---------- globals */
@@ -77,6 +78,11 @@ void hud_hires_tags_loaded(
 			hires_bitmaps[hires_bitmap_count].asset = asset;
 			hires_bitmap_count++;
 		}
+	}
+	if (asset < asset_count)
+	{
+		platform_log("high-res hud: only %d bitmaps can be found in a map: textures %ld to %ld are not drawn",
+			MAXIMUM_HIRES_BITMAPS, asset, asset_count - 1);
 	}
 	platform_log("high-res hud: %ld of %ld bitmaps in this map (%ld not in it)",
 		hires_bitmap_count, asset_count, missing);

@@ -9,13 +9,14 @@ port/linux/game/hud_hires_tags.c). Each texture is decoded from its PNG when
 first drawn and kept: up to 69 of the HUD's, about 225 MB with their mip
 levels, though a game draws only some (the scopes' only when zoomed), and
 the titles of the menus shown, about 3 MB each (11 MB for the carnage
-report's, a whole panel).
+report's, a whole panel), and the profiles' Spartan pictures shown, about
+0.7 MB each.
 They are drawn with linear filtering and their mip levels (d3d8_gl.c,
 configure_sampler), as they are larger than they appear.
 
-The PNGs are the ones tools/hud_assets.py and title_assets.py write, so only
-what they write is read: 8-bit RGBA, not interlaced, its data inflated with
-the game's zlib.
+The PNGs are the ones tools/hud_assets.py, title_assets.py and
+spartan_assets.py write, so only what they write is read: 8-bit RGBA, not
+interlaced, its data inflated with the game's zlib.
 */
 
 #include "hud_hires.h"
@@ -31,19 +32,18 @@ the game's zlib.
 /* the game's (port/linux/game/hud_hires_tags.c) */
 long hud_hires_asset_at(unsigned long address, long width, long height);
 
-#define MAXIMUM_TEXTURES 128
-
 static struct
 {
 	unsigned int texture;
 	unsigned long levels;
 	int failed;
 	int other_pixels_logged;
-} textures[MAXIMUM_TEXTURES];
+} textures[HUD_HIRES_MAXIMUM_TEXTURES];
 
 long hud_hires_asset_count(void)
 {
-	return hud_hires_embedded_count < MAXIMUM_TEXTURES ? (long)hud_hires_embedded_count : MAXIMUM_TEXTURES;
+	return hud_hires_embedded_count < HUD_HIRES_MAXIMUM_TEXTURES ? (long)hud_hires_embedded_count :
+		HUD_HIRES_MAXIMUM_TEXTURES;
 }
 
 char const *hud_hires_asset_tag(long asset)

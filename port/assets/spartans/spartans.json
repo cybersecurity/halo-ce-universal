@@ -1,0 +1,208 @@
+{
+ "source": "ui\\shell\\main_menu\\settings_select\\player_setup\\player_profile_edit\\color_edit\\player_color_marine_large",
+ "place": [
+  0.47,
+  0.11,
+  0.36
+ ],
+ "assets": [
+  {
+   "name": "colors_sm__0",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 0,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 3460376014,
+   "source_crc": 166682256
+  },
+  {
+   "name": "colors_sm__1",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 1,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 2514669277,
+   "source_crc": 766694141
+  },
+  {
+   "name": "colors_sm__2",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 2,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 153646948,
+   "source_crc": 716840461
+  },
+  {
+   "name": "colors_sm__3",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 3,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 2288205472,
+   "source_crc": 3027592798
+  },
+  {
+   "name": "colors_sm__4",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 4,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 361694722,
+   "source_crc": 3714073261
+  },
+  {
+   "name": "colors_sm__5",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 5,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 2779061205,
+   "source_crc": 659338661
+  },
+  {
+   "name": "colors_sm__6",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 6,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 1175329069,
+   "source_crc": 3651587321
+  },
+  {
+   "name": "colors_sm__7",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 7,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 410420071,
+   "source_crc": 2458911725
+  },
+  {
+   "name": "colors_sm__8",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 8,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 4107150749,
+   "source_crc": 1065730410
+  },
+  {
+   "name": "colors_sm__9",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 9,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 1556714238,
+   "source_crc": 3534614280
+  },
+  {
+   "name": "colors_sm__10",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 10,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 1286158101,
+   "source_crc": 4068166959
+  },
+  {
+   "name": "colors_sm__11",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 11,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 428177347,
+   "source_crc": 807413154
+  },
+  {
+   "name": "colors_sm__12",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 12,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 562363080,
+   "source_crc": 3950066387
+  },
+  {
+   "name": "colors_sm__13",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 13,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 2045042904,
+   "source_crc": 3636472538
+  },
+  {
+   "name": "colors_sm__14",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 14,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 3410032291,
+   "source_crc": 1406142066
+  },
+  {
+   "name": "colors_sm__15",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 15,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 3329672732,
+   "source_crc": 3601171571
+  },
+  {
+   "name": "colors_sm__16",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 16,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 2386987935,
+   "source_crc": 1985460146
+  },
+  {
+   "name": "colors_sm__17",
+   "tag": "ui\\shell\\bitmaps\\colors_sm",
+   "bitmap": 17,
+   "width": 128,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 2,
+   "crc": 2526660284,
+   "source_crc": 1456821002
+  }
+ ]
+}
