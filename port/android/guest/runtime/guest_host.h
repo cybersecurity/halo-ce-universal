@@ -106,4 +106,8 @@ void host_gl_wait_frame(unsigned int slot);
 /* the storage directories the port uses, copied into buffer */
 void host_android_path(int which, char *buffer, unsigned int size);
 
+/* the edges where Android keeps its gestures, as left, top, right, bottom
+in pixels of the current orientation, into insets[4]; all 0 when unknown */
+void host_gesture_insets(int *insets);
+
 #endif

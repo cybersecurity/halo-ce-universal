@@ -1376,3 +1376,94 @@ static void virtual_keyboard_process_internal(
 
 	return;
 }
+
+/* The "B =BACK" and "A =ENTER" legends are part of the keyboard's background
+bitmap, not widgets, so nothing else can hit-test them; measured on the
+rendered screen (icon and label, with a few pixels of margin). */
+static rectangle2d const keyboard_back_legend_rect= {412, 368, 438, 462};
+static rectangle2d const keyboard_enter_legend_rect= {412, 468, 438, 572};
+
+/* (virtual_keyboard.h) */
+long virtual_keyboard_target_rectangles(
+	rectangle2d *rectangles,
+	long maximum)
+{
+	long count = 0;
+	short key_index;
+
+	for (key_index = 0; key_index < NUMBER_OF_VIRTUAL_KEYS && count < maximum; key_index++)
+		rectangles[count++] = keyboard_rect[key_index];
+	if (count < maximum)
+		rectangles[count++] = keyboard_back_legend_rect;
+	if (count < maximum)
+		rectangles[count++] = keyboard_enter_legend_rect;
+
+	return count;
+}
+
+/* (virtual_keyboard.h) */
+boolean virtual_keyboard_click(
+	short x,
+	short y,
+	long *hit)
+{
+	short key_index, row, column;
+
+	if (hit)
+		*hit = NONE;
+	if (!virtual_keyboard_globals.active)
+		return FALSE;
+	if (x >= keyboard_back_legend_rect.x0 && x < keyboard_back_legend_rect.x1 &&
+		y >= keyboard_back_legend_rect.y0 && y < keyboard_back_legend_rect.y1)
+	{
+		if (hit)
+			*hit = NUMBER_OF_VIRTUAL_KEYS;
+		if (virtual_keyboard_cancel() == TRUE)
+		{
+			virtual_keyboard_globals.time_of_last_event = system_milliseconds();
+			virtual_keyboard_globals.last_event = _event_cancel;
+		}
+		return TRUE;
+	}
+	if (x >= keyboard_enter_legend_rect.x0 && x < keyboard_enter_legend_rect.x1 &&
+		y >= keyboard_enter_legend_rect.y0 && y < keyboard_enter_legend_rect.y1)
+	{
+		if (hit)
+			*hit = NUMBER_OF_VIRTUAL_KEYS + 1;
+		key_index = virtual_keyboard_layout_table[0][0];
+	}
+	else
+	{
+		for (key_index = 0; key_index < NUMBER_OF_VIRTUAL_KEYS; key_index++)
+		{
+			rectangle2d const *rectangle = &keyboard_rect[key_index];
+
+			if (x >= rectangle->x0 && x < rectangle->x1 && y >= rectangle->y0 && y < rectangle->y1)
+				break;
+		}
+		if (key_index == NUMBER_OF_VIRTUAL_KEYS)
+			return FALSE;
+		if (hit)
+			*hit = key_index;
+	}
+	for (row = 0; row < VIRTUAL_KEYBOARD_ROW_COUNT; row++)
+	{
+		for (column = 0; column < VIRTUAL_KEYBOARD_COLUMN_COUNT; column++)
+		{
+			if (virtual_keyboard_layout_table[row][column] == key_index)
+			{
+				virtual_keyboard_globals.row = row;
+				virtual_keyboard_globals.column = column;
+				virtual_keyboard_globals.last_key = key_index;
+				if (virtual_keyboard_select() == TRUE)
+				{
+					virtual_keyboard_globals.time_of_last_event = system_milliseconds();
+					virtual_keyboard_globals.last_event = _event_key_select;
+				}
+				return TRUE;
+			}
+		}
+	}
+
+	return FALSE;
+}
