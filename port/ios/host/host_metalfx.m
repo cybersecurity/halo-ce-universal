@@ -9,9 +9,13 @@ int host_ios_metalfx_present(unsigned int t,unsigned int w,unsigned int h,unsign
 #else
 /* Optional ANGLE Metal -> IOSurface -> MetalFX presentation. Both APIs share the
    input image; explicit completion fences protect ownership across APIs. */
+#if HALO_MACOS
+#import <AppKit/AppKit.h>
+#else
 #import <UIKit/UIKit.h>
-#import <OpenGLES/ES3/gl.h>
-#import <OpenGLES/ES3/glext.h>
+#endif
+#include <GLES3/gl32.h>
+#include <GLES2/gl2ext.h>
 
 #import <CoreVideo/CoreVideo.h>
 #import <Metal/Metal.h>
@@ -32,7 +36,16 @@ static CVPixelBufferRef pixels;
 static GLuint sharedTexture;
 static CVMetalTextureRef metalImage;
 static id<MTLTexture> output;
+#if HALO_MACOS
+@interface HaloMetalSurface : NSView
+@end
+@implementation HaloMetalSurface
+-(NSView *)hitTest:(NSPoint)point {(void)point;return nil;}
+@end
+static NSView *surface;
+#else
 static UIView *surface;
+#endif
 static CAMetalLayer *layer;
 static GLuint readFBO,writeFBO;
 static unsigned inputW,inputH,outputW,outputH;
@@ -96,11 +109,19 @@ int host_ios_metalfx_present(unsigned int texture,unsigned int w,unsigned int h,
         pending=nil;
         if(success && (w!=inputW || h!=inputH || ow!=outputW || oh!=outputH))success=configure(w,h,ow,oh);
         if(success && !surface) {
+#if HALO_MACOS
+            extern void *host_macos_game_window(void);
+            NSWindow *window=(__bridge NSWindow *)host_macos_game_window();
+            NSView *root=window.contentView;
+            if(root){surface=[[HaloMetalSurface alloc]initWithFrame:root.bounds];surface.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;surface.wantsLayer=YES;layer=[CAMetalLayer layer];layer.device=device;layer.pixelFormat=MTLPixelFormatBGRA8Unorm;layer.framebufferOnly=NO;[surface.layer addSublayer:layer];[root addSubview:surface];}
+            else success=NO;
+#else
             UIWindow *window=nil;
             for(UIScene *scene in UIApplication.sharedApplication.connectedScenes)if([scene isKindOfClass:UIWindowScene.class])for(UIWindow *candidate in ((UIWindowScene*)scene).windows)if(candidate.isKeyWindow)window=candidate;
             UIView *root=window.rootViewController.view;
             if(root){surface=[[UIView alloc]initWithFrame:root.bounds];surface.userInteractionEnabled=NO;surface.autoresizingMask=UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight;layer=[CAMetalLayer layer];layer.device=device;layer.pixelFormat=MTLPixelFormatBGRA8Unorm;layer.framebufferOnly=NO;[surface.layer addSublayer:layer];[root insertSubview:surface atIndex:0];}
             else success=NO;
+#endif
         }
         if(success)success=halo_graphics_shared_begin();
         if(success) {
@@ -110,7 +131,12 @@ int host_ios_metalfx_present(unsigned int texture,unsigned int w,unsigned int h,
             /* Guest row zero already denotes the top, as Metal expects. */
             glBlitFramebuffer(0,0,w,h,0,0,w,h,GL_COLOR_BUFFER_BIT,GL_NEAREST);
             success=halo_graphics_shared_end();
-            layer.frame=surface.bounds;layer.contentsScale=surface.window.screen.scale;
+            layer.frame=surface.bounds;
+#if HALO_MACOS
+            layer.contentsScale=surface.window.backingScaleFactor;
+#else
+            layer.contentsScale=surface.window.screen.scale;
+#endif
             CGSize size=CGSizeMake(round(surface.bounds.size.width*layer.contentsScale),round(surface.bounds.size.height*layer.contentsScale));
             if(!CGSizeEqualToSize(layer.drawableSize,size))layer.drawableSize=size;
             id<CAMetalDrawable> drawable=[layer nextDrawable];
@@ -123,7 +149,7 @@ int host_ios_metalfx_present(unsigned int texture,unsigned int w,unsigned int h,
                 id<MTLBlitCommandEncoder> blit=[commands blitCommandEncoder];
                 [blit copyFromTexture:output sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0,0,0) sourceSize:MTLSizeMake(ow,oh,1) toTexture:drawable.texture destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake((drawable.texture.width-ow)/2,(drawable.texture.height-oh)/2,0)];
                 [blit endEncoding];[commands presentDrawable:drawable];[commands commit];pending=commands;surface.hidden=NO;
-            } else {surface.hidden=YES;success=NO;}
+            } else {host_logf(HOST_LOG_WARN,"MetalFX drawable unavailable or too small (%ux%u requested)",ow,oh);surface.hidden=YES;success=NO;}
         }
         glBindFramebuffer(GL_READ_FRAMEBUFFER,oldRead);glBindFramebuffer(GL_DRAW_FRAMEBUFFER,oldWrite);glBindTexture(GL_TEXTURE_2D,oldTexture);
         if(scissor)glEnable(GL_SCISSOR_TEST);else glDisable(GL_SCISSOR_TEST);

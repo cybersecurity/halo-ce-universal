@@ -34,6 +34,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--simulator', action='store_true', help='build for an ARM64 simulator')
+    mode.add_argument('--guest-only', action='store_true', help='prepare shared Apple guest and dependencies without building an app')
     mode.add_argument('--unsigned', action='store_true', help='build a device app for signing later')
     parser.add_argument('--team', help='Apple development team ID for device signing')
     parser.add_argument('--bundle-id', help='bundle identifier covered by your signing profile (default org.haloce.ios)')
@@ -44,7 +45,7 @@ def main():
     args = parser.parse_args()
     if platform.system() != 'Darwin' or platform.machine() != 'arm64':
         parser.error('an Apple Silicon Mac with full Xcode is required')
-    if not args.simulator and not args.unsigned and not args.team:
+    if not args.guest_only and not args.simulator and not args.unsigned and not args.team:
         parser.error('use --team YOUR_TEAM_ID to sign, or --unsigned to sign later')
     if args.team and (args.unsigned or args.simulator):
         parser.error('--team is only used for signed device builds')
@@ -78,6 +79,8 @@ def main():
         ('port/third_party/tomlc17/LICENSE', 'tomlc17.txt'),
     ):
         shutil.copyfile(ROOT/source, notices/name)
+    if args.guest_only:
+        return
     build=ROOT/'build'/'ios'/('app-simulator' if args.simulator else
                 'app-unsigned' if args.unsigned else 'app-device')
     sdk='iphonesimulator' if args.simulator else 'iphoneos'

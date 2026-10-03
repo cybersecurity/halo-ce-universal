@@ -114,7 +114,11 @@ int64_t host_sdl_thread_id(void)
 
 uint32_t host_sdl_create_window(const char *title, int width, int height, int64_t flags)
 {
-	if(halo_graphics_metal())flags=(flags & ~SDL_WINDOW_OPENGL) | SDL_WINDOW_METAL;
+	#if HALO_MACOS
+    flags=(flags & ~SDL_WINDOW_FULLSCREEN) | SDL_WINDOW_RESIZABLE;
+    width=1280;height=720;
+#endif
+    if(halo_graphics_metal())flags=(flags & ~SDL_WINDOW_OPENGL) | SDL_WINDOW_METAL;
 	return handle_new(_handle_window, SDL_CreateWindow(title, width, height, (SDL_WindowFlags)flags));
 }
 
@@ -162,10 +166,30 @@ int host_sdl_gl_set_swap_interval(int interval)
 	return halo_graphics_metal()?halo_graphics_swap_interval(interval):SDL_GL_SetSwapInterval(interval);
 }
 
+#if HALO_MACOS
+/* Capture this application's own framebuffer for unattended renderer checks. */
+static void test_capture(SDL_Window *window) {
+    static int frames;const char *path=SDL_getenv("HALO_MAC_TEST_FRAME");
+    if(!path || ++frames!=60)return;
+    int w,h;SDL_GetWindowSizeInPixels(window,&w,&h);
+    unsigned char *pixels=SDL_malloc((size_t)w*h*4);if(!pixels)return;
+    void (*readPixels)(int,int,int,int,unsigned,unsigned,void*)=halo_graphics_proc("glReadPixels");
+    void (*getInteger)(unsigned,int*)=halo_graphics_proc("glGetIntegerv");
+    void (*bindFramebuffer)(unsigned,unsigned)=halo_graphics_proc("glBindFramebuffer");
+    int previous=0;getInteger(0x8CAA,&previous);bindFramebuffer(0x8CA8,0);
+    readPixels(0,0,w,h,0x1908,0x1401,pixels);bindFramebuffer(0x8CA8,previous);
+    SDL_Surface *surface=SDL_CreateSurfaceFrom(w,h,SDL_PIXELFORMAT_RGBA32,pixels,w*4);
+    if(surface){SDL_FlipSurface(surface,SDL_FLIP_VERTICAL);SDL_SaveBMP(surface,path);SDL_DestroySurface(surface);}
+    SDL_free(pixels);host_logf(HOST_LOG_INFO,"Saved test framebuffer: %s",path);
+}
+#endif
 int host_sdl_gl_swap_window(uint32_t window)
 {
 	SDL_Window *object = handle_get(window, _handle_window);
 
+#if HALO_MACOS
+    if(object)test_capture(object);
+#endif
 	return object ? (halo_graphics_metal()?halo_graphics_swap():SDL_GL_SwapWindow(object)) : 0;
 }
 
@@ -400,14 +424,24 @@ void host_sdl_get_clipboard_text(char *buffer, uint32_t size)
 uint32_t host_ios_default_framebuffer(void)
 {
     if(halo_graphics_metal())return 0;
+#if !HALO_MACOS
     for (unsigned i = 1; i < HANDLE_COUNT; i++)
         if (handles[i].type == _handle_window)
             return (uint32_t)SDL_GetNumberProperty(SDL_GetWindowProperties(handles[i].object),
                 SDL_PROP_WINDOW_UIKIT_OPENGL_FRAMEBUFFER_NUMBER, 0);
+#endif
     return 0;
 }
 
 int host_sdl_show_simple_message_box(unsigned int flags, const char *title, const char *message)
 {
     return SDL_ShowSimpleMessageBox((SDL_MessageBoxFlags)flags, title, message, NULL) ? 1 : 0;
+}
+
+void host_sdl_window_size(unsigned int window,int *width,int *height) {
+ SDL_Window *object=handle_get(window,_handle_window);*width=*height=0;
+ if(object)SDL_GetWindowSize(object,width,height);
+}
+void host_sdl_warp_mouse(unsigned int window,float x,float y) {
+ SDL_Window *object=handle_get(window,_handle_window);if(object)SDL_WarpMouseInWindow(object,x,y);
 }

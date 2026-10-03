@@ -3,6 +3,7 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #include "ios_host.h"
 #include "xiso.h"
+#import "../../apple/game_store.h"
 #import "host_orientation.h"
 
 #if !__has_feature(objc_arc)
@@ -59,7 +60,7 @@ static int import_progress(void *context, const char *file, uint64_t done, uint6
     [stack addArrangedSubview:icon];
     UILabel *title=[UILabel new];title.text=@"Halo: CE";title.font=[UIFont preferredFontForTextStyle:UIFontTextStyleLargeTitle];
     title.adjustsFontForContentSizeCategory=YES;title.textAlignment=NSTextAlignmentCenter;[stack addArrangedSubview:title];
-    UILabel *body=[UILabel new];body.text=@"Choose your own Halo: Combat Evolved Xbox XISO.\nWe'll import the game and start it for you.";
+    UILabel *body=[UILabel new];body.text=@"Choose your own Halo: Combat Evolved Xbox XISO.\nWe'll verify and keep a private copy, then start the game.";
     body.font=[UIFont preferredFontForTextStyle:UIFontTextStyleBody];body.adjustsFontForContentSizeCategory=YES;
     body.numberOfLines=0;body.textAlignment=NSTextAlignmentCenter;body.textColor=UIColor.secondaryLabelColor;[stack addArrangedSubview:body];
     self.chooseButton=[UIButton buttonWithType:UIButtonTypeSystem];
@@ -124,47 +125,16 @@ static int import_progress(void *context, const char *file, uint64_t done, uint6
     self.backgroundTask=[UIApplication.sharedApplication beginBackgroundTaskWithName:@"Import Halo" expirationHandler:^{self.cancelled=YES;[self.coordinator cancel];}];
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED,0), ^{
         @autoreleasepool {
-            NSFileManager *files=NSFileManager.defaultManager;
-            NSString *staging=[self.documents stringByAppendingPathComponent:[@".halo-import-" stringByAppendingString:NSUUID.UUID.UUIDString]];
-            NSError *folderError=nil;__block NSString *failure=nil;__block BOOL imported=NO;
-            if (![files createDirectoryAtPath:staging withIntermediateDirectories:NO attributes:nil error:&folderError]) failure=@"Could not create the import folder. Check available storage.";
-            if (!failure) {
-                [@"Halo XISO import v1" writeToFile:[staging stringByAppendingPathComponent:@"owner.txt"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
-                [[NSURL fileURLWithPath:staging] setResourceValue:@YES forKey:NSURLIsExcludedFromBackupKey error:nil];
-                NSFileCoordinator *coordinator=[[NSFileCoordinator alloc] initWithFilePresenter:nil];NSError *coordinationError=nil;
-                self.coordinator=coordinator;
-                if (self.cancelled) [coordinator cancel];
-                [coordinator coordinateReadingItemAtURL:url options:0 error:&coordinationError byAccessor:^(NSURL *readable) {
-                    char error[1024]={0};
-                    if (self.cancelled) {failure=@"Import cancelled.";return;}
-                    imported=xiso_extract_maps(readable.fileSystemRepresentation,staging.fileSystemRepresentation,import_progress,(__bridge void *)self,error,sizeof(error));
-                    if (!imported) failure=[NSString stringWithUTF8String:error];
-                }];
-                if (coordinationError) {imported=NO;failure=self.cancelled?@"Import cancelled.":@"Could not access the disc image. Download it in Files, then choose it again.";}
-                self.coordinator=nil;
-            }
-            if (imported && self.cancelled) {imported=NO;failure=@"Import cancelled.";}
-            if (imported) {
-                NSString *target=[self.documents stringByAppendingPathComponent:@"maps"];
-                NSString *source=[staging stringByAppendingPathComponent:@"maps"];
-                NSString *backup=[staging stringByAppendingPathComponent:@"previous-maps"];
-                NSError *moveError=nil;
-                BOOL existing=[files fileExistsAtPath:target];
-                if (existing && ![files moveItemAtPath:target toPath:backup error:&moveError]) {imported=NO;failure=@"Could not replace incomplete game data. Your existing files were kept.";}
-                if (imported && ![files moveItemAtPath:source toPath:target error:&moveError]) {
-                    imported=NO;failure=@"Could not finish the game import. Try again.";
-                    if (existing && ![files moveItemAtPath:backup toPath:target error:nil])
-                        failure=@"Could not finish the import. Existing maps remain in the import backup folder.";
-                }
-                if (imported) {
-                    NSURL *mapsURL=[NSURL fileURLWithPath:target];[mapsURL setResourceValue:@YES forKey:NSURLIsExcludedFromBackupKey error:nil];
-                    /* Successful completion marker used only for diagnostics; game data stays separate. */
-                    host_logf(HOST_LOG_INFO,"XISO import complete; original map bytes preserved");
-                }
-                /* Preserve the backup if an unexpected restore failure left it here. */
-                if (!imported && [files fileExistsAtPath:backup]) staging=nil;
-            }
-            if (staging) [files removeItemAtPath:staging error:nil];
+            __block NSString *failure=nil;__block BOOL imported=NO;
+            NSFileCoordinator *coordinator=[[NSFileCoordinator alloc] initWithFilePresenter:nil];NSError *coordinationError=nil;
+            self.coordinator=coordinator;
+            if(self.cancelled)[coordinator cancel];
+            [coordinator coordinateReadingItemAtURL:url options:0 error:&coordinationError byAccessor:^(NSURL *readable) {
+                if(self.cancelled){failure=@"Import cancelled.";return;}
+                imported=halo_game_store_import(readable,self.documents,import_progress,(__bridge void *)self,&failure);
+            }];
+            if(coordinationError && !imported)failure=self.cancelled?@"Import cancelled.":@"Could not access the image. Download it in Files, then choose it again.";
+            self.coordinator=nil;
             if (scoped) [url stopAccessingSecurityScopedResource];
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self.spinner stopAnimating];self.cancelButton.hidden=YES;self.importing=NO;
@@ -194,8 +164,7 @@ void host_ios_prepare_assets(const char *root) {
         }
         [files removeItemAtPath:staging error:nil];
     }
-    char reason[1024]={0};
-    if (xiso_maps_ready(maps.fileSystemRepresentation,reason,sizeof(reason))) return;
+    if (halo_game_store_current(documents)) return;
     UIWindowScene *scene=nil;
     for (UIScene *candidate in UIApplication.sharedApplication.connectedScenes)
         if ([candidate isKindOfClass:UIWindowScene.class]) {scene=(UIWindowScene *)candidate;break;}

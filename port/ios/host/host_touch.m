@@ -140,7 +140,6 @@ void host_ios_touch_reset(void) {
 @property(nonatomic,strong) HaloStick *moveStick;
 @property(nonatomic,strong) HaloStick *lookStick;
 @property(nonatomic,strong) NSMutableArray<HaloButton *> *buttons;
-@property(nonatomic,strong) UIButton *toggle;
 @end
 static __weak HaloControls *activeControls;
 void host_ios_touch_focus(void) {[activeControls becomeFirstResponder];}
@@ -186,10 +185,6 @@ void host_ios_touch_focus(void) {[activeControls becomeFirstResponder];}
     [self addButton:@"ZOOM" label:@"Zoom" button:SDL_GAMEPAD_BUTTON_RIGHT_STICK axis:-1];
     [self addButton:@"LIGHT" label:@"Flashlight" button:SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER axis:-1];
     [self addButton:@"SWAP G" label:@"Switch grenade" button:SDL_GAMEPAD_BUTTON_LEFT_SHOULDER axis:-1];
-    self.toggle=[UIButton buttonWithType:UIButtonTypeSystem];[self.toggle setTitle:@"Hide controls" forState:UIControlStateNormal];
-    [self.toggle setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];self.toggle.titleLabel.font=[UIFont systemFontOfSize:12];
-    self.toggle.backgroundColor=[UIColor colorWithWhite:0 alpha:.3];self.toggle.layer.cornerRadius=12;
-    [self.toggle addTarget:self action:@selector(toggleControls) forControlEvents:UIControlEventTouchUpInside];[self addSubview:self.toggle];
     [[NSNotificationCenter defaultCenter]addObserver:self selector:@selector(reset) name:UIApplicationWillResignActiveNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(controllerChanged) name:controllerChanged object:nil];
     [self controllerChanged];
@@ -197,19 +192,14 @@ void host_ios_touch_focus(void) {[activeControls becomeFirstResponder];}
 }
 - (void)controllerChanged {
     BOOL connected=primary_hardware!=0;
-    self.toggle.hidden=connected;
     [self setControlsHidden:connected];
 }
 - (void)setControlsHidden:(BOOL)hidden {
     [self reset];
     self.moveStick.hidden=self.lookStick.hidden=hidden;
     for(UIView *button in self.buttons)button.hidden=hidden;
-    [self.toggle setTitle:hidden?@"Show controls":@"Hide controls" forState:UIControlStateNormal];
 }
 - (void)reset {host_ios_touch_reset();[self.moveStick reset];[self.lookStick reset];}
-- (void)toggleControls {
-    [self setControlsHidden:!self.moveStick.hidden];
-}
 - (void)layoutSubviews {
     [super layoutSubviews];CGRect r=UIEdgeInsetsInsetRect(self.bounds,self.safeAreaInsets);
     CGFloat left=r.origin.x+16,right=CGRectGetMaxX(r)-16,bottom=CGRectGetMaxY(r)-12,top=r.origin.y+10;
@@ -232,7 +222,6 @@ void host_ios_touch_focus(void) {[activeControls becomeFirstResponder];}
     self.buttons[13].frame=CGRectMake(right-180,top+55,80,36);
     self.buttons[14].frame=CGRectMake(left+104,top+55,80,36);
     for(UIButton *b in self.buttons){b.layer.cornerRadius=MIN(b.bounds.size.width,b.bounds.size.height)/2;b.titleLabel.adjustsFontSizeToFitWidth=YES;}
-    self.toggle.frame=CGRectMake(right-108,top,108,32);
 }
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
     for(UIView *view in self.subviews)if(!view.hidden && [view pointInside:[self convertPoint:point toView:view] withEvent:event])return YES;

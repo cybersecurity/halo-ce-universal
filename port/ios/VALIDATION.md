@@ -156,3 +156,34 @@ cases above are still unverified. Keep the PR in draft until those checks pass.
   all source references (13 shader sources, 7 recorded events in the menu run).
 - This adds a Metal backend via ANGLE, not a handwritten Metal renderer.
   Extended campaign/crossplay performance and all-device coverage remain open.
+
+## Private-image storage and native Mac target (2026-10-03)
+
+- Removed the touch visibility toggle; iPhone controls remain automatic and
+  the native AppKit target creates no touch overlay.
+- Imported the user's full 7,825,162,240-byte disc through the shared private
+  storage transaction. SHA-256 readback matched; all original maps validated.
+- Six synthetic storage tests pass: retained image and restart without source,
+  cancellation preserving current data, corrupt import preserving current data,
+  truncated stored image rejection, pointer traversal rejection, and cleanup
+  restricted to owned unpublished generations. Existing 16 XISO parser tests
+  and ABI/memory/audio/display/room tests also pass.
+- iPhone 13 Pro: native first-launch import screen observed; a verified private
+  image generation was then transferred to its container for migration testing.
+  Relaunch reached Metal main menu with 198 resolved imports, touch controls
+  visible, and no hide/show toggle. The full Files-picker import transaction
+  was exercised in the shared native importer, not driven end-to-end by taps
+  on this phone. iPhone 15 Pro was not used.
+- Mac: native main-menu and Silent Cartographer framebuffers captured, with
+  audio. Developer ID/hardened-runtime app launched successfully inside its
+  sandbox using its private Application Support generation. Initial MetalFX
+  testing found an inactive-window lookup; using the SDL Cocoa window fixed
+  that, with scaler execution confirmed. Performance and interactive controller,
+  menu, and crossplay coverage remain outstanding.
+- Simulator build passes, but this session's simulator launch service stalled;
+  the device checks above replace that attempted UI smoke test, not a claimed
+  simulator pass.
+- Unsigned IPA and signed DMG contain no user disc image or maps. Replacement
+  HUD/title/font payloads are disabled in Apple guest builds, and the app icon
+  is original geometric art. Signing does not establish legal clearance.
+- DMG notarization and actual AirDrop delivery are not yet verified.

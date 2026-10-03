@@ -9,10 +9,9 @@ The Home Screen name is **Halo: CE**. The portable ILP32 runtime lives in
 `port/runtime`; UIKit, Darwin, touch, audio, and the native loader live here.
 The existing Android, Linux, Windows and web build targets are retained.
 
-The icon is carried over from NicholasDominici/halo-ce-ios and adapts its
-Master Chief artwork into an opaque square; iOS applies its rounded icon mask.
-The source is `Icon-Artwork.png`, with device sizes in
-`Assets.xcassets/AppIcon.appiconset`. See [icon notes](ICON.md) for the prompt.
+The icon is original geometric artwork; see [icon notes](ICON.md). Apple builds
+exclude the bundled replacement HUD/title/font assets and require a user-owned
+disc image. See [distribution status](../apple/DISTRIBUTION.md).
 
 ## Build
 
@@ -61,7 +60,7 @@ memory is used.
 
 ## Simulator smoke tests
 
-After installing the simulator app and adding maps to its Documents folder,
+After installing the simulator app and importing an ISO through the app,
 these explicit launch settings bypass the room chooser for repeatable tests:
 
 ```sh
@@ -87,25 +86,29 @@ The cache validator accepts these exact Xbox v5 cache builds on iOS:
 2. Tap **Choose Halo XISO** and select your `.iso` or `.xiso` in Files (On My
    iPhone/iPad, iCloud Drive, or another Files provider). Compressed ZIP/7z
    archives and PC/MCC disc images are not supported.
-3. The app validates the Xbox filesystem, cache version/build, and complete
-   campaign map set before copying. A progress bar shows extraction; Cancel
-   safely stops it. Once finished, the game starts automatically.
+3. The app copies the image into a private generation, verifies the copy with
+   SHA-256 readback, and validates the Xbox filesystem, cache version/build,
+   and complete campaign map set during extraction. Cancel safely stops it.
+   Once finished, the game starts automatically.
 
 The image is opened through the system document picker with coordinated,
 security-scoped access. A cloud image may need to download before extraction.
-Leave enough local storage for its maps as well as any local XISO copy.
+Leave enough local storage for the retained image plus approximately 1.9 GB
+of extracted maps, and any separate source copy already on the phone.
 Nothing is fetched from a game-download service, and the source image is never
-modified or deleted. After import, subsequent launches use the extracted maps.
+modified or deleted. Subsequent launches use the private image/map generation
+without accessing the original Files location.
 
 You can also copy **one** `.iso` or `.xiso` directly into Halo: CE's Documents
 folder using Finder's Files tab or Files > On My iPhone/iPad > Halo: CE, then
 launch the app. It detects and imports that image when game data is missing.
 If several images are present, choose one with the picker. After a successful
-import, deleting the extra XISO copy from the app folder can reclaim storage.
+import, the original loose source file can be removed. Keep the retained
+`game-UUID/disc.iso` and its map cache; deleting these requires re-import.
 
 Imports run in a private staging directory. Invalid or cancelled imports do
-not replace existing maps. Interrupted imports are cleaned up on next launch;
-existing maps displaced during the final move are restored if needed. Saves
+not replace the current game generation. Owned incomplete imports are cleaned
+up on next launch. Existing committed generations are preserved. Saves
 and profiles stay in `Documents/save` throughout.
 
 ### Install a source build
@@ -125,7 +128,7 @@ Downloaded unsigned IPAs must first be signed with your own Apple account.
 For packaged-IPA signing instructions, see the official
 [AltStore Classic setup guide](https://faq.altstore.io/) or
 [Sideloadly FAQ](https://sideloadly.io/faq). These signing tools have not been
-validated as part of this port; this integration has not yet been tested on a physical device. Follow your signing tool's refresh instructions before
+validated as part of this port; direct Xcode builds have been tested on iPhone 13 Pro. Follow your signing tool's refresh instructions before
 the provisioning profile expires. Keep the same account and bundle identifier
 when updating to preserve the app's data.
 
@@ -138,13 +141,12 @@ hashes. Existing output files are never replaced.
 ```sh
 python3 tools/ios_extract_assets.py '/path/to/Halo.xiso.iso'
 python3 tools/ios_extract_assets.py '/path/to/Halo.xiso.iso' --output assets
-xcrun devicectl device copy to --device DEVICE_UDID \
-  --domain-type appDataContainer --domain-identifier com.yourname.haloce \
-  --source assets/maps --destination Documents/maps
 ```
 
-Keep `maps` directly inside Documents. `config.toml`, `debug.txt`, and
-`ios-runtime.log` are available there for diagnostics. Back up `Documents/save`
+Manual map extraction is an inspection tool; maps alone no longer satisfy
+first-launch setup. Import the image through the app to retain its verified
+private copy. `config.toml` and `ios-runtime.log` stay in Documents; the game's
+`debug.txt` is in the active `game-UUID` folder. Back up `Documents/save`
 before uninstalling or changing bundle IDs.
 
 ## Controls
@@ -173,8 +175,9 @@ in-app graphics settings menu are not implemented yet.
 The left stick moves and the right stick aims. The four arrows navigate menus.
 A selects/jumps; B returns/melees; X reloads/uses; Y changes weapons. Separate
 buttons provide fire, grenade, crouch, zoom, flashlight, grenade selection,
-and pause. Hold buttons for held actions. “Hide controls” leaves a small toggle
-so a connected hardware controller can be used with an unobstructed picture.
+and pause. Hold buttons for held actions. Touch controls hide automatically
+when a hardware controller connects and return when it disconnects. There is
+no hide/show toggle. The native Mac app never creates a touch overlay.
 Compatible Backbone, Xbox and PlayStation controllers use SDL's iOS gamepad
 backend. Pair Bluetooth controllers in iOS Settings > Bluetooth before or
 while the app runs; attach a compatible wired Backbone directly to the phone.
@@ -264,9 +267,10 @@ The signed ARM64 ILP32 runtime, memory layout, UIKit input, GLES renderer,
 XISO importer, and build tooling are imported/adapted from
 [NicholasDominici/halo-ce-ios](https://github.com/NicholasDominici/halo-ce-ios/tree/3f2c14101d3ae1c7f0c0a11993a43407fadbeb46),
 branch `ios-port`. Integration changes keep PR #12's current game/network source,
-use its musl math and HUD assets, preserve other platforms, and connect the iOS
-runtime to browser rooms. This target builds iPhone/iPad apps. Dedicated macOS,
-visionOS and tvOS products are outside this PR.
+use its musl math, preserve other platforms, and connect the Apple runtime to
+browser rooms. Apple distribution builds omit the embedded HUD/title/font
+replacements. This target builds iPhone/iPad apps; [port/macos](../macos/README.md)
+builds the native Mac app. Dedicated visionOS and tvOS products remain open.
 
 ## How the port works
 
@@ -327,16 +331,13 @@ in Xcode. With exactly one simulator booted:
 ```sh
 xcrun simctl install booted build/ios/app-simulator/Release-iphonesimulator/HaloCE.app
 HALO_SIM_DATA=$(xcrun simctl get_app_container booted org.haloce.ios data)
-cp -R assets/maps "$HALO_SIM_DATA/Documents/maps"
+cp "/path/to/your/game.xiso" "$HALO_SIM_DATA/Documents/game.xiso"
 xcrun simctl launch booted org.haloce.ios
 ```
 
 Use an explicit simulator ID instead of `booted` when more than one is running.
-To exercise the in-app import instead, copy an XISO into the simulator app's
-Documents folder and launch without a maps folder.
-The manual copy command assumes `Documents/maps` does not yet exist; avoid nesting a
-second `maps` directory. Simulator graphics are slow; validate performance on
-a physical device.
+The app imports the single loose image on first launch. Simulator graphics
+are slow; validate performance on a physical device.
 
 ## Troubleshooting
 
@@ -345,9 +346,10 @@ a physical device.
   Xcode provisioning updates; it never supplies somebody else's certificate.
 - **App fails to launch:** confirm it was signed for your device, trust the
   developer if requested, and enable Developer Mode. An unsigned IPA will not launch.
-- **Menu never appears or maps fail validation:** check `Documents/maps/ui.map`,
+- **Menu never appears or maps fail validation:** check `Documents/game-UUID/maps/ui.map`,
   confirm exact original Xbox build IDs above, and inspect `ios-runtime.log`
-  and `debug.txt`. A directory named `Documents/maps/maps` is incorrect.
+  and the active generation’s `debug.txt`. Re-import if the retained image or
+  validated map cache is incomplete.
 - **Changing your bundle ID:** iOS treats this as a separate app/container.
   Keep the same ID when updating and back up `Documents/save` before uninstalling.
 - **Audio issues:** share device/OS and output route along with the runtime

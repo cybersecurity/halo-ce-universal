@@ -1,8 +1,13 @@
 #include "host_graphics.h"
 #include "host_debug.h"
+#import "../../apple/game_store.h"
 /* Start the statically compiled guest on the iOS UI thread and persist its log. */
 #import <Foundation/Foundation.h>
+#if HALO_MACOS
+#import <AppKit/AppKit.h>
+#else
 #import <UIKit/UIKit.h>
+#endif
 #include "ios_host.h"
 #include "../network/room_bridge.h"
 #include <SDL3/SDL.h>
@@ -43,7 +48,14 @@ static uint32_t copy_string(const char *text) {
 int main(int argc,char **argv) {
     (void)argc;(void)argv;
     @autoreleasepool {
-#if TARGET_OS_TV
+#if HALO_MACOS
+        [NSApplication sharedApplication];
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+        NSString *documents=[NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory,NSUserDomainMask,YES).firstObject stringByAppendingPathComponent:NSBundle.mainBundle.bundleIdentifier];
+        NSString *override=NSProcessInfo.processInfo.environment[@"HALO_MAC_TEST_DATA_ROOT"];
+        if(override.length)documents=override;
+        [NSFileManager.defaultManager createDirectoryAtPath:documents withIntermediateDirectories:YES attributes:nil error:nil];
+#elif TARGET_OS_TV
         /* tvOS apps may only write to Caches (purgeable). */
         NSString *documents=[NSSearchPathForDirectoriesInDomains(NSCachesDirectory,NSUserDomainMask,YES).firstObject stringByAppendingPathComponent:@"Halo"];
         [NSFileManager.defaultManager createDirectoryAtPath:documents withIntermediateDirectories:YES attributes:nil error:nil];
@@ -55,8 +67,13 @@ int main(int argc,char **argv) {
         chdir(data_root);
         log_file=fopen("ios-runtime.log","w");setvbuf(stderr,NULL,_IONBF,0);
         host_logf(HOST_LOG_INFO,"Halo iOS native guest starting");
+#if !HALO_MACOS
         UIApplication.sharedApplication.idleTimerDisabled=YES;
+#endif
         host_ios_prepare_assets(data_root);
+        NSString *gameData=halo_game_store_current(documents);
+        if(!gameData)host_fatal("Private game image is unavailable.");
+        snprintf(data_root,sizeof(data_root),"%s",gameData.fileSystemRepresentation);
         if(host_load_image(NULL,0))host_fatal("Could not map the signed game image. See ios-runtime.log in Files.");
         host_install_signal_handlers();
         SDL_SetHint(SDL_HINT_ORIENTATIONS,"LandscapeLeft LandscapeRight");
@@ -76,20 +93,24 @@ int main(int argc,char **argv) {
             width=(480*longer/shorter)&~1;
             pixel_width=(int)(longer*density+0.5f);pixel_height=(int)(shorter*density+0.5f);
         }
-        char env_data[1200],env_save[1200],env_width[64],env_pixel_width[64],env_pixel_height[64];
+        char env_config[1200],env_data[1200],env_save[1200],env_width[64],env_pixel_width[64],env_pixel_height[64];
+        snprintf(env_config,sizeof(env_config),"HALO_CONFIG_ROOT=%s",documents.fileSystemRepresentation);
         snprintf(env_data,sizeof(env_data),"HALO_DATA_ROOT=%s",data_root);
         snprintf(env_save,sizeof(env_save),"HALO_SAVE_ROOT=%s",save_root);
         snprintf(env_width,sizeof(env_width),"HALO_DISPLAY_WIDTH=%d",width);
         snprintf(env_pixel_width,sizeof(env_pixel_width),"HALO_DISPLAY_PIXEL_WIDTH=%d",pixel_width);
         snprintf(env_pixel_height,sizeof(env_pixel_height),"HALO_DISPLAY_PIXEL_HEIGHT=%d",pixel_height);
         const char *env[16];size_t env_count=0;
-        env[env_count++]=env_data;env[env_count++]=env_save;env[env_count++]=env_width;
+        env[env_count++]=env_config;env[env_count++]=env_data;env[env_count++]=env_save;env[env_count++]=env_width;
         env[env_count++]=env_pixel_width;env[env_count++]=env_pixel_height;
 #if TARGET_OS_TV
         char env_render[64];
         /* The build chooses the render height (tools/ios_build.py --render-height). */
         int render_height=[[NSBundle.mainBundle objectForInfoDictionaryKey:@"HaloRenderHeight"] intValue];
         if(render_height>0){snprintf(env_render,sizeof(env_render),"HALO_RENDER_HEIGHT=%d",render_height);env[env_count++]=env_render;}
+#endif
+#if HALO_MACOS
+        env[env_count++]="HALO_DESKTOP_INPUT=1";
 #endif
         env[env_count++]="HALO_NET_ONLINE=0";
         env[env_count++]="TZ=UTC0";env[env_count++]=NULL;

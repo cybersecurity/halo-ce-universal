@@ -26,7 +26,7 @@ def prepare():
         for info in package.infolist():
             if info.is_dir() or any(p.startswith('._') for p in Path(info.filename).parts):
                 continue
-            if '/ios-arm64' not in info.filename and info.filename != 'dist/BUILD_INFO.txt':
+            if '/ios-arm64' not in info.filename and '/macos-arm64/' not in info.filename and info.filename != 'dist/BUILD_INFO.txt':
                 continue
             target = directory / info.filename
             if not target.resolve().is_relative_to(directory.resolve()):

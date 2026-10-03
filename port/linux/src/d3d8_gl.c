@@ -1208,7 +1208,7 @@ HRESULT WINAPI Direct3D_CreateDevice(UINT adapter, D3DDEVTYPE device_type, void 
 
 /* ---------- the menus' pointer */
 
-#ifdef HALO_ILP32
+#if defined(HALO_ILP32) && !defined(HALO_IOS)
 int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
 {
 	(void)menus_active;

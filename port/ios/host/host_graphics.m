@@ -1,6 +1,10 @@
 /* ANGLE's Metal backend and Apple's native GLES driver have distinct symbol
    namespaces. No guest rendering call may accidentally cross between them. */
+#if HALO_MACOS
+#import <AppKit/AppKit.h>
+#else
 #import <UIKit/UIKit.h>
+#endif
 #import <QuartzCore/CAMetalLayer.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_metal.h>
@@ -8,8 +12,8 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <EGL/eglext_angle.h>
-#include <OpenGLES/ES3/gl.h>
-#include <OpenGLES/ES3/glext.h>
+#include <GLES3/gl32.h>
+#include <GLES2/gl2ext.h>
 #include <dlfcn.h>
 #include <string.h>
 #include "host_graphics.h"
@@ -39,8 +43,13 @@ void halo_graphics_set_preference(int value) {
 }
 void halo_graphics_initialize(void) {
     metal=halo_graphics_prefer_metal();
+#if HALO_MACOS
+    metal=YES; /* macOS package ships ANGLE Metal; Apple has no GLES driver. */
+#endif
+#if !HALO_MACOS
     NSString *test=NSProcessInfo.processInfo.environment[@"HALO_IOS_TEST_RENDERER"];
     if([test isEqualToString:@"metal"] || [test isEqualToString:@"opengl"])metal=[test isEqualToString:@"metal"];
+#endif
     host_logf(HOST_LOG_INFO,"Renderer: %s",metal?"Metal (ANGLE)":"OpenGL ES (Apple)");
 }
 int halo_graphics_metal(void) {return metal;}

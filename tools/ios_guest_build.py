@@ -360,7 +360,7 @@ def generate_ios_guest_build(n: Writer, sln: Any) -> None:
         if source.name.startswith("posix_") or source.name in guest_host_only:
             continue
         objects.append(guest_object(source, platform_cflags))
-    for source in hud_assets_build(n, "ios", gen_dir / "hud_hires_assets.c"):
+    for source in [Path("port/apple/no_embedded_art.c")]:
         objects.append(guest_object(source, platform_cflags))
     math_cflags = " ".join([guest_abi, "-std=gnu11", "-w", *libc_includes,
         f"-I{MUSL_MATH_DIR}/include", f"-include {MUSL_MATH_DIR}/include/libm.h"])

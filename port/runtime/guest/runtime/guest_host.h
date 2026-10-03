@@ -58,6 +58,8 @@ void host_sdl_get_error(char *buffer, unsigned int size);
 long long host_sdl_ticks(void);
 long long host_sdl_thread_id(void);
 unsigned int host_sdl_create_window(const char *title, int width, int height, long long flags);
+void host_sdl_window_size(unsigned int window, int *width, int *height);
+void host_sdl_warp_mouse(unsigned int window, float x, float y);
 void host_sdl_window_size_in_pixels(unsigned int window, int *width, int *height);
 int host_sdl_set_relative_mouse(unsigned int window, int enabled);
 int host_sdl_gl_set_attribute(int attribute, int value);

@@ -33,7 +33,7 @@ static struct platform_input_state input_state;
 /* keys pressed since the last read, so a press and release between two
 reads still counts as a press (input injected on Android/iOS, or a slow frame) */
 static unsigned char keys_pressed[SDL_SCANCODE_COUNT];
-#ifndef HALO_ILP32
+#if !defined(HALO_ILP32) || defined(HALO_IOS)
 /* the menus' pointer (platform_ui_pointer_set_active), under input_lock */
 static struct platform_ui_pointer ui_pointer;
 static float ui_pointer_wheel;
@@ -853,7 +853,7 @@ void platform_pump_events(void)
 #endif
 			break;
 		case SDL_EVENT_MOUSE_MOTION:
-#ifndef HALO_ILP32
+#if !defined(HALO_ILP32) || defined(HALO_IOS)
 			/* in the menus the mouse moves the pointer, not the view */
 			if (input_state.ui_pointer)
 			{
@@ -868,7 +868,7 @@ void platform_pump_events(void)
 			break;
 		case SDL_EVENT_MOUSE_BUTTON_DOWN:
 		case SDL_EVENT_MOUSE_BUTTON_UP:
-#ifndef HALO_ILP32
+#if !defined(HALO_ILP32) || defined(HALO_IOS)
 			/* clicks in the menus go to the pointer; a button held down
 			when the menu closes stays up until pressed again, so the click
 			that resumes the game does not also fire */
@@ -952,7 +952,7 @@ void platform_pump_events(void)
 	platform_invite_clipboard(look_at_clipboard);
 }
 
-#ifndef HALO_ILP32
+#if !defined(HALO_ILP32) || defined(HALO_IOS)
 /* ---------- the menus' pointer */
 
 /* While a menu is up the mouse is released, its pointer shows (centered when
@@ -960,6 +960,9 @@ the menu opens) and its motion, clicks and wheel go to the menus
 (halo_ui_pointer_update, d3d8_gl.c) instead of the controller and the aim. */
 void platform_ui_pointer_set_active(BOOL active)
 {
+#ifdef HALO_IOS
+	if (!getenv("HALO_DESKTOP_INPUT")) return;
+#endif
 	if (!platform_window || (active != FALSE) == (input_state.ui_pointer != FALSE))
 		return;
 	pthread_mutex_lock(&input_lock);

@@ -56,3 +56,6 @@ host_ios_room_ping
 host_ios_room_open
 host_ios_render_height
 host_ios_metalfx_present
+
+host_sdl_window_size
+host_sdl_warp_mouse

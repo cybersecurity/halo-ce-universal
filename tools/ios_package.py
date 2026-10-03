@@ -17,8 +17,8 @@ def package(app, output, require_unsigned=False):
     if info.get('CFBundleExecutable') != 'HaloCE' or not (app/'HaloCE').is_file():
         raise ValueError('Not a complete HaloCE.app')
     files = sorted(p for p in app.rglob('*') if p.is_file())
-    forbidden = {'.map', '.iso', '.xiso', '.p12', '.p8'}
-    if any(p.suffix.lower() in forbidden or p.is_symlink() for p in files):
+    forbidden = {'.map', '.iso', '.xiso', '.xbe', '.p12', '.p8'}
+    if any(p.suffix.lower() in forbidden or p.is_symlink() or p.name in {'game-store.plist', 'integrity.plist', 'config.toml', 'ios-runtime.log'} or any(part in {'maps', 'save'} for part in p.relative_to(app).parts) for p in files):
         raise ValueError('Refusing to package game data, private keys, or symlinks')
     if require_unsigned:
         if any(p.suffix == '.mobileprovision' or '_CodeSignature' in p.parts for p in files):

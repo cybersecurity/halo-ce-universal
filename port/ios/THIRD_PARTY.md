@@ -15,8 +15,9 @@ Other vendored components retain their original notices in the source tree.
 
 Halo, Master Chief, game artwork, and original game assets belong to their
 respective rights holders. The project license does not grant rights to those
-materials. The icon adapts supplied Halo artwork using image generation; see
-[ICON.md](ICON.md). No game maps, disc images, Microsoft signing material, or
+materials. The icon is original geometric artwork; see [ICON.md](ICON.md).
+Apple builds omit the embedded replacement HUD, title and font assets and
+render the artwork from the user-provided disc image. No game maps, disc images, Microsoft signing material, or
 Xbox SDK are distributed in the app. This is an unofficial community port,
 unaffiliated with Microsoft, Bungie, or Halo Studios.
 

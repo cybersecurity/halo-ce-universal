@@ -1,6 +1,10 @@
 /* The game executes natively. WebKit hosts only the bundled PR #12 WebRTC
    transport, with copied bounded packet queues and no downloaded game code. */
+#if HALO_MACOS
+#import <AppKit/AppKit.h>
+#else
 #import <UIKit/UIKit.h>
+#endif
 #import <WebKit/WebKit.h>
 #import <QuartzCore/QuartzCore.h>
 #include <TargetConditionals.h>
@@ -8,14 +12,44 @@
 #include "../host/ios_host.h"
 
 static WKWebView *transport;
+#if HALO_MACOS
+static NSWindow *room_window;
+static NSTextField *status_label;
+@interface NSTextField (HaloText)
+@property(nonatomic,copy) NSString *text;
+@end
+@implementation NSTextField (HaloText)
+-(NSString *)text{return self.stringValue;}
+-(void)setText:(NSString *)text{self.stringValue=text?:@"";}
+@end
+#else
 static UIWindow *room_window;
 static UILabel *status_label;
+#endif
 static NSMutableArray *reports;
 static BOOL in_flight, selected, manual;
 static uint32_t input_ack;
 static NSUInteger session_generation;
 static CFTimeInterval last_tick;
 
+#if HALO_MACOS
+@interface HaloRoomController : NSObject
+@property(nonatomic,strong) NSTextField *code,*status;
+@property(nonatomic) BOOL chosen,cancelled;
+@end
+@implementation HaloRoomController
+-(instancetype)init {if(!(self=[super init]))return nil;
+ self.code=[[NSTextField alloc]initWithFrame:NSMakeRect(20,115,400,28)];self.code.placeholderString=@"Room code";self.code.stringValue=[NSUserDefaults.standardUserDefaults stringForKey:@"haloRoom"]?:@"FQLX01";
+ self.status=[NSTextField wrappingLabelWithString:@"Enter the same room code as your friends."];self.status.frame=NSMakeRect(20,60,400,45);
+ return self;}
+-(void)joinRoom {if(!self.code.stringValue.length)return;self.chosen=YES;self.code.enabled=NO;self.status.stringValue=@"Connecting…";}
+-(void)cancelRoom {self.cancelled=YES;self.chosen=YES;}
+@end
+static void roomPump(void) {
+ NSEvent *event=[NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate dateWithTimeIntervalSinceNow:.008] inMode:NSDefaultRunLoopMode dequeue:YES];if(event)[NSApp sendEvent:event];
+ [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.002]];
+}
+#else
 @interface HaloRoomController : UIViewController<UITextFieldDelegate>
 @property(nonatomic,strong) UITextField *code;
 @property(nonatomic,strong) UILabel *status;
@@ -73,6 +107,8 @@ static CFTimeInterval last_tick;
 - (void)cancelRoom {self.cancelled=YES;self.chosen=YES;[self.view endEditing:YES];}
 - (BOOL)textFieldShouldReturn:(UITextField *)field {(void)field;[self joinRoom];return NO;}
 @end
+
+#endif
 
 @interface HaloRoomNavigation : NSObject<WKNavigationDelegate>
 @end
@@ -184,16 +220,36 @@ void host_ios_room_prepare(void) {
 }
 
 void host_ios_room_open(void) {
+#if HALO_MACOS
+    NSWindow *previous=NSApp.keyWindow;
+#else
     UIWindow *previous=nil;
     UIWindowScene *scene=nil;
     for (UIScene *candidate in UIApplication.sharedApplication.connectedScenes)
         if ([candidate isKindOfClass:UIWindowScene.class]) {scene=(UIWindowScene*)candidate;break;}
     if(!scene){host_logf(HOST_LOG_ERROR,"No window scene for room chooser");return;}
     for(UIWindow *window in scene.windows)if(window.isKeyWindow)previous=window;
+#endif
     ++session_generation;
     [transport evaluateJavaScript:@"HaloNative.leave()" completionHandler:nil];
-    transport=nil;room_window.hidden=YES;in_flight=selected=manual=NO;input_ack=0;last_tick=0;
+    transport=nil;
+#if HALO_MACOS
+    [room_window orderOut:nil];
+#else
+    room_window.hidden=YES;
+#endif
+    in_flight=selected=manual=NO;input_ack=0;last_tick=0;
     ios_room_reset();reports=[NSMutableArray new];host_ios_touch_reset();
+#if HALO_MACOS
+    room_window=[[NSWindow alloc]initWithContentRect:NSMakeRect(0,0,440,180) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];room_window.title=@"Online multiplayer";
+    HaloRoomController *controller=[HaloRoomController new];status_label=controller.status;
+    [room_window.contentView addSubview:controller.code];[room_window.contentView addSubview:controller.status];
+    NSButton *join=[NSButton buttonWithTitle:@"Join room" target:controller action:@selector(joinRoom)];join.frame=NSMakeRect(320,15,100,32);[room_window.contentView addSubview:join];
+    NSButton *cancel=[NSButton buttonWithTitle:@"Cancel" target:controller action:@selector(cancelRoom)];cancel.frame=NSMakeRect(200,15,100,32);[room_window.contentView addSubview:cancel];
+    [room_window center];[room_window makeKeyAndOrderFront:nil];
+    while(!controller.chosen)roomPump();
+    if(controller.cancelled){[room_window orderOut:nil];[previous makeKeyAndOrderFront:nil];return;}
+#else
     room_window=[[UIWindow alloc]initWithWindowScene:scene];
     HaloRoomController *controller=[HaloRoomController new];room_window.rootViewController=controller;
     room_window.windowLevel=UIWindowLevelNormal+1;[room_window makeKeyAndVisible];
@@ -205,6 +261,7 @@ void host_ios_room_open(void) {
 #endif
     while(!controller.chosen)[NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.01]];
     if(controller.cancelled){room_window.hidden=YES;[previous makeKeyAndVisible];return;}
+#endif
     NSString *code=controller.code.text;
     [NSUserDefaults.standardUserDefaults setObject:code forKey:@"haloRoom"];
     WKWebViewConfiguration *config=[WKWebViewConfiguration new];
@@ -212,8 +269,12 @@ void host_ios_room_open(void) {
     config.websiteDataStore=WKWebsiteDataStore.defaultDataStore;
     transport=[[WKWebView alloc] initWithFrame:CGRectMake(0,0,1,1) configuration:config];
     navigation=[HaloRoomNavigation new];transport.navigationDelegate=navigation;
+#if HALO_MACOS
+    [room_window.contentView addSubview:transport];
+#else
     transport.userInteractionEnabled=NO;
     [controller.view addSubview:transport];
+#endif
     NSMutableString *html=[NSMutableString stringWithString:@"<!doctype html><meta name='viewport' content='width=device-width'><script>"];
     for (NSString *name in @[@"net",@"room"]) {
         NSString *path=[NSBundle.mainBundle pathForResource:name ofType:@"js" inDirectory:@"Network"];
@@ -236,7 +297,11 @@ void host_ios_room_open(void) {
             [transport evaluateJavaScript:[NSString stringWithFormat:@"HaloNative.join(%@); true",json] completionHandler:^(id value,NSError*error){(void)value;if(error)joining=NO;}];
         }
         host_ios_room_tick();
+#if HALO_MACOS
+        roomPump();
+#else
         [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.01]];
+#endif
     }
     if (!selected || controller.cancelled) {
         ++session_generation;
@@ -244,11 +309,20 @@ void host_ios_room_open(void) {
         [transport evaluateJavaScript:@"HaloNative.leave()" completionHandler:nil];
         transport=nil;manual=YES;
         host_logf(HOST_LOG_ERROR,"Room connection cancelled or timed out; returning to menus.");
+#if HALO_MACOS
+        [room_window orderOut:nil];
+#else
         room_window.hidden=YES;
+#endif
     }
     // Retain the WebKit view in the foreground scene beneath the SDL window.
+#if HALO_MACOS
+    [room_window orderOut:nil];
+    [previous makeKeyAndOrderFront:nil];
+#else
     room_window.windowLevel=UIWindowLevelNormal-1;
     status_label.hidden=YES;
     [previous makeKeyAndVisible];
+#endif
     host_ios_touch_reset();
 }

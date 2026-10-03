@@ -1,7 +1,11 @@
 /* Shader-source diagnostics are exportable data, never game maps or saves. */
+#if HALO_MACOS
+#import <AppKit/AppKit.h>
+#else
 #import <UIKit/UIKit.h>
+#endif
 #import <QuartzCore/QuartzCore.h>
-#import <OpenGLES/ES3/gl.h>
+#include <GLES3/gl32.h>
 #import <CommonCrypto/CommonDigest.h>
 #include <stdatomic.h>
 #include <string.h>
@@ -20,7 +24,11 @@ static NSString *glRenderer;
 #define HALO_BUILD_REVISION "unknown"
 #endif
 static NSUInteger sourceBytes,dropped;
+#if HALO_MACOS
+static BOOL debugPresented;
+#else
 static __weak UIViewController *debugController;
+#endif
 void halo_debug_initialize(void) {
     NSUserDefaults *settings=NSUserDefaults.standardUserDefaults;
     atomic_store(&recording,[settings boolForKey:@"HaloRecordShaderStalls"] || [NSProcessInfo.processInfo.environment[@"HALO_IOS_TEST_SHADER_CAPTURE"] boolValue]);
@@ -80,14 +88,22 @@ void halo_debug_draw_end(double started) {
     if(events.count>=4096){dropped++;return;}
     [events addObject:@{@"stage":@"first_draw_wait",@"milliseconds":@(ms),@"sources":[attachments[@(currentProgram)] copy]?:@[],@"time":@([NSDate date].timeIntervalSince1970)}];
 }
+#if HALO_MACOS
+int halo_debug_is_presented(void) {return debugPresented;}
+#else
 int halo_debug_is_presented(void) {return debugController!=nil;}
+#endif
 void halo_debug_forget(uint32_t object,int program) {
     if(program)[drawnPrograms removeObject:@(object)];
     if(program)[attachments removeObjectForKey:@(object)];else [shaderKeys removeObjectForKey:@(object)];
 }
+#if HALO_MACOS
+static void exportReport(id presenter) {
+#else
 static void exportReport(UIViewController *presenter) {
+#endif
     prepare();struct utsname device;uname(&device);
-    NSDictionary *report=@{@"schema":@1,@"renderer":halo_graphics_metal()?@"Metal (ANGLE)":@"OpenGL ES (Apple)",@"gpu":glRenderer?:@"unknown",@"revision":@HALO_BUILD_REVISION,@"metalfx":@(halo_metalfx_enabled()!=0),@"device":[NSString stringWithUTF8String:device.machine],@"os":UIDevice.currentDevice.systemVersion,
+    NSDictionary *report=@{@"schema":@1,@"renderer":halo_graphics_metal()?@"Metal (ANGLE)":@"OpenGL ES (Apple)",@"gpu":glRenderer?:@"unknown",@"revision":@HALO_BUILD_REVISION,@"metalfx":@(halo_metalfx_enabled()!=0),@"device":[NSString stringWithUTF8String:device.machine],@"os":NSProcessInfo.processInfo.operatingSystemVersionString,
         @"build":[NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleVersion"]?:@"unknown",@"threshold_ms":@2,
         @"note":@"CPU compile/link completion timings and synchronized first-use draw waits. First-use waits include draw cost and may include deferred driver compilation; they are not isolated shader-compiler timings. Shader sources can guide warm-up updates.",
         @"dropped":@(dropped),@"events":[events copy],@"sources":[sources copy]};
@@ -98,6 +114,13 @@ static void exportReport(UIViewController *presenter) {
     oldReports=[oldReports sortedArrayUsingSelector:@selector(compare:)];
     for(NSUInteger i=0;i+4<oldReports.count;i++)[NSFileManager.defaultManager removeItemAtURL:[folder URLByAppendingPathComponent:oldReports[i]] error:nil];
     NSURL *file=[folder URLByAppendingPathComponent:[NSString stringWithFormat:@"halo-shaders-%.0f.json",NSDate.date.timeIntervalSince1970]];
+#if HALO_MACOS
+    (void)presenter;
+    if(!data || ![data writeToURL:file options:NSDataWritingAtomic error:&error]){NSAlert *alert=[NSAlert new];alert.messageText=@"Export failed";alert.informativeText=error.localizedDescription;[alert runModal];return;}
+    NSSharingService *share=[NSSharingService sharingServiceNamed:NSSharingServiceNameSendViaAirDrop];
+    [share performWithItems:@[file]];
+}
+#else
     if(!data || ![data writeToURL:file options:NSDataWritingAtomic error:&error]){UIAlertController *alert=[UIAlertController alertControllerWithTitle:@"Export failed" message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];[alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];[presenter presentViewController:alert animated:YES completion:nil];return;}
     UIActivityViewController *share=[[UIActivityViewController alloc]initWithActivityItems:@[file] applicationActivities:nil];
     share.popoverPresentationController.sourceView=presenter.view;share.popoverPresentationController.sourceRect=CGRectMake(CGRectGetMidX(presenter.view.bounds),40,1,1);
@@ -169,3 +192,27 @@ void halo_debug_present(void) {
     [presenter presentViewController:navigation animated:YES completion:nil];
     navigation.presentationController.delegate=controller;
 }
+
+#endif
+#if HALO_MACOS
+@interface HaloDebugActions : NSObject
+@end
+@implementation HaloDebugActions
+-(void)upscale:(NSMenuItem *)item {BOOL on=!halo_metalfx_enabled();halo_metalfx_set_enabled(on);[NSUserDefaults.standardUserDefaults setBool:on forKey:@"HaloMetalFX"];item.state=halo_metalfx_enabled()?NSControlStateValueOn:NSControlStateValueOff;}
+-(void)record:(NSMenuItem *)item {BOOL on=!atomic_load(&recording);atomic_store(&recording,on);[drawnPrograms removeAllObjects];[NSUserDefaults.standardUserDefaults setBool:on forKey:@"HaloRecordShaderStalls"];item.state=on?NSControlStateValueOn:NSControlStateValueOff;}
+-(void)share:(id)sender {(void)sender;exportReport(nil);}
+-(void)clear:(id)sender {(void)sender;[events removeAllObjects];[drawnPrograms removeAllObjects];dropped=0;}
+@end
+static HaloDebugActions *actions;
+void halo_debug_present(void) {
+    if(actions)return;prepare();actions=[HaloDebugActions new];
+    if(!NSApp.mainMenu)NSApp.mainMenu=[NSMenu new];
+    NSMenuItem *heading=[[NSMenuItem alloc]initWithTitle:@"Debug" action:NULL keyEquivalent:@""];
+    NSMenu *menu=[[NSMenu alloc]initWithTitle:@"Debug"];menu.autoenablesItems=NO;
+    [menu addItemWithTitle:@"Renderer: Metal (ANGLE)" action:NULL keyEquivalent:@""];
+    NSArray *titles=@[@"MetalFX spatial upscaling",@"Record shader stalls",@"AirDrop shader report…",@"Clear recorded events"];
+    SEL selectors[]={@selector(upscale:),@selector(record:),@selector(share:),@selector(clear:)};
+    for(int i=0;i<4;i++){NSMenuItem *item=[menu addItemWithTitle:titles[i] action:selectors[i] keyEquivalent:@""];item.target=actions;if(i==0){item.enabled=halo_metalfx_supported();item.state=halo_metalfx_enabled();}if(i==1)item.state=atomic_load(&recording);}
+    heading.submenu=menu;[NSApp.mainMenu addItem:heading];
+}
+#endif

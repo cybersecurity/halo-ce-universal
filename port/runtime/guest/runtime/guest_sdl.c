@@ -214,3 +214,9 @@ bool SDL_ShowSimpleMessageBox(SDL_MessageBoxFlags flags, const char *title, cons
     (void)window;
     return host_sdl_show_simple_message_box((unsigned int)flags, title, message) != 0;
 }
+
+bool SDL_GetWindowSize(SDL_Window *window,int *width,int *height) {
+ int w=0,h=0;host_sdl_window_size((unsigned int)window,&w,&h);
+ if(width)*width=w;if(height)*height=h;return w>0 && h>0;
+}
+void SDL_WarpMouseInWindow(SDL_Window *window,float x,float y) {host_sdl_warp_mouse((unsigned int)window,x,y);}

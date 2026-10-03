@@ -320,8 +320,8 @@ static void config_path(char *path, size_t size)
 {
 #ifdef HALO_ILP32
 	/* the data folder, which the app names (port/ios/host/host_main.m) */
-	const char *root = getenv("HALO_DATA_ROOT");
-
+	const char *root = getenv("HALO_CONFIG_ROOT");
+	if (!root || !*root) root = getenv("HALO_DATA_ROOT");
 	snprintf(path, size, "%s/config.toml", root && *root ? root : ".");
 #else
 	/* the executable's folder, with its separator */
