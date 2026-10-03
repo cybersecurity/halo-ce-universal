@@ -36,6 +36,9 @@ symbols in this file:
 #include "physical_memory_map.h"
 #include "main.h"
 #include "rasterizer/xbox/rasterizer_xbox.h"
+#ifdef HALO_NATIVE_PORT
+void platform_open_log(void);
+#endif
 
 /* ---------- prototypes */
 
@@ -104,6 +107,10 @@ shell_idle(
 int main(
 	void)
 {
+#ifdef HALO_NATIVE_PORT
+	/* before anything logs: a Windows GUI process has no console */
+	platform_open_log();
+#endif
 	fuck_code_in_the_eye();
 	rasterizer_preinitialize__fill_you_up_with_the_devils_cock();
 	physical_memory_allocate();

@@ -207,6 +207,10 @@ static const struct config_setting config_settings[] =
 	{ "paths.saves", _config_string, "\"\"", "HALO_SAVE_ROOT", _environment_value, _platform_desktop,
 		"Where saved games and profiles go; empty for the usual place\n"
 		"(~/.local/share/halo-linux, or %APPDATA%\\halo on Windows)." },
+	{ "paths.log", _config_string, "\"\"", "HALO_LOG", _environment_value, _platform_desktop,
+		"Where the port writes its log; empty writes to the terminal, except\n"
+		"on Windows, which has no console and writes halo.log beside the\n"
+		"saves." },
 
 	{ "network.address", _config_string, "\"\"", "HALO_NET_ADDRESS", _environment_value, _platform_all,
 		"This machine's IPv4 address for system link, for a machine on several\n"

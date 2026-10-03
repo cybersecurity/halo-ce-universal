@@ -103,6 +103,8 @@ out of an Xbox disc image into destination (sdl_platform.c), and quits if
 the player declines; nonzero once destination has one */
 BOOL platform_offer_game_data(const char *destination);
 const char *platform_save_root(void);
+/* chosen before anything logs; shell_xbox.c's main calls it first */
+void platform_open_log(void);
 
 /* ---------- contiguous ("physical") memory
 

@@ -18,7 +18,8 @@
     ],
     "defines": [
       "DEBUG",
-      "xbox"
+      "xbox",
+      "HALO_NATIVE_PORT"
     ],
     "include_dirs": [
       "source",

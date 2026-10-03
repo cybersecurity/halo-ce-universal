@@ -6,6 +6,7 @@ threads, asynchronous procedure calls, time, memory and debug output.
 */
 
 #include "platform.h"
+#include "port_config.h"
 
 #include <errno.h>
 #include <sched.h>
@@ -22,15 +23,46 @@ threads, asynchronous procedure calls, time, memory and debug output.
 
 /* ---------- logging */
 
+static FILE *log_file;
+
+/* Where the port's lines go, chosen before anything logs (shell_xbox.c's
+main calls this first). The terminal, except where there is none: a Windows
+GUI process has no console, so stderr is written to an invalid handle and
+every line is lost. There it writes halo.log beside the saves, which is
+also what paths.log asks for on any platform. */
+void platform_open_log(void)
+{
+	const char *configured = config_string("paths.log");
+	char path[MAX_PATH];
+
+	if (*configured)
+		snprintf(path, sizeof(path), "%s", configured);
+#ifdef _WIN32
+	else
+		snprintf(path, sizeof(path), "%s/halo.log", platform_save_root());
+#else
+	else
+		return;
+#endif
+	/* the host's own fopen: in the game's, stdio.h makes it the one that
+	translates Xbox paths */
+	log_file = (fopen)(path, "w");
+	if (log_file)
+		setbuf(log_file, NULL);  /* a crash must not lose the lines explaining it */
+	else
+		fprintf(stderr, "halo-linux: cannot write the log to %s; using the terminal\n", path);
+}
+
 void platform_log(const char *format, ...)
 {
+	FILE *out = log_file ? log_file : stderr;
 	va_list arguments;
 
-	fputs("halo-linux: ", stderr);
+	fputs("halo-linux: ", out);
 	va_start(arguments, format);
-	vfprintf(stderr, format, arguments);
+	vfprintf(out, format, arguments);
 	va_end(arguments);
-	fputc('\n', stderr);
+	fputc('\n', out);
 }
 
 void platform_unimplemented(const char *name)
