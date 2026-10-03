@@ -13,8 +13,66 @@ static UILabel *status_label;
 static NSMutableArray *reports;
 static BOOL in_flight, selected, manual;
 static uint32_t input_ack;
-static char mode[40], target[64];
+static NSUInteger session_generation;
 static CFTimeInterval last_tick;
+
+@interface HaloRoomController : UIViewController<UITextFieldDelegate>
+@property(nonatomic,strong) UITextField *code;
+@property(nonatomic,strong) UILabel *status;
+@property(nonatomic,strong) UIScrollView *scroll;
+@property(nonatomic,strong) UIButton *join;
+@property(nonatomic) BOOL chosen, cancelled;
+@end
+@implementation HaloRoomController
+- (void)viewDidLoad {
+    [super viewDidLoad];self.view.backgroundColor=UIColor.systemBackgroundColor;
+    UILabel *title=[UILabel new];title.text=@"Online multiplayer";title.font=[UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
+    UILabel *hint=[UILabel new];hint.text=@"Enter the same room code as your friends.";hint.numberOfLines=0;
+    self.code=[UITextField new];self.code.borderStyle=UITextBorderStyleRoundedRect;self.code.placeholder=@"Room code";
+    self.code.text=[NSUserDefaults.standardUserDefaults stringForKey:@"haloRoom"] ?: @"FQLX01";
+    self.code.autocapitalizationType=UITextAutocapitalizationTypeAllCharacters;
+    self.code.autocorrectionType=UITextAutocorrectionTypeNo;self.code.returnKeyType=UIReturnKeyJoin;self.code.delegate=self;
+    self.code.accessibilityIdentifier=@"halo.room.code";
+    self.status=[UILabel new];self.status.numberOfLines=0;self.status.font=[UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
+    UIStackView *fields=[[UIStackView alloc]initWithArrangedSubviews:@[title,hint,self.code,self.status]];
+    fields.axis=UILayoutConstraintAxisVertical;fields.spacing=8;fields.translatesAutoresizingMaskIntoConstraints=NO;
+    self.scroll=[UIScrollView new];self.scroll.translatesAutoresizingMaskIntoConstraints=NO;self.scroll.keyboardDismissMode=UIScrollViewKeyboardDismissModeInteractive;
+    [self.view addSubview:self.scroll];[self.scroll addSubview:fields];
+    UIButton *cancel=[UIButton buttonWithType:UIButtonTypeSystem];[cancel setTitle:@"Cancel" forState:UIControlStateNormal];
+    [cancel addTarget:self action:@selector(cancelRoom) forControlEvents:UIControlEventTouchUpInside];
+    self.join=[UIButton buttonWithType:UIButtonTypeSystem];[self.join setTitle:@"Join room" forState:UIControlStateNormal];
+    [self.join addTarget:self action:@selector(joinRoom) forControlEvents:UIControlEventTouchUpInside];
+    UIStackView *actions=[[UIStackView alloc]initWithArrangedSubviews:@[cancel,self.join]];actions.distribution=UIStackViewDistributionFillEqually;actions.spacing=16;actions.translatesAutoresizingMaskIntoConstraints=NO;
+    [self.view addSubview:actions];UILayoutGuide *safe=self.view.safeAreaLayoutGuide;
+    [NSLayoutConstraint activateConstraints:@[
+        [actions.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:16],
+        [actions.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-16],
+        [actions.bottomAnchor constraintEqualToAnchor:self.view.keyboardLayoutGuide.topAnchor constant:-8],
+        [actions.heightAnchor constraintEqualToConstant:44],
+        [self.scroll.topAnchor constraintEqualToAnchor:safe.topAnchor constant:8],
+        [self.scroll.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:16],
+        [self.scroll.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-16],
+        [self.scroll.bottomAnchor constraintEqualToAnchor:actions.topAnchor constant:-8],
+        [fields.topAnchor constraintEqualToAnchor:self.scroll.contentLayoutGuide.topAnchor],
+        [fields.bottomAnchor constraintEqualToAnchor:self.scroll.contentLayoutGuide.bottomAnchor],
+        [fields.leadingAnchor constraintEqualToAnchor:self.scroll.contentLayoutGuide.leadingAnchor],
+        [fields.trailingAnchor constraintEqualToAnchor:self.scroll.contentLayoutGuide.trailingAnchor],
+        [fields.widthAnchor constraintEqualToAnchor:self.scroll.frameLayoutGuide.widthAnchor],
+        [self.code.heightAnchor constraintEqualToConstant:44]]];
+}
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    if(self.code.isFirstResponder)[self.scroll scrollRectToVisible:[self.code convertRect:self.code.bounds toView:self.scroll] animated:NO];
+}
+- (void)joinRoom {
+    NSString *text=[self.code.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if(!text.length){self.status.text=@"Enter a room code.";return;}
+    self.code.text=text;self.chosen=YES;self.join.enabled=NO;self.code.enabled=NO;
+    [self.view endEditing:YES];self.status.text=@"Connecting…";
+}
+- (void)cancelRoom {self.cancelled=YES;self.chosen=YES;[self.view endEditing:YES];}
+- (BOOL)textFieldShouldReturn:(UITextField *)field {(void)field;[self joinRoom];return NO;}
+@end
 
 @interface HaloRoomNavigation : NSObject<WKNavigationDelegate>
 @end
@@ -26,7 +84,7 @@ static CFTimeInterval last_tick;
         ? WKNavigationActionPolicyAllow : WKNavigationActionPolicyCancel);
 }
 - (void)webViewWebContentProcessDidTerminate:(WKWebView *)view {
-    (void)view;
+    if(view!=transport)return;
     host_logf(HOST_LOG_ERROR, "Room transport stopped; restart the app to reconnect.");
     const uint32_t command[4] = {2, 1, 0, 0}; ios_room_queue_command(command);
     status_label.text = @"Network process stopped. Restart the app to reconnect.";
@@ -67,7 +125,9 @@ void host_ios_room_tick(void) {
     NSData *json = [NSJSONSerialization dataWithJSONObject:request options:0 error:nil];
     NSString *script = [NSString stringWithFormat:@"HaloNative.exchange(%@)", [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding]];
     in_flight = YES;
+    NSUInteger generation=session_generation;
     [transport evaluateJavaScript:script completionHandler:^(id result, NSError *error) {
+        if(generation!=session_generation)return;
         in_flight = NO;
         if (error || ![result isKindOfClass:NSDictionary.class]) {
             // During initial document loading HaloNative does not exist yet.
@@ -109,46 +169,43 @@ void host_ios_room_tick(void) {
             NSString *role=selection[@"role"];
             if (![role isEqualToString:@"host"] && ![role isEqualToString:@"join"]) return;
             uint32_t ip=[selection[@"hostAddress"] unsignedIntValue];
-            snprintf(mode,sizeof(mode),"HALO_QUICK_PLAY=%s",role.UTF8String);
-            snprintf(target,sizeof(target),"HALO_QUICK_PLAY_TARGET=%u.%u.%u.%u",ip&255,(ip>>8)&255,(ip>>16)&255,ip>>24);
+            const uint32_t start[4]={6,[role isEqualToString:@"host"]?1U:2U,ip,[selection[@"epoch"] unsignedIntValue]};
+            if(!ios_room_queue_command(start)){network_error(@"Room command queue full");return;}
             selected=YES;
         }
     }];
 }
 
-const char *host_ios_room_mode(void) { return mode; }
-const char *host_ios_room_target(void) { return target; }
-
 void host_ios_room_prepare(void) {
-    reports=[NSMutableArray new];
+#if TARGET_OS_SIMULATOR
+    if([NSProcessInfo.processInfo.environment[@"HALO_IOS_TEST_ROOM"] length] ||
+       [NSProcessInfo.processInfo.environment[@"HALO_IOS_TEST_ROOM_UI"] isEqualToString:@"1"])host_ios_room_open();
+#endif
+}
+
+void host_ios_room_open(void) {
+    UIWindow *previous=nil;
     UIWindowScene *scene=nil;
     for (UIScene *candidate in UIApplication.sharedApplication.connectedScenes)
         if ([candidate isKindOfClass:UIWindowScene.class]) {scene=(UIWindowScene*)candidate;break;}
-    if (!scene) { host_logf(HOST_LOG_ERROR,"No window scene for room chooser"); return; }
-    room_window=[[UIWindow alloc] initWithWindowScene:scene];
-    UIViewController *controller=[UIViewController new];
-    controller.view.backgroundColor=UIColor.systemBackgroundColor;
-    room_window.rootViewController=controller;
-    [room_window makeKeyAndVisible];
-    status_label=[[UILabel alloc] initWithFrame:CGRectMake(24,24,scene.coordinateSpace.bounds.size.width-48,100)];
-    status_label.numberOfLines=0; status_label.text=@"Choose a browser room, or open the game menus.";
-    [controller.view addSubview:status_label];
-    __block BOOL chosen=NO;
-    __block NSString *code=nil;
-    UIAlertController *chooser=[UIAlertController alertControllerWithTitle:@"Halo online" message:@"Enter the same room code as the web players. Keep the app open during play." preferredStyle:UIAlertControllerStyleAlert];
-    [chooser addTextFieldWithConfigurationHandler:^(UITextField *field){field.placeholder=@"Room code";field.text=[NSUserDefaults.standardUserDefaults stringForKey:@"haloRoom"] ?: @"FQLX01";field.autocapitalizationType=UITextAutocapitalizationTypeAllCharacters;}];
-    [chooser addAction:[UIAlertAction actionWithTitle:@"Game menus" style:UIAlertActionStyleCancel handler:^(UIAlertAction*a){(void)a;manual=YES;chosen=YES;}]];
-    [chooser addAction:[UIAlertAction actionWithTitle:@"Join room" style:UIAlertActionStyleDefault handler:^(UIAlertAction*a){(void)a;code=chooser.textFields.firstObject.text;chosen=YES;}]];
+    if(!scene){host_logf(HOST_LOG_ERROR,"No window scene for room chooser");return;}
+    for(UIWindow *window in scene.windows)if(window.isKeyWindow)previous=window;
+    ++session_generation;
+    [transport evaluateJavaScript:@"HaloNative.leave()" completionHandler:nil];
+    transport=nil;room_window.hidden=YES;in_flight=selected=manual=NO;input_ack=0;last_tick=0;
+    ios_room_reset();reports=[NSMutableArray new];host_ios_touch_reset();
+    room_window=[[UIWindow alloc]initWithWindowScene:scene];
+    HaloRoomController *controller=[HaloRoomController new];room_window.rootViewController=controller;
+    room_window.windowLevel=UIWindowLevelNormal+1;[room_window makeKeyAndVisible];
+    [controller loadViewIfNeeded];status_label=controller.status;
 #if TARGET_OS_SIMULATOR
-    // Explicit simulator launch settings make real-engine smoke tests repeatable.
-    NSDictionary *environment=NSProcessInfo.processInfo.environment;
-    NSString *test_room=environment[@"HALO_IOS_TEST_ROOM"];
-    if (test_room.length) {code=test_room;chosen=YES;}
-    else if ([environment[@"HALO_IOS_TEST_MENUS"] isEqualToString:@"1"]) {manual=YES;chosen=YES;}
+    NSString *test_room=NSProcessInfo.processInfo.environment[@"HALO_IOS_TEST_ROOM"];
+    if(test_room.length){controller.code.text=test_room;[controller joinRoom];}
+    else if([NSProcessInfo.processInfo.environment[@"HALO_IOS_TEST_ROOM_UI"] isEqualToString:@"1"])[controller.code becomeFirstResponder];
 #endif
-    if (!chosen) [controller presentViewController:chooser animated:NO completion:nil];
-    while (!chosen) [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.01]];
-    if (manual) {room_window.hidden=YES;return;}
+    while(!controller.chosen)[NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.01]];
+    if(controller.cancelled){room_window.hidden=YES;[previous makeKeyAndVisible];return;}
+    NSString *code=controller.code.text;
     [NSUserDefaults.standardUserDefaults setObject:code forKey:@"haloRoom"];
     WKWebViewConfiguration *config=[WKWebViewConfiguration new];
     // Isolated persistent origin retains the virtual room address across launches.
@@ -173,7 +230,7 @@ void host_ios_room_prepare(void) {
     NSString *json=[[NSString alloc]initWithData:[NSJSONSerialization dataWithJSONObject:options options:0 error:nil] encoding:NSUTF8StringEncoding];
     NSDate *deadline=[NSDate dateWithTimeIntervalSinceNow:90];
     __block BOOL joining=NO;
-    while (!selected && deadline.timeIntervalSinceNow>0) {
+    while (!selected && !controller.cancelled && deadline.timeIntervalSinceNow>0) {
         if(!transport.loading && !joining){
             joining=YES;
             [transport evaluateJavaScript:[NSString stringWithFormat:@"HaloNative.join(%@); true",json] completionHandler:^(id value,NSError*error){(void)value;if(error)joining=NO;}];
@@ -181,12 +238,17 @@ void host_ios_room_prepare(void) {
         host_ios_room_tick();
         [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.01]];
     }
-    if (!selected) {
+    if (!selected || controller.cancelled) {
+        ++session_generation;
+        ios_room_reset();selected=NO;in_flight=NO;
         [transport evaluateJavaScript:@"HaloNative.leave()" completionHandler:nil];
         transport=nil;manual=YES;
-        host_logf(HOST_LOG_ERROR,"Room connection timed out; opening game menus.");
+        host_logf(HOST_LOG_ERROR,"Room connection cancelled or timed out; returning to menus.");
+        room_window.hidden=YES;
     }
     // Retain the WebKit view in the foreground scene beneath the SDL window.
     room_window.windowLevel=UIWindowLevelNormal-1;
     status_label.hidden=YES;
+    [previous makeKeyAndVisible];
+    host_ios_touch_reset();
 }

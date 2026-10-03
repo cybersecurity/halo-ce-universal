@@ -10,6 +10,13 @@ void web_js_post(int kind, const char *text) { if (kind == 6) host_ios_room_repo
 int web_net_host_ping(unsigned int address, unsigned int host, unsigned int epoch) {
     return host_ios_room_ping(address, host, epoch);
 }
+void ios_quick_play_reset(void);
+void ios_quick_play_begin(int host, unsigned long target, unsigned int epoch);
+void ios_room_open(void) {
+    web_quick_play_cancel();web_quick_play_take_cancel();
+    ios_quick_play_reset();
+    host_ios_room_open();
+}
 void ios_room_pump(void) {
     unsigned int c[4];
     for (int count = 0; count < 32 && host_ios_room_poll(c); count++) {
@@ -19,6 +26,7 @@ void ios_room_pump(void) {
         case 3: web_quick_play_migrate(c[1], c[2], c[3]); break;
         case 4: web_quick_play_reconnect(c[1], c[2]); break;
         case 5: web_quick_play_cancel(); break;
+        case 6: ios_quick_play_begin(c[1]==1,quick_play_engine_address(c[2]),c[3]); break;
         }
     }
 }

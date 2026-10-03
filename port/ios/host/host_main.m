@@ -88,10 +88,6 @@ int main(int argc,char **argv) {
         if(render_height>0){snprintf(env_render,sizeof(env_render),"HALO_RENDER_HEIGHT=%d",render_height);env[env_count++]=env_render;}
 #endif
         env[env_count++]="HALO_NET_ONLINE=0";
-        if (host_ios_room_mode()[0]) {
-            env[env_count++]=host_ios_room_mode();
-            env[env_count++]=host_ios_room_target();
-        }
         env[env_count++]="TZ=UTC0";env[env_count++]=NULL;
         uint32_t *environment=host_low_map(sizeof(uint32_t)*env_count,PROT_READ|PROT_WRITE);
         for(size_t i=0;i<env_count-1;i++)environment[i]=copy_string(env[i]);environment[env_count-1]=0;

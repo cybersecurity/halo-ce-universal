@@ -65,12 +65,13 @@ After installing the simulator app and adding maps to its Documents folder,
 these explicit launch settings bypass the room chooser for repeatable tests:
 
 ```sh
-SIMCTL_CHILD_HALO_IOS_TEST_MENUS=1 xcrun simctl launch SIMULATOR_UDID org.haloce.ios
+xcrun simctl launch SIMULATOR_UDID org.haloce.ios
 SIMCTL_CHILD_HALO_IOS_TEST_ROOM=YOUR_TEST_ROOM xcrun simctl launch SIMULATOR_UDID org.haloce.ios
 ```
 
 Terminate the app between launches. These settings apply only to simulator
-builds; device builds always show the normal chooser. Use a unique room code
+builds; normal launches open the game menus. `HALO_IOS_TEST_ROOM_UI=1`
+opens the room form with its keyboard for simulator layout inspection. Use a unique room code
 and the same code in a browser build from the pinned PR #12 source.
 
 ## Install and add game data
@@ -174,7 +175,31 @@ A selects/jumps; B returns/melees; X reloads/uses; Y changes weapons. Separate
 buttons provide fire, grenade, crouch, zoom, flashlight, grenade selection,
 and pause. Hold buttons for held actions. “Hide controls” leaves a small toggle
 so a connected hardware controller can be used with an unobstructed picture.
+Compatible Backbone, Xbox and PlayStation controllers use SDL's iOS gamepad
+backend. Pair Bluetooth controllers in iOS Settings > Bluetooth before or
+while the app runs; attach a compatible wired Backbone directly to the phone.
+See [Apple's controller pairing guide](https://support.apple.com/en-ie/111099).
+The USB-C Backbone requires a compatible USB-C device; it cannot plug directly
+into the Lightning iPhone 13 Pro.
+
 The first hardware controller shares player one with the on-screen controls.
+Touch controls hide when a gamepad connects and return when it disconnects;
+**Show controls** remains available to override hiding. Player one's controller
+stays selected while connected, even if another controller is attached.
+
+| Action | Xbox / standard labels | PlayStation labels |
+| --- | --- | --- |
+| Select / jump | A | Cross |
+| Back / melee | B | Circle |
+| Reload / use | X | Square |
+| Switch weapon | Y | Triangle |
+| Fire / grenade | RT / LT | R2 / L2 |
+| Flashlight / switch grenade | RB / LB | R1 / L1 |
+| Crouch / zoom | Left / right stick click | L3 / R3 |
+| Pause | Menu / Start | Options |
+
+Actual Backbone, Xbox and PlayStation hardware validation remains pending;
+controller model-specific capabilities such as haptics are not promised.
 Developer console messages, frame counters, profiling text and the menu's build label are omitted
 from the game picture. Diagnostic log files remain available in Documents.
 
@@ -195,11 +220,16 @@ web demo may have another network version and is not a supported comparison.
 Both players need matching original Xbox maps. Protocol compatibility does not
 establish compatibility between different game-data releases.
 
-After map import, choose **Join room** and enter the web player's room code.
+After map import, the app opens Halo's main menu. Select **Multiplayer →
+System Link** to open the native online-room form, then enter the web player's
+room code and choose **Join room**. The original Xbox maps supply the System
+Link label; on this iOS target it opens browser-compatible online rooms.
+The keyboard stays closed until the code field is tapped. The form scrolls,
+and Cancel/Join stay above the keyboard in landscape.
 The shared room controller elects a host and starts quick play, initially
 Beaver Creek Slayer. A native player can be elected host or join a web host.
-Choose **Game menus** to use the original menus instead. Room selection runs
-once per launch; relaunch to change rooms. Keep the app in the foreground.
+Cancel returns to the menus. After leaving a match, reopen System Link to
+choose another room. Keep the app in the foreground.
 Background survival and recovery on physical devices remain unverified.
 
 The game, renderer, audio and memory runtime are compiled native ARM64 code.

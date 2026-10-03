@@ -52,3 +52,5 @@ host_sdl_show_simple_message_box
 host_ios_room_poll
 host_ios_room_report
 host_ios_room_ping
+
+host_ios_room_open

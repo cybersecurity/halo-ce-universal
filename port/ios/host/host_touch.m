@@ -8,6 +8,8 @@
 
 static SDL_Joystick *touch_joystick;
 static SDL_JoystickID touch_id, primary_hardware;
+static SDL_Gamepad *primary_gamepad;
+static NSString *const controllerChanged = @"HaloControllerChanged";
 
 static void button_state(int button, BOOL down) {
     if(touch_joystick) SDL_SetJoystickVirtualButton(touch_joystick,button,down);
@@ -32,14 +34,23 @@ void host_ios_touch_initialize(void) {
 }
 int host_ios_gamepads(uint32_t *out,int capacity) {
     int count=0,used=0;SDL_JoystickID *ids=SDL_GetGamepads(&count);
-    primary_hardware=0;
+    SDL_JoystickID next=0;
+    for(int i=0;i<count;i++)if(ids[i]!=touch_id) {
+        if(!next || ids[i]==primary_hardware)next=ids[i];
+        if(ids[i]==primary_hardware)break;
+    }
+    if(next!=primary_hardware) {
+        if(primary_gamepad)SDL_CloseGamepad(primary_gamepad);
+        primary_gamepad=next?SDL_OpenGamepad(next):NULL;
+        primary_hardware=primary_gamepad?next:0;
+        host_logf(HOST_LOG_INFO,"controller: %s",primary_gamepad?SDL_GetGamepadName(primary_gamepad):"disconnected; using touch");
+        void (^announce)(void)=^{[NSNotificationCenter.defaultCenter postNotificationName:controllerChanged object:nil];};
+        if(NSThread.isMainThread)announce();else dispatch_async(dispatch_get_main_queue(),announce);
+    }
     if(capacity>0 && touch_id)out[used++]=touch_id;
     for(int i=0;i<count;i++) {
-        if(ids[i]==touch_id)continue;
-        if(!primary_hardware) {
-            primary_hardware=ids[i];
-            if(!SDL_GetGamepadFromID(ids[i]))SDL_OpenGamepad(ids[i]);
-        } else if(used<capacity) out[used++]=ids[i];
+        if(ids[i]==touch_id || ids[i]==primary_hardware)continue;
+        if(used<capacity)out[used++]=ids[i];
     }
     SDL_free(ids);return used;
 }
@@ -50,7 +61,7 @@ int host_ios_gamepad_type(SDL_Gamepad *pad) {
 int host_ios_gamepad_axis(SDL_Gamepad *pad,int axis) {
     int value=SDL_GetGamepadAxis(pad,axis);
     if(SDL_GetGamepadID(pad)==touch_id && primary_hardware) {
-        int physical=SDL_GetGamepadAxis(SDL_GetGamepadFromID(primary_hardware),axis);
+        int physical=SDL_GetGamepadAxis(primary_gamepad,axis);
         if(abs(physical)>abs(value))value=physical;
     }
     return value;
@@ -58,7 +69,7 @@ int host_ios_gamepad_axis(SDL_Gamepad *pad,int axis) {
 int host_ios_gamepad_button(SDL_Gamepad *pad,int button) {
     return SDL_GetGamepadButton(pad,button) ||
         (SDL_GetGamepadID(pad)==touch_id && primary_hardware &&
-         SDL_GetGamepadButton(SDL_GetGamepadFromID(primary_hardware),button));
+         SDL_GetGamepadButton(primary_gamepad,button));
 }
 void host_ios_touch_reset(void) {
     for(int i=0;i<SDL_GAMEPAD_BUTTON_COUNT;i++)button_state(i,NO);
@@ -162,13 +173,20 @@ void host_ios_touch_reset(void) {
     self.toggle.backgroundColor=[UIColor colorWithWhite:0 alpha:.3];self.toggle.layer.cornerRadius=12;
     [self.toggle addTarget:self action:@selector(toggleControls) forControlEvents:UIControlEventTouchUpInside];[self addSubview:self.toggle];
     [[NSNotificationCenter defaultCenter]addObserver:self selector:@selector(reset) name:UIApplicationWillResignActiveNotification object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(controllerChanged) name:controllerChanged object:nil];
+    [self controllerChanged];
     return self;
+}
+- (void)controllerChanged { [self setControlsHidden:primary_hardware!=0]; }
+- (void)setControlsHidden:(BOOL)hidden {
+    [self reset];
+    self.moveStick.hidden=self.lookStick.hidden=hidden;
+    for(UIView *button in self.buttons)button.hidden=hidden;
+    [self.toggle setTitle:hidden?@"Show controls":@"Hide controls" forState:UIControlStateNormal];
 }
 - (void)reset {host_ios_touch_reset();[self.moveStick reset];[self.lookStick reset];}
 - (void)toggleControls {
-    [self reset];BOOL hidden=!self.moveStick.hidden;
-    self.moveStick.hidden=self.lookStick.hidden=hidden;for(UIView *b in self.buttons)b.hidden=hidden;
-    [self.toggle setTitle:hidden?@"Show controls":@"Hide controls" forState:UIControlStateNormal];
+    [self setControlsHidden:!self.moveStick.hidden];
 }
 - (void)layoutSubviews {
     [super layoutSubviews];CGRect r=UIEdgeInsetsInsetRect(self.bounds,self.safeAreaInsets);

@@ -92,6 +92,23 @@ static void quick_play_finish(const char *phase, const char *message, boolean le
 	web_quick_play_report(phase, message);
 }
 
+#if defined(HALO_IOS_BROWSER) || defined(HALO_QUICK_PLAY_TEST)
+/* Called only on the game thread after the menu disposes the old session. */
+void ios_quick_play_reset(void)
+{
+    memset(&quick_play, 0, sizeof(quick_play));
+    quick_play.checked = TRUE;
+}
+void ios_quick_play_begin(int host, unsigned long target, unsigned int epoch)
+{
+    ios_quick_play_reset();
+    quick_play.host = host;
+    quick_play.target = target;
+    quick_play.epoch = epoch;
+    quick_play_phase(QUICK_SETTLING, system_milliseconds(), "loading", "Opening multiplayer...");
+}
+#endif
+
 static void quick_play_show_lobby(void)
 {
 	ui_widgets_close_all();

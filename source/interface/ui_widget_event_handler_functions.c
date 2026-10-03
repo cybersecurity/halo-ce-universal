@@ -2288,6 +2288,16 @@ static boolean network_game_server_list_initialize(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
+#ifdef HALO_IOS_BROWSER
+    /* Original Xbox maps call this handler when System Link is opened. */
+    { void ios_room_open(void);
+      dispose_global_network_game_client();
+      dispose_global_network_game_server();
+      main_goto_main_menu();
+      ios_room_open();
+      return TRUE; }
+#else
+
 	boolean result = TRUE;
 
 	dispose_global_network_game_client();
@@ -2301,6 +2311,7 @@ static boolean network_game_server_list_initialize(
 		result = FALSE;
 	}
 	return result;
+#endif
 }
 
 static boolean main_menu_initialize(

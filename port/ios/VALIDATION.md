@@ -53,6 +53,25 @@ same engine with simulator-only launch settings added to bypass the chooser;
 those settings do not affect device builds. Local host migration tests also
 pass with the `HALO_IOS_BROWSER` feature guard and reject original failure cases.
 
+## Menu and controller follow-up
+
+- Normal launch now opens Halo's main menu. The signed update was installed on
+  the designated iPhone 13 Pro (iOS 26.7.1); its screenshot confirms the menu,
+  and its log reports 194 resolved imports and active PCM output.
+- System Link's menu handler now opens the room chooser after startup. The
+  native form uses the keyboard layout guide and a scrollable field area;
+  a landscape simulator screenshot with the keyboard visible confirms the
+  code field and both action buttons remain on screen.
+- The real quick-play state machine passes deferred-start and repeat-start
+  tests; stale packet/control/ping state is cleared between room selections.
+  A simulator room launch still reaches Beaver Creek gameplay.
+- SDL hardware-controller routing retains the connected primary gamepad,
+  balances its owned open/close reference, logs changes and automatically
+  hides/restores touch controls. The simulator's gamepad triggers hiding;
+  Backbone/Xbox/PlayStation hardware behavior remains unverified.
+- The iPhone 15 Pro is excluded from further device testing at the user's
+  request. Physical-device tests now target only the iPhone 13 Pro.
+
 ## Reproduce
 
 ```sh

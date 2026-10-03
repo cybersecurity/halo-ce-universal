@@ -99,6 +99,7 @@ void host_gl_wait_frame(unsigned int slot);
 int host_sdl_show_simple_message_box(unsigned int flags, const char *title, const char *message);
 
 /* Browser room control uses only fixed-width scalars at the ABI boundary. */
+void host_ios_room_open(void);
 int host_ios_room_poll(unsigned int *command);
 void host_ios_room_report(const char *json);
 int host_ios_room_ping(unsigned int address, unsigned int host, unsigned int epoch);

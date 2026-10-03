@@ -5,6 +5,11 @@
 static struct web_shared_state shared;
 static pthread_mutex_t command_lock = PTHREAD_MUTEX_INITIALIZER;
 static uint32_t commands[64][4], command_read, command_write;
+void ios_room_reset(void) {
+    pthread_mutex_lock(&command_lock);
+    memset(&shared,0,sizeof(shared));command_read=command_write=0;
+    pthread_mutex_unlock(&command_lock);
+}
 struct web_shared_state *web_shared_state(void) { return &shared; }
 static void ring_copy(void *out, const unsigned char *ring, size_t capacity,
     uint32_t offset, size_t size) {

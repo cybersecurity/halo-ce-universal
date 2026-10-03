@@ -108,6 +108,16 @@ static void launch(const char *setting)
 
 int main(void)
 {
+    /* Room selection can start after normal menu startup, then start again
+       after a previous session; no stale ownership/map/epoch is retained. */
+    reset("");step(0,TRUE);assert(created==0 && quick_play.checked);
+    ios_quick_play_begin(0,0x0a010203UL,2);step(0,TRUE);step(2000,TRUE);
+    assert(created==1 && quick_play.target==0x0a010203UL && quick_play.epoch==2);
+    dispose_global_network_game_client();dispose_global_network_game_server();
+    ios_quick_play_reset();assert(quick_play.phase==QUICK_OFF && !quick_play.owned);
+    ios_quick_play_begin(1,0,0);step(0,TRUE);step(2000,TRUE);
+    assert(created==2 && quick_play.host && quick_play.epoch==0);
+    reset("");
 	unsigned long address;
 	/* Must match transport_client_start's SWAP4(socket address), not the
 	JS ring's little-endian socket word; otherwise every elected host is skipped. */

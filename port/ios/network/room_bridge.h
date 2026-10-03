@@ -12,6 +12,6 @@ void ios_room_update_pings(uint32_t host, uint32_t epoch, uint32_t updated,
     const int32_t rows[][2], size_t count);
 void host_ios_room_prepare(void);
 void host_ios_room_tick(void);
-const char *host_ios_room_mode(void);
-const char *host_ios_room_target(void);
+void host_ios_room_open(void);
+void ios_room_reset(void);
 #endif

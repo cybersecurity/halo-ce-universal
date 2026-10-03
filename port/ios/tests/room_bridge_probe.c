@@ -10,6 +10,12 @@ int host_ios_room_poll(unsigned int *command);
 struct address { uint16_t family, port; uint32_t ip; unsigned char padding[8]; };
 int main(void) {
     struct web_shared_state *s=web_shared_state();
+    /* Changing rooms must not replay packets, pings or commands from the old room. */
+    s->net_out_write=32;s->net_in_write=32;s->net_local_address=123;s->ping_count=1;
+    const uint32_t old_command[4]={3,1,123,9};unsigned int discarded[4];
+    assert(ios_room_queue_command(old_command));ios_room_reset();
+    assert(!host_ios_room_poll(discarded));
+    assert(!s->net_out_write && !s->net_in_write && !s->net_local_address && !s->ping_count);
     struct address local={2,0x3412,0,{0}}, remote={2,0x7856,0x0302010a,{0}};
     s->net_local_address=0x0402010a;
     int socket=posix_socket(2,2,0);
