@@ -61,3 +61,15 @@ test('ping snapshot preserves signed unavailable values and network address word
   words[10]=0x0a010204;words[11]=37;words[12]=0x0a010205;words[13]=-1;
   assert.deepEqual(plain(api.exchange({}).pings),{host:0x0a010203,epoch:4,updated:4294967286,rows:[[0x0a010204,37],[0x0a010205,-1]]});
 });
+
+test('all 128 browser ping rows fit without overwriting packet queues',()=>{
+  const {api,words,bytes}=fixture();
+  assert.equal(api.offsets.pingPeerCount,128);
+  words[9]=128;
+  for(let i=0;i<128;i++){words[10+i*2]=0x0a010200+i;words[11+i*2]=i;}
+  const packet=frame();assert.equal(api.exchange({out:packet.toString('base64')}).sent,32);
+  const pings=api.exchange({}).pings;
+  assert.equal(pings.rows.length,128);
+  assert.deepEqual(plain(pings.rows[127]),[0x0a01027f,127]);
+  assert.deepEqual(Buffer.from(bytes.subarray(api.offsets.netOut,api.offsets.netOut+32)),packet);
+});

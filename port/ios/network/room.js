@@ -3,12 +3,13 @@
 'use strict';
 const HaloNative = (() => {
   const OUT = 1024 * 1024, IN = 2 * OUT, LIMIT = 256 * 1024;
+  const PING_PEERS = 128, META = 40 + PING_PEERS * 8;
   const offsets = { netLocalAddress: 0, netOutWrite: 4, netOutRead: 8,
     netInWrite: 12, netInRead: 16, pingSequence: 20, pingHost: 24,
-    pingEpoch: 28, pingUpdated: 32, pingCount: 36, pingPeers: 40, pingPeerCount: 16,
-    netOut: 256, netOutBytes: OUT,
-    netIn: 256 + OUT, netInBytes: IN };
-  const buffer = new ArrayBuffer(256 + OUT + IN);
+    pingEpoch: 28, pingUpdated: 32, pingCount: 36, pingPeers: 40, pingPeerCount: PING_PEERS,
+    netOut: META, netOutBytes: OUT,
+    netIn: META + OUT, netInBytes: IN };
+  const buffer = new ArrayBuffer(META + OUT + IN);
   const bytes = new Uint8Array(buffer), words = new Int32Array(buffer);
   const commands = [];
   let pending = null, inputId = 0, selected = null, error = null, status = 'Ready';
@@ -99,7 +100,7 @@ const HaloNative = (() => {
       const input = incoming(value.ack);
       return {sent, input, commands: commands.splice(0), selected, error, status,
         address: HaloNet.address, pings: {host: words[6] >>> 0, epoch: words[7] >>> 0, updated: words[8] >>> 0,
-          rows: Array.from({length: Math.max(0, Math.min(16, words[9]))},
+          rows: Array.from({length: Math.max(0, Math.min(PING_PEERS, words[9]))},
             (_, i) => [words[10 + i * 2] >>> 0, words[11 + i * 2]])}};
     },
     async leave() { command(5); await HaloNet.leave(); selected = null; },

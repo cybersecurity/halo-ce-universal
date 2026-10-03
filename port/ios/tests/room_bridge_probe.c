@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
+#include "../../web/src/web_ping.h"
 
 int host_ios_room_poll(unsigned int *command);
 struct address { uint16_t family, port; uint32_t ip; unsigned char padding[8]; };
@@ -48,6 +50,15 @@ int main(void) {
     assert(!ios_room_queue_command(command));
     for(int i=0;i<64;i++){assert(host_ios_room_poll(copy));assert(!memcmp(command,copy,16));}
     assert(!host_ios_room_poll(copy));
+    struct timespec now;clock_gettime(CLOCK_REALTIME,&now);
+    uint32_t milliseconds=(uint32_t)((uint64_t)now.tv_sec*1000+now.tv_nsec/1000000);
+    int32_t pings[128][2];
+    for(int i=0;i<128;i++){pings[i][0]=0x0a010200+i;pings[i][1]=i;}
+    ios_room_update_pings(0x0a010204,7,milliseconds,pings,128);
+    assert(web_net_host_ping(0x7f02010a,0x0402010a,7)==127);
+    assert(web_net_host_ping(0x7f02010a,0x0402010a,8)==-1);
+    ios_room_update_pings(0x0a010204,7,milliseconds-60000,pings,128);
+    assert(web_net_host_ping(0x7f02010a,0x0402010a,7)==-1);
     assert(posix_socket_close(socket)==0);
     puts("PASS: native browser sockets, wraparound, framing, backpressure, control ordering");
 }

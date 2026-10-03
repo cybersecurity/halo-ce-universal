@@ -18,12 +18,18 @@ Reports of gameplay on the original iOS fork are not validation of this merge.
 - Display sizing and fifteen synthetic XISO regressions passed under sanitizers.
 - Native virtual sockets passed packet framing, ring/counter wraparound,
   backpressure and ordered control-queue tests under ASan/UBSan.
-- JavaScript suite: all 130 tests passed, including five new native adapter
-  tests, including delayed acknowledgements and migration/reconnect callbacks.
+- JavaScript suite: all 132 tests passed, including six new native adapter
+  tests, including delayed acknowledgements, all 128 ping rows and migration/reconnect callbacks.
 - A real macOS WebKit-to-Chromium WebRTC connection carried 4,096 exact datagram
   bytes and 262,144 exact ordered reliable-stream bytes from native virtual
   sockets and back through PR #12's transport.
   This tests the network bridge, not the game or an iPhone.
+
+The shared browser build and relay CI passed at `30372ca8`; iOS and the
+Android/Linux/Windows builds previously passed at `84b117aa`. See the fork
+[Actions runs](https://github.com/AttilaTheFun/halo-ce-universal/actions)
+for revision-specific results. Local host migration tests also pass with the
+`HALO_IOS_BROWSER` feature guard and still reject the original failure cases.
 
 ## Reproduce
 
