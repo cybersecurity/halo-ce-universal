@@ -89,6 +89,9 @@ WINDOWS_ABI_FLAGS = [
 
 GAME_FLAGS = [
     "-std=gnu89",
+    # a desktop application: the main menu offers EXIT GAME
+    # (port/linux/include/halo_exit_game.h)
+    "-DHALO_DESKTOP_APPLICATION",
     "-w",
     "-Wno-error=incompatible-pointer-types",
     "-Wno-error=incompatible-function-pointer-types",

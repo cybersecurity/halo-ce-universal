@@ -446,7 +446,10 @@ void _rasterizer_decals_dispose(
 		IDirect3DVertexBuffer8_Release(local_d3d_vertex_buffer);
 		local_d3d_vertex_buffer = NULL;
 	}
-	lruv_delete(local_vertex_cache);
+	/* port: the cache is in the game state (game_state_lruv_cache_new), which
+	game_state_dispose frees whole, not from the heap that lruv_delete gives
+	it back to; the Xbox never disposed of the game (main_exit) */
+	local_vertex_cache = NULL;
 
 	return;
 }

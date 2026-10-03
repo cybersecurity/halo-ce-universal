@@ -240,7 +240,9 @@ void cseries_initialize(
 void cseries_dispose(
 	void)
 {
-	debug_dump_memory();
+	/* port: no heap dump at every exit (debug_dump_memory, appended to
+	d:\heap_dump.txt next to maps/); the console's debug_dump_memory still
+	writes one when asked */
 
 	return;
 };

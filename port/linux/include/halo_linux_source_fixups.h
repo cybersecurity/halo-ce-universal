@@ -45,5 +45,8 @@ long halo_screen_commit(void);
 void halo_screen_ui_offset(unsigned char centered);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
+/* EXIT GAME in the main menu, in the builds of a desktop application
+(source/interface/ui_widget.c) */
+#include "halo_exit_game.h"
 
 #endif

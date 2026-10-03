@@ -371,6 +371,7 @@ symbols in this file:
 #include "interface/terminal.h"
 #include "saved games/player_profile.h"
 #include "saved games/game_state.h"
+#include "saved games/saved_game_files.h"
 #include "sound/sound_manager.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_console_vars.h"
@@ -710,6 +711,10 @@ boolean display_precache_progress = FALSE;
 struct _screenshot_and_framerate_globals global_screenshot_count = { 0 };
 boolean debug_render_freeze;
 
+/* port: set by EXIT GAME in the desktop builds' main menu (ui_widget.c);
+main_globals has no room for it */
+static boolean main_exit_game_requested = FALSE;
+
 /* ---------- public code */
 
 real main_get_seconds_elapsed(
@@ -1045,6 +1050,16 @@ void main_goto_main_menu(
 	main_globals.switch_to_structure_bsp_index = NONE;
 	main_globals.saving_map = FALSE;
 	main_globals.want_to_be_at_main_menu = TRUE;
+	return;
+}
+
+/* port: EXIT GAME (ui_widget.c): the main loop ends before its next frame,
+and the game disposes of itself and returns from main() (main_exit,
+shell_dispose) */
+void main_exit_game(
+	void)
+{
+	main_exit_game_requested = TRUE;
 	return;
 }
 
@@ -2150,6 +2165,9 @@ static void main_exit(
 	}
 
 	game_dispose_from_old_map();
+	/* port: the map's file too, as a change of map closes it
+	(scenario_unload); cache_files_dispose (shell_dispose) expects it closed */
+	cache_file_close();
 	game_dispose();
 	debug_keys_dispose();
 	console_dispose();
@@ -3089,7 +3107,8 @@ void main_loop(
 	main_setup_connection();
 	main_initialize_time();
 
-	while (TRUE)
+	/* (port: or until EXIT GAME, main_exit_game) */
+	while (!main_exit_game_requested)
 	{
 		if (!game_in_editor())
 		{
@@ -3311,7 +3330,18 @@ void main_loop(
 		}
 	}
 
-	error(_error_silent, "end of saved film");
+	error(_error_silent, main_exit_game_requested ? "exiting the game" : "end of saved film");
+	if (main_exit_game_requested)
+	{
+		/* port: as the Xbox did before launching another program
+		(clean_up_for_image_launch): no map left half copied, and no saved
+		game file half written when saved_game_files_dispose disposes of
+		the mutex its writers hold */
+		if (cache_files_precache_in_progress())
+			cache_files_precache_map_end();
+		if (saved_game_files_take_mutex())
+			saved_game_files_release_mutex();
+	}
 	main_exit();
 
 	return;

@@ -83,6 +83,25 @@
    "cap": 19.5
   },
   {
+   "name": "main_menu__menu_game_demos__quit__0",
+   "tag": "ui\\shell\\main_menu\\menu_game_demos",
+   "bitmap": 0,
+   "width": 256,
+   "height": 64,
+   "format": "dxt3",
+   "scale": 4,
+   "crc": 1729337660,
+   "text": "QUIT",
+   "lefts": [
+    97.25,
+    119.0,
+    139.5,
+    145.75
+   ],
+   "cap": 19.5,
+   "in_place_of": "GAME DEMOS"
+  },
+  {
    "name": "main_menu__menu_game_demos__1",
    "tag": "ui\\shell\\main_menu\\menu_game_demos",
    "bitmap": 1,
@@ -104,6 +123,25 @@
     210.5
    ],
    "cap": 19.5
+  },
+  {
+   "name": "main_menu__menu_game_demos__quit__1",
+   "tag": "ui\\shell\\main_menu\\menu_game_demos",
+   "bitmap": 1,
+   "width": 256,
+   "height": 64,
+   "format": "dxt3",
+   "scale": 4,
+   "crc": 3727390563,
+   "text": "QUIT",
+   "lefts": [
+    97.25,
+    119.0,
+    139.5,
+    145.75
+   ],
+   "cap": 19.5,
+   "in_place_of": "GAME DEMOS"
   },
   {
    "name": "main_menu__menu_load_campaign__0",

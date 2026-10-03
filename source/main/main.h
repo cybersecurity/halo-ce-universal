@@ -97,6 +97,9 @@ void main_switch_structure_bsp(
 void main_goto_main_menu(
 	void);
 
+void main_exit_game(
+	void);
+
 void main_menu_precache_resources(
 	void);
 

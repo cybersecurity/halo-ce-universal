@@ -118,6 +118,8 @@ def measure():
     cap = font["glyf"][font.getBestCmap()[ord("H")]].yMax
     observations, seen = [], set()
     for title in json.loads(TITLES.read_text())["assets"]:
+        if "in_place_of" in title:
+            continue    # (a text set with the font's spacing, not as the map's: QUIT)
         if (title["tag"], title["text"]) in seen:
             continue    # (a selected item's text is placed as its other frame's)
         seen.add((title["tag"], title["text"]))

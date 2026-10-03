@@ -211,7 +211,10 @@ void lruv_delete(
 	struct lruv_cache *cache)
 {
 	lruv_cache_verify(cache, TRUE);
-	data_dispose(cache->blocks);
+	/* port: the blocks' array is inside the cache's own allocation
+	(lruv_initialize), freed below, not an array of data_new's; the Xbox
+	never deleted a cache, as its game never ended */
+	data_make_invalid(cache->blocks);
 	csmemset(cache, 0, sizeof(*cache));
 	match_free("c:\\halo\\SOURCE\\memory\\lruv_cache.c", 163, cache);
 

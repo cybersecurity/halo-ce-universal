@@ -66,10 +66,33 @@ long hud_hires_asset_fits(long asset, long width, long height)
 		embedded->width / width == embedded->height / height && embedded->width / width > 1;
 }
 
+/* the texture for the same bitmap as asset's, drawn for other pixels, with
+this CRC: the game draws its own in some bitmaps (QUIT in the main menu's
+GAME DEMOS frames, in the builds of a desktop application:
+source/interface/ui_widget.c), which have textures of their own; -1 if none */
+static long hud_hires_override_variant(long asset, unsigned long crc, unsigned long width, unsigned long height)
+{
+	long other;
+
+	for (other = 0; other < hud_hires_asset_count(); other++)
+	{
+		if (other != asset && hud_hires_embedded[other].crc == crc &&
+			hud_hires_embedded[other].bitmap == hud_hires_embedded[asset].bitmap &&
+			hud_hires_embedded[other].title == hud_hires_embedded[asset].title &&
+			!strcmp(hud_hires_embedded[other].tag, hud_hires_embedded[asset].tag) &&
+			hud_hires_asset_fits(other, (long)width, (long)height))
+		{
+			return other;
+		}
+	}
+	return -1;
+}
+
 long hud_hires_override_find(unsigned long address, unsigned long width, unsigned long height,
 	unsigned long level0_size)
 {
 	static int hud_enabled = -1, titles_enabled = -1;
+	unsigned long crc;
 	long asset;
 
 	if (hud_enabled < 0)
@@ -84,8 +107,13 @@ long hud_hires_override_find(unsigned long address, unsigned long width, unsigne
 		return -1;
 	if (!(hud_hires_embedded[asset].title ? titles_enabled : hud_enabled))
 		return -1;
-	if (crc32(0L, (const Bytef *)address, (uInt)level0_size) != hud_hires_embedded[asset].crc)
+	crc = crc32(0L, (const Bytef *)address, (uInt)level0_size);
+	if (crc != hud_hires_embedded[asset].crc)
 	{
+		long variant = hud_hires_override_variant(asset, crc, width, height);
+
+		if (variant >= 0)
+			return variant;
 		if (!textures[asset].other_pixels_logged)
 		{
 			platform_log("high-res hud: %s bitmap %d is not the one its texture was drawn for here "

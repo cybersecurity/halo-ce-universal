@@ -657,6 +657,7 @@ struct widget_instance;
 #include "interface/ui_widget_text_search_and_replace_functions.h"
 #include "interface/virtual_keyboard.h"
 #include "main/main.h"
+#include "memory/crc.h"
 #include "memory/stack_memory_pool.h"
 #include "networking/network_client_manager.h"
 #include "networking/network_connection.h"
@@ -873,7 +874,9 @@ enum
 {
 	/* the button event types are the gamepad button indices; the enumeration
 	runs 0..33 and only the types this file names are listed */
+	_widget_event_a_button = _gamepad_analog_button_a,
 	_widget_event_b_button = _gamepad_analog_button_b,
+	_widget_event_start_button = _gamepad_binary_button_start,
 	_widget_event_dpad_up = _gamepad_binary_button_dpad_up,
 	_widget_event_dpad_down = _gamepad_binary_button_dpad_down,
 	_widget_event_dpad_left = _gamepad_binary_button_dpad_left,
@@ -1419,6 +1422,18 @@ static void widget_instance_process_one_event_recursive(
 	boolean *return_widget_deleted);
 static boolean ui_check_for_pause_game(
 	void);
+static short ui_exit_game_widget_get(
+	struct widget_instance const *widget);
+static boolean ui_exit_game_widget_set_text(
+	struct widget_instance *widget);
+static void ui_exit_game_main_menu_loaded(
+	struct widget_instance *root);
+static boolean ui_exit_game_compose_label(
+	struct widget_instance *item);
+static short ui_exit_game_button_press(
+	struct widget_instance *widget,
+	short button_index,
+	boolean *widget_deleted);
 
 /* ---------- globals */
 
@@ -3754,6 +3769,10 @@ struct widget_instance *ui_widget_load_by_name_or_tag(
 				tag_index,
 				local_player_index,
 				widget_stack);
+			/* port: QUIT in the main menu, unless a created handler
+			closed the widget */
+			if (!parent && widget_globals.active_widgets[widget_stack] == widget)
+				ui_exit_game_main_menu_loaded(widget);
 		}
 		else
 		{
@@ -4905,7 +4924,9 @@ static void widget_instance_render_text_box(
 	rectangle2d bounds;
 	rectangle2d clip;
 
-	if (definition->text_label_string_list.index != NONE)
+	/* port: QUIT's question has the code's text */
+	if (!ui_exit_game_widget_set_text(widget) &&
+		definition->text_label_string_list.index != NONE)
 	{
 		short string_list_index;
 		wchar_t *string;
@@ -5234,6 +5255,588 @@ static void widget_instance_render_spinner_list(
 	}
 
 	return;
+}
+
+/* ---------- QUIT (desktop builds)
+
+The Xbox game never ended on its own, so its main menu has no way out. Where
+halo_exit_game_supported (port/linux/include/halo_exit_game.h), the main
+menu's GAME DEMOS item, hidden on every computer (xbox_demos_available), is
+QUIT instead. The menu's labels are bitmaps, so QUIT's two frames (normal and
+focused) are made of the stock menu artwork when the main menu loads
+(ui_exit_game_compose_label); on a map without the expected artwork the item
+stays GAME DEMOS, hidden. Where the menus' titles are drawn from their
+high-res pictures (display.high_res_text: port/linux/src/hud_hires.c), the
+platform layer draws QUIT's (port/assets/titles, set in OpenCE by
+tools/title_assets.py as the other items' are) in place of the frames, which
+it knows by their checksums; the frames made here are what is seen without.
+
+A asks first, on the question screen of a profile's deletion
+(ui\shell\error\confirm_delete_profile, without its fullscreen wrapper, whose
+A deletes the profile) with the code's text. A there ends the main loop
+(main_exit_game); B goes back with QUIT focused (process_ui_widgets).
+START (Escape) opens the question, as it opens the other items, but does not
+answer it. */
+
+enum
+{
+	_ui_exit_game_widget_item,		/* the main menu's QUIT */
+	_ui_exit_game_widget_question,	/* the screen that asks */
+	_ui_exit_game_widget_question_text,
+	NUMBER_OF_UI_EXIT_GAME_WIDGETS
+};
+
+enum
+{
+	/* the items' two frames: cached (_bitmap_cached_bit, xbox_texture_cache.c),
+	DXT3 (_bitmap_format_dxt3), 256x64, no mipmaps; a byte for each texel */
+	UI_EXIT_GAME_LABEL_FRAMES = 2,
+	UI_EXIT_GAME_LABEL_CACHED_BIT = 7,
+	UI_EXIT_GAME_LABEL_FORMAT = 15,
+	UI_EXIT_GAME_LABEL_WIDTH = 256,
+	UI_EXIT_GAME_LABEL_HEIGHT = 64,
+	UI_EXIT_GAME_LABEL_SIZE = UI_EXIT_GAME_LABEL_WIDTH * UI_EXIT_GAME_LABEL_HEIGHT,
+	/* QUIT's first column, centred as the other items' labels are */
+	UI_EXIT_GAME_LABEL_LEFT = 90
+};
+
+enum
+{
+	/* the frames QUIT is made of, and QUIT's own */
+	_ui_exit_game_label_game_demos,
+	_ui_exit_game_label_multiplayer,
+	_ui_exit_game_label_quit,
+	NUMBER_OF_UI_EXIT_GAME_LABEL_PICTURES
+};
+
+static char const ui_exit_game_widget_names[NUMBER_OF_UI_EXIT_GAME_WIDGETS][24] =
+{
+	"exit_game_item",
+	"exit_game_question",
+	"exit_game_question_text"
+};
+
+/* QUIT's pieces, drawn in order (each replaces the texels under it, or with
+over only where it is more opaque): from GAME DEMOS's frame or MULTIPLAYER's,
+the source rectangle, the column after UI_EXIT_GAME_LABEL_LEFT (same rows),
+mirrored, over */
+static struct
+{
+	boolean multiplayer;
+	short x, y, width, height;
+	short left;
+	boolean mirrored;
+	boolean over;
+} const ui_exit_game_label_pieces[] =
+{
+	{ FALSE, 23, 0, 8, 64, 0, FALSE, FALSE },	/* Q: glow on the left (the G's) */
+	{ FALSE, 190, 0, 22, 64, 8, FALSE, FALSE },	/* Q: the O */
+	{ FALSE, 31, 0, 3, 8, 8, FALSE, FALSE },	/* Q: glow at the top left */
+	{ FALSE, 31, 25, 3, 7, 8, FALSE, FALSE },	/* Q: glow at the bottom left */
+	{ TRUE, 58, 0, 2, 64, 28, FALSE, FALSE },	/* Q: glow on the right, over the S */
+	{ TRUE, 221, 22, 7, 1, 22, FALSE, TRUE },	/* Q: tail (the tip of the R's leg) */
+	{ TRUE, 221, 23, 7, 1, 21, FALSE, TRUE },
+	{ TRUE, 221, 24, 7, 8, 22, FALSE, TRUE },
+	{ FALSE, 197, 25, 4, 1, 20, FALSE, TRUE },	/* Q: the bowl's bottom under the tail */
+	{ TRUE, 60, 0, 20, 64, 30, FALSE, FALSE },	/* U */
+	{ TRUE, 112, 0, 4, 64, 50, FALSE, FALSE },	/* I */
+	{ TRUE, 92, 0, 16, 64, 54, FALSE, FALSE },	/* T */
+	{ TRUE, 92, 0, 4, 16, 70, TRUE, FALSE },	/* T: the bar's right end (its left end) */
+	{ TRUE, 90, 0, 2, 16, 74, TRUE, FALSE },	/* T: glow right of the bar */
+	{ TRUE, 27, 16, 7, 16, 66, TRUE, FALSE },	/* T: glow right of the stem (the M's left) */
+	{ TRUE, 0, 20, 2, 44, 54, FALSE, FALSE },	/* (clears the L's foot left of the T) */
+	{ TRUE, 116, 0, 2, 64, 54, FALSE, TRUE }	/* I: its right edge */
+};
+
+/* each frame's crc_checksum_buffer: GAME DEMOS's and MULTIPLAYER's in the
+English ui.map, where the pieces are measured, and QUIT's as drawn from them
+(it changes with the pieces, and with it the CRCs QUIT's high-res pictures
+stand for, port/assets/titles/titles.json: these inverted, as zlib's are;
+tools/title_assets.py, VARIANTS) */
+static unsigned long const ui_exit_game_label_checksums[UI_EXIT_GAME_LABEL_FRAMES][NUMBER_OF_UI_EXIT_GAME_LABEL_PICTURES] =
+{
+	{ 0x6788AD73, 0xED12A321, 0x98EC66C3 },
+	{ 0x765A7F0E, 0x152ED5EB, 0x21D4889C }
+};
+
+static wchar_t const ui_exit_game_question[] = L"Are you sure you wish to\r\nexit Halo?";
+
+static short ui_exit_game_widget_get(
+	struct widget_instance const *widget)
+{
+	short index;
+
+	for (index = 0; index < NUMBER_OF_UI_EXIT_GAME_WIDGETS; index++)
+	{
+		if (widget->name == ui_exit_game_widget_names[index])
+			return index;
+	}
+
+	return NONE;
+}
+
+/* the code's text for the question's text box; FALSE for any other widget */
+static boolean ui_exit_game_widget_set_text(
+	struct widget_instance *widget)
+{
+	unsigned long length;
+
+	if (ui_exit_game_widget_get(widget) != _ui_exit_game_widget_question_text)
+		return FALSE;
+	length = ustrlen(ui_exit_game_question);
+	widget->parameters.text_box.text = pool_resize_pointer(
+		widget_memory_pool,
+		widget->parameters.text_box.text,
+		2 * length + 2,
+		__FILE__,
+		__LINE__);
+	if (widget->parameters.text_box.text)
+		csmemcpy(widget->parameters.text_box.text, ui_exit_game_question, 2 * length + 2);
+
+	return TRUE;
+}
+
+static void ui_exit_game_main_menu_loaded(
+	struct widget_instance *root)
+{
+	struct widget_instance *item;
+
+	if (!halo_exit_game_supported() ||
+		root->definition_tag_index != tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\main_menu\\main_menu"))
+	{
+		return;
+	}
+	item = widget_instance_find_by_tag_index_recursive(
+		root,
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\main_menu\\main_menu_item_game_demos"));
+	if (!item ||
+		item->type != _ui_widget_type_text_box ||
+		!item->parent ||
+		item->parent->type != _ui_widget_type_column_list)
+	{
+		return;
+	}
+	/* (where QUIT's frames cannot be made, the item stays as its created
+	handler left it: GAME DEMOS, hidden) */
+	if (!ui_exit_game_compose_label(item))
+		return;
+	item->name = ui_exit_game_widget_names[_ui_exit_game_widget_item];
+	item->visible = TRUE;
+	item->disabled = FALSE;
+
+	return;
+}
+
+/* a texel's DXT3 block: 16 bytes, its texels' alpha (4 bits each, row by
+row), two 5:6:5 colours, then each texel's choice of four colours (2 bits):
+the two, and two between them */
+static byte *ui_exit_game_label_block(
+	byte const *pixels,
+	short x,
+	short y)
+{
+	return (byte *)pixels + (y / 4 * (UI_EXIT_GAME_LABEL_WIDTH / 4) + x / 4) * 16;
+}
+
+/* whether any of a block's texels is to be seen */
+static boolean ui_exit_game_label_block_visible(
+	byte const *block)
+{
+	short index;
+
+	for (index = 0; index < 8; index++)
+	{
+		if (block[index])
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+/* a block's four colours (red, green, blue) */
+static void ui_exit_game_label_colours(
+	byte const *block,
+	long colours[4][3])
+{
+	short index;
+
+	for (index = 0; index < 2; index++)
+	{
+		long colour = block[8 + 2 * index] | block[9 + 2 * index] << 8;
+
+		colours[index][0] = (colour >> 11) * 255 / 31;
+		colours[index][1] = (colour >> 5 & 63) * 255 / 63;
+		colours[index][2] = (colour & 31) * 255 / 31;
+	}
+	for (index = 0; index < 3; index++)
+	{
+		colours[2][index] = (2 * colours[0][index] + colours[1][index]) / 3;
+		colours[3][index] = (colours[0][index] + 2 * colours[1][index]) / 3;
+	}
+
+	return;
+}
+
+/* which of the four colours is nearest the colour (adding how far, squared,
+to the error) */
+static short ui_exit_game_label_nearest(
+	long colours[4][3],
+	long const *colour,
+	long *error)
+{
+	short nearest = 0;
+	long nearest_distance = 0;
+	short index;
+
+	for (index = 0; index < 4; index++)
+	{
+		long red = colours[index][0] - colour[0];
+		long green = colours[index][1] - colour[1];
+		long blue = colours[index][2] - colour[2];
+		long distance = red * red + green * green + blue * blue;
+
+		if (!index || distance < nearest_distance)
+		{
+			nearest = index;
+			nearest_distance = distance;
+		}
+	}
+	if (error)
+		*error += nearest_distance;
+
+	return nearest;
+}
+
+/* a block about to take a texel (of that colour) from a block with other
+colours: the pair of the two blocks' colours that best fits its texels and
+that one, its texels choosing again */
+static void ui_exit_game_label_merge_colours(
+	byte *block,
+	byte const *source,
+	long const *colour)
+{
+	word endpoints[4];
+	word best[2];
+	long existing[16][3];
+	long colours[4][3];
+	long best_error = -1;
+	short texel;
+	short first;
+	short second;
+
+	ui_exit_game_label_colours(block, colours);
+	for (texel = 0; texel < 16; texel++)
+		csmemcpy(existing[texel], colours[block[12 + texel / 4] >> texel % 4 * 2 & 3], sizeof(existing[texel]));
+	for (first = 0; first < 2; first++)
+	{
+		endpoints[first] = block[8 + 2 * first] | block[9 + 2 * first] << 8;
+		endpoints[2 + first] = source[8 + 2 * first] | source[9 + 2 * first] << 8;
+	}
+	best[0] = endpoints[0];
+	best[1] = endpoints[1];
+	for (first = 0; first < 4; first++)
+	{
+		for (second = 0; second < 4; second++)
+		{
+			long error = 0;
+
+			if (endpoints[first] == endpoints[second])
+				continue;
+			block[8] = (byte)endpoints[first];
+			block[9] = (byte)(endpoints[first] >> 8);
+			block[10] = (byte)endpoints[second];
+			block[11] = (byte)(endpoints[second] >> 8);
+			ui_exit_game_label_colours(block, colours);
+			for (texel = 0; texel < 16; texel++)
+			{
+				if (block[texel / 2] >> texel % 2 * 4 & 15)
+					ui_exit_game_label_nearest(colours, existing[texel], &error);
+			}
+			ui_exit_game_label_nearest(colours, colour, &error);
+			if (best_error < 0 || error < best_error)
+			{
+				best_error = error;
+				best[0] = endpoints[first];
+				best[1] = endpoints[second];
+			}
+		}
+	}
+	block[8] = (byte)best[0];
+	block[9] = (byte)(best[0] >> 8);
+	block[10] = (byte)best[1];
+	block[11] = (byte)(best[1] >> 8);
+	ui_exit_game_label_colours(block, colours);
+	for (texel = 0; texel < 16; texel++)
+	{
+		short index = ui_exit_game_label_nearest(colours, existing[texel], NULL);
+
+		block[12 + texel / 4] = (byte)((block[12 + texel / 4] & ~(3 << texel % 4 * 2)) | index << texel % 4 * 2);
+	}
+
+	return;
+}
+
+/* a texel of the source's in the pixels (when over, only if more opaque):
+its alpha, and its block's colour nearest its own; a block with no texel to
+see yet takes the source block's colours first */
+static void ui_exit_game_label_copy_texel(
+	byte *pixels,
+	short x,
+	short y,
+	byte const *source_pixels,
+	short source_x,
+	short source_y,
+	boolean over)
+{
+	byte *block = ui_exit_game_label_block(pixels, x, y);
+	byte const *source = ui_exit_game_label_block(source_pixels, source_x, source_y);
+	short texel = y % 4 * 4 + x % 4;
+	short source_texel = source_y % 4 * 4 + source_x % 4;
+	short alpha = source[source_texel / 2] >> source_texel % 2 * 4 & 15;
+	long colours[4][3];
+	long colour[3];
+	short index;
+
+	if (over && alpha <= (block[texel / 2] >> texel % 2 * 4 & 15))
+		return;
+	if (alpha)
+	{
+		ui_exit_game_label_colours(source, colours);
+		csmemcpy(colour, colours[source[12 + source_texel / 4] >> source_texel % 4 * 2 & 3], sizeof(colour));
+		if (!ui_exit_game_label_block_visible(block))
+			csmemcpy(block + 8, source + 8, 4);
+		else if (csmemcmp(block + 8, source + 8, 4))
+			ui_exit_game_label_merge_colours(block, source, colour);
+		ui_exit_game_label_colours(block, colours);
+		index = ui_exit_game_label_nearest(colours, colour, NULL);
+		block[12 + texel / 4] = (byte)((block[12 + texel / 4] & ~(3 << texel % 4 * 2)) | index << texel % 4 * 2);
+	}
+	block[texel / 2] = (byte)((block[texel / 2] & (texel % 2 ? 0x0F : 0xF0)) | alpha << texel % 2 * 4);
+
+	return;
+}
+
+/* QUIT's frame in the pixels, from GAME DEMOS's and MULTIPLAYER's */
+static void ui_exit_game_label_draw(
+	byte *pixels,
+	byte const *game_demos,
+	byte const *multiplayer)
+{
+	short piece;
+
+	csmemset(pixels, 0, UI_EXIT_GAME_LABEL_SIZE);
+	for (piece = 0; piece < (short)NUMBEROF(ui_exit_game_label_pieces); piece++)
+	{
+		short left = UI_EXIT_GAME_LABEL_LEFT + ui_exit_game_label_pieces[piece].left;
+		short y;
+
+		/* (a piece must lie inside the frames: none is skipped) */
+		if (ui_exit_game_label_pieces[piece].x < 0 ||
+			ui_exit_game_label_pieces[piece].y < 0 ||
+			left < 0 ||
+			ui_exit_game_label_pieces[piece].x + ui_exit_game_label_pieces[piece].width > UI_EXIT_GAME_LABEL_WIDTH ||
+			ui_exit_game_label_pieces[piece].y + ui_exit_game_label_pieces[piece].height > UI_EXIT_GAME_LABEL_HEIGHT ||
+			left + ui_exit_game_label_pieces[piece].width > UI_EXIT_GAME_LABEL_WIDTH)
+		{
+			continue;
+		}
+		for (y = 0; y < ui_exit_game_label_pieces[piece].height; y++)
+		{
+			short x;
+
+			for (x = 0; x < ui_exit_game_label_pieces[piece].width; x++)
+			{
+				ui_exit_game_label_copy_texel(
+					pixels,
+					left + x,
+					ui_exit_game_label_pieces[piece].y + y,
+					ui_exit_game_label_pieces[piece].multiplayer ? multiplayer : game_demos,
+					ui_exit_game_label_pieces[piece].x +
+						(ui_exit_game_label_pieces[piece].mirrored ? ui_exit_game_label_pieces[piece].width - 1 - x : x),
+					ui_exit_game_label_pieces[piece].y + y,
+					ui_exit_game_label_pieces[piece].over);
+			}
+		}
+	}
+
+	return;
+}
+
+/* QUIT in the GAME DEMOS item's frames, where the texture cache holds them
+(again whenever the main menu loads, as the cache may have read them anew):
+TRUE when both frames are QUIT's; otherwise nothing is written */
+static boolean ui_exit_game_compose_label(
+	struct widget_instance *item)
+{
+	static byte pixels[UI_EXIT_GAME_LABEL_FRAMES][UI_EXIT_GAME_LABEL_SIZE];
+	struct ui_widget_definition *definition = ui_widget_definition_get(item->definition_tag_index);
+	long group_indices[2];
+	struct bitmap_data *bitmaps[UI_EXIT_GAME_LABEL_FRAMES][2];
+	boolean quit[UI_EXIT_GAME_LABEL_FRAMES];
+	short frame;
+	short index;
+
+	group_indices[_ui_exit_game_label_game_demos] = tag_loaded(BITMAP_GROUP_TAG, "ui\\shell\\main_menu\\menu_game_demos");
+	group_indices[_ui_exit_game_label_multiplayer] = tag_loaded(BITMAP_GROUP_TAG, "ui\\shell\\main_menu\\menu_multiplayer");
+	if (group_indices[_ui_exit_game_label_game_demos] == NONE ||
+		group_indices[_ui_exit_game_label_multiplayer] == NONE ||
+		definition->background_bitmap.index != group_indices[_ui_exit_game_label_game_demos])
+	{
+		return FALSE;
+	}
+	/* (each group's two frames: two bitmaps, as the pieces expect them) */
+	for (frame = 0; frame < UI_EXIT_GAME_LABEL_FRAMES; frame++)
+	{
+		for (index = 0; index < 2; index++)
+		{
+			struct bitmap_data *bitmap = bitmap_group_get_bitmap_from_sequence(group_indices[index], 0, frame);
+
+			if (!bitmap ||
+				(frame && bitmap == bitmaps[0][index]) ||
+				!TEST_FLAG(bitmap->flags, UI_EXIT_GAME_LABEL_CACHED_BIT) ||
+				bitmap->format != UI_EXIT_GAME_LABEL_FORMAT ||
+				bitmap->width != UI_EXIT_GAME_LABEL_WIDTH ||
+				bitmap->height != UI_EXIT_GAME_LABEL_HEIGHT ||
+				bitmap->mipmap_count != 0 ||
+				bitmap->pixels_size < UI_EXIT_GAME_LABEL_SIZE)
+			{
+				error(_error_silent, "QUIT: the main menu's frames are not the expected kind; no QUIT");
+
+				return FALSE;
+			}
+			bitmaps[frame][index] = bitmap;
+		}
+	}
+	/* (all four loaded, as drawing loads them, before any is read: a load may
+	take another's place in the cache) */
+	for (frame = 0; frame < UI_EXIT_GAME_LABEL_FRAMES; frame++)
+	{
+		for (index = 0; index < 2; index++)
+			_texture_cache_bitmap_get_hardware_format(bitmaps[frame][index], TRUE, TRUE);
+	}
+	for (frame = 0; frame < UI_EXIT_GAME_LABEL_FRAMES; frame++)
+	{
+		unsigned long checksums[2];
+
+		for (index = 0; index < 2; index++)
+		{
+			if (!bitmaps[frame][index]->base_address)
+			{
+				error(_error_silent, "QUIT: the main menu's frames could not be loaded; no QUIT");
+
+				return FALSE;
+			}
+			crc_new(&checksums[index]);
+			crc_checksum_buffer(&checksums[index], bitmaps[frame][index]->base_address, UI_EXIT_GAME_LABEL_SIZE);
+		}
+		quit[frame] = checksums[_ui_exit_game_label_game_demos] ==
+			ui_exit_game_label_checksums[frame][_ui_exit_game_label_quit];
+		if (!quit[frame] &&
+			(checksums[_ui_exit_game_label_game_demos] != ui_exit_game_label_checksums[frame][_ui_exit_game_label_game_demos] ||
+			checksums[_ui_exit_game_label_multiplayer] != ui_exit_game_label_checksums[frame][_ui_exit_game_label_multiplayer]))
+		{
+			error(_error_silent, "QUIT: the main menu's frames are not the expected artwork (frame %d: %08lX %08lX); no QUIT",
+				frame,
+				checksums[_ui_exit_game_label_game_demos],
+				checksums[_ui_exit_game_label_multiplayer]);
+
+			return FALSE;
+		}
+	}
+	/* (both frames made, and found to be QUIT's, before either is written) */
+	for (frame = 0; frame < UI_EXIT_GAME_LABEL_FRAMES; frame++)
+	{
+		unsigned long checksum;
+
+		if (quit[frame])
+			continue;
+		ui_exit_game_label_draw(
+			pixels[frame],
+			bitmaps[frame][_ui_exit_game_label_game_demos]->base_address,
+			bitmaps[frame][_ui_exit_game_label_multiplayer]->base_address);
+		crc_new(&checksum);
+		crc_checksum_buffer(&checksum, pixels[frame], UI_EXIT_GAME_LABEL_SIZE);
+		if (checksum != ui_exit_game_label_checksums[frame][_ui_exit_game_label_quit])
+		{
+			error(_error_silent, "QUIT: frame %d was not drawn as expected (%08lX); no QUIT", frame, checksum);
+
+			return FALSE;
+		}
+	}
+	for (frame = 0; frame < UI_EXIT_GAME_LABEL_FRAMES; frame++)
+	{
+		if (!quit[frame])
+			csmemcpy(bitmaps[frame][_ui_exit_game_label_game_demos]->base_address, pixels[frame], UI_EXIT_GAME_LABEL_SIZE);
+	}
+
+	return TRUE;
+}
+
+/* A on QUIT: the question in place of the main menu */
+static boolean ui_exit_game_ask(
+	struct widget_instance *item,
+	boolean *widget_deleted)
+{
+	long question_tag_index = tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\error\\confirm_delete_profile");
+	long text_tag_index = tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\error\\confirm_delete_profile_text_box");
+	struct widget_instance *question;
+	struct widget_instance *text;
+
+	if (question_tag_index == NONE || text_tag_index == NONE)
+	{
+		error(_error_silent, "failed to load the QUIT question");
+
+		return FALSE;
+	}
+	/* (this deletes the main menu, and the item with it) */
+	question = ui_widget_launch_widget(item, question_tag_index);
+	if (!question)
+		return FALSE;
+	*widget_deleted = TRUE;
+	text = widget_instance_find_by_tag_index_recursive(question, text_tag_index);
+	if (!text || text->type != _ui_widget_type_text_box)
+	{
+		/* (never with the text that asks to delete a profile) */
+		error(_error_silent, "failed to load the QUIT question");
+		widget_instance_go_back_to_previous(question);
+
+		return FALSE;
+	}
+	question->name = ui_exit_game_widget_names[_ui_exit_game_widget_question];
+	text->name = ui_exit_game_widget_names[_ui_exit_game_widget_question_text];
+
+	return TRUE;
+}
+
+/* a button pressed on QUIT or its question: the sound it makes, or NONE
+for a button the widget leaves to the others */
+static short ui_exit_game_button_press(
+	struct widget_instance *widget,
+	short button_index,
+	boolean *widget_deleted)
+{
+	switch (ui_exit_game_widget_get(widget))
+	{
+	case _ui_exit_game_widget_item:
+		if (button_index == _widget_event_a_button ||
+			button_index == _widget_event_start_button)
+		{
+			return ui_exit_game_ask(widget, widget_deleted) ?
+				_ui_audio_feedback_forward :
+				_ui_audio_feedback_flag_failure;
+		}
+		break;
+	case _ui_exit_game_widget_question:
+		if (button_index == _widget_event_a_button)
+		{
+			main_exit_game();
+
+			return _ui_audio_feedback_forward;
+		}
+		break;
+	}
+
+	return NONE;
 }
 
 /* ---------- the mouse (desktop builds)
@@ -5728,17 +6331,22 @@ static void ui_widgets_process_mouse(
 			}
 			else
 			{
+				struct widget_instance *menu = ui_mouse_menu();
 				long index;
 
 				/* a screen with nothing to pick (a message to dismiss): the
-				click is its A */
+				click is its A; but not QUIT's question, which a click
+				beside its buttons must not answer */
 				for (index = 0; index < ui_mouse_target_count; index++)
 				{
 					if (ui_mouse_targets[index].kind != _ui_mouse_target_button)
 						break;
 				}
-				if (index == ui_mouse_target_count)
+				if (index == ui_mouse_target_count &&
+					!(menu && ui_exit_game_widget_get(menu) == _ui_exit_game_widget_question))
+				{
 					ui_mouse_press(_gamepad_analog_button_a);
+				}
 			}
 		}
 		if (ui_mouse_press_count)
@@ -6649,7 +7257,28 @@ static void widget_instance_process_one_event_recursive(
 			}
 		}
 	}
-	if (event_for_this_widget)
+	/* port: QUIT and its question answer their buttons in code, not
+	with their tags' handlers (GAME DEMOS's would launch the Xbox demos) */
+	if (event_for_this_widget &&
+		!widget_deleted &&
+		ui_exit_game_widget_get(widget) != NONE)
+	{
+		if (event->type == _event_type_button &&
+			event->data.button.value == 1)
+		{
+			short sound = ui_exit_game_button_press(
+				widget,
+				event->data.button.index,
+				&widget_deleted);
+
+			if (sound != NONE)
+			{
+				audio_feedback = sound;
+				event_handled = TRUE;
+			}
+		}
+	}
+	else if (event_for_this_widget)
 	{
 		long handler_index;
 

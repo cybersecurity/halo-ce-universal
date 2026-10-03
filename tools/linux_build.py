@@ -103,6 +103,10 @@ LINUX_ABI_FLAGS = [
 GAME_FLAGS = [
     "-std=gnu89",
     "-D__STRICT_ANSI__",
+    # a desktop application: the main menu offers EXIT GAME
+    # (port/linux/include/halo_exit_game.h); the Android build's game units
+    # have their own flags, without it
+    "-DHALO_DESKTOP_APPLICATION",
     "-w",
     "-Wno-error=incompatible-pointer-types",
     "-Wno-error=incompatible-function-pointer-types",
