@@ -8,6 +8,7 @@ import struct
 import subprocess
 import tempfile
 import unittest
+from ios_extract_assets import map_entries
 
 ROOT=Path(__file__).resolve().parents[1]
 BUILD=ROOT/'build/ios/xiso-tests'
@@ -77,6 +78,16 @@ class ImportTests(unittest.TestCase):
                 self.assertEqual(self.invoke('ready',self.dest/'maps').returncode,0)
     def test_whole_disc_partition(self):
         fixture(self.image,partition=0x02080000);self.extract()
+    def test_inspection_helper_partition_offsets(self):
+        for partition in (0,0x0FD90000,0x02080000,0x18300000):
+            with self.subTest(partition=hex(partition)):
+                payloads=fixture(self.image,partition=partition)
+                with self.image.open('rb') as image:
+                    entries=map_entries(image)
+                    self.assertEqual(len(entries),len(payloads))
+                    for path,start,size in entries:
+                        image.seek(start)
+                        self.assertEqual(image.read(size),payloads[path.name])
     def test_bad_magic(self):
         fixture(self.image);self.patch(0x10000,b'NOPE');self.extract('not an Xbox XISO')
     def test_truncated_extent(self):

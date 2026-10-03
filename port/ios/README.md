@@ -59,6 +59,20 @@ Code signing and provisioning must succeed
 before installation. No jailbreak, JIT entitlement, or writable executable
 memory is used.
 
+## Simulator smoke tests
+
+After installing the simulator app and adding maps to its Documents folder,
+these explicit launch settings bypass the room chooser for repeatable tests:
+
+```sh
+SIMCTL_CHILD_HALO_IOS_TEST_MENUS=1 xcrun simctl launch SIMULATOR_UDID org.haloce.ios
+SIMCTL_CHILD_HALO_IOS_TEST_ROOM=YOUR_TEST_ROOM xcrun simctl launch SIMULATOR_UDID org.haloce.ios
+```
+
+Terminate the app between launches. These settings apply only to simulator
+builds; device builds always show the normal chooser. Use a unique room code
+and the same code in a browser build from the pinned PR #12 source.
+
 ## Install and add game data
 
 The cache validator accepts these exact Xbox v5 cache builds on iOS:

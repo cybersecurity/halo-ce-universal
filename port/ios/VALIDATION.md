@@ -9,13 +9,33 @@ Reports of gameplay on the original iOS fork are not validation of this merge.
 
 - Unsigned ARM64 iPhone/iPad app and IPA built with Xcode 27 and LLVM/LLD 23.1.2.
 - ARM64 iOS simulator app compiled and linked, installed and launched on the
-  iPhone 18 Pro / iOS 27 simulator. The native landscape XISO picker appeared.
-  Startup stopped at the asset prompt; no game maps were available.
+  iPhone 18 Pro / iOS 27 simulator. With the user's NTSC-US v5 maps
+  (`01.10.12.2276`), the native main menu and Beaver Creek gameplay rendered;
+  the audio callback reported active PCM output. This is simulator evidence,
+  not physical-device performance or a listening test.
+- The full-disc ISO uses partition offset `0x18300000`. Native extraction and
+  the inspection helper produced byte-identical results for all 24 maps
+  (1,860,638,720 bytes); SHA-256 hashes were compared locally. The helper now
+  recognizes that offset, which the native and browser importers already used.
+- Real game crossplay with Chromium's WASM build from CI revision `221ba03e`:
+  the browser joined the native host's running match at tick 2991, then the
+  native client joined a fresh browser-hosted match at tick 592. Both rendered
+  Beaver Creek and the host logs confirmed the remote player finished loading.
+  Both processes ran on the same Mac, using public signaling and WebRTC.
+- Host departure worked in both directions: after terminating iOS, Chromium
+  adopted the live match at tick 4542 / epoch 1; after closing the browser host,
+  iOS adopted the live match at tick 1279 / epoch 1. The engine logged preserved
+  match state. Score, movement/fire replication and extended continuity have
+  not yet been systematically verified.
+- A cold restart of the original iOS host could not join its former match
+  after the browser took over: the browser server rejected the new connection
+  because its selected machine slot was occupied. This is a known failing
+  scenario, distinct from live-client host migration and fresh-room joining.
 - Signed native ILP32 execution probe passed: layout, global/stack access,
   indirect calls, atomics and pointer zero-extension.
 - Concurrent memory protection/tracking and zeroed reused mappings passed.
 - Audio handoff passed 100 real SDL callbacks and 134,144 exact PCM samples.
-- Display sizing and fifteen synthetic XISO regressions passed under sanitizers.
+- Display sizing and sixteen synthetic XISO regressions passed under sanitizers.
 - Native virtual sockets passed packet framing, ring/counter wraparound,
   backpressure and ordered control-queue tests under ASan/UBSan.
 - JavaScript suite: all 132 tests passed, including six new native adapter
@@ -25,11 +45,13 @@ Reports of gameplay on the original iOS fork are not validation of this merge.
   sockets and back through PR #12's transport.
   This tests the network bridge, not the game or an iPhone.
 
-The shared browser build and relay CI passed at `30372ca8`; iOS and the
-Android/Linux/Windows builds previously passed at `84b117aa`. See the fork
+All three CI workflows passed at `221ba03e`: browser/relay/tests, iOS unsigned
+IPA/simulator/probes, and Android/Linux/Windows builds. See the fork
 [Actions runs](https://github.com/AttilaTheFun/halo-ce-universal/actions)
-for revision-specific results. Local host migration tests also pass with the
-`HALO_IOS_BROWSER` feature guard and still reject the original failure cases.
+for revision-specific results. The asset-based simulator tests above used the
+same engine with simulator-only launch settings added to bypass the chooser;
+those settings do not affect device builds. Local host migration tests also
+pass with the `HALO_IOS_BROWSER` feature guard and reject original failure cases.
 
 ## Reproduce
 
@@ -57,16 +79,15 @@ by default CI, because external signaling and GUI availability are variable.
 
 - Install a personally signed build on an iPhone/iPad and import the user's
   original maps. Validate menu, campaign, controls, rendering and audio.
-- Use a browser game built from the pinned PR #12 revision with identical maps.
-  Join from iOS, spawn, move/fire, and verify both clients see the same match.
-- Repeat with iOS hosting. Exercise late join, disconnect/reconnect, host
-  departure/migration, scores, player identity and checkpoint continuity.
+- Repeat the successful simulator join/host/migration tests on hardware with
+  matching browser maps. Verify movement/fire replication, scores, player
+  identity and checkpoint continuity over extended play.
+- Resolve cold-restart admission after host migration; verify reconnect paths.
 - Test separate internet connections and TURN-only connectivity.
 - Measure frame time, latency, memory and extended play on hardware.
 - Exercise app background/resume and WebKit process termination; recovery is
   not yet a validated promise.
 
-No real maps or physical device were supplied for this integration session.
-The full game match and physical-device behaviors above remain unverified.
-CI builds and transport tests must not be presented as proof of playable
-native/browser crossplay. Keep the PR in draft until those checks pass.
+The user supplied a compatible original Xbox disc image. Real native/browser
+matches now have simulator evidence; physical-device behavior and the remaining
+cases above are still unverified. Keep the PR in draft until those checks pass.

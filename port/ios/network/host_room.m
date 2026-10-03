@@ -3,6 +3,7 @@
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
 #import <QuartzCore/QuartzCore.h>
+#include <TargetConditionals.h>
 #include "room_bridge.h"
 #include "../host/ios_host.h"
 
@@ -138,7 +139,14 @@ void host_ios_room_prepare(void) {
     [chooser addTextFieldWithConfigurationHandler:^(UITextField *field){field.placeholder=@"Room code";field.text=[NSUserDefaults.standardUserDefaults stringForKey:@"haloRoom"] ?: @"FQLX01";field.autocapitalizationType=UITextAutocapitalizationTypeAllCharacters;}];
     [chooser addAction:[UIAlertAction actionWithTitle:@"Game menus" style:UIAlertActionStyleCancel handler:^(UIAlertAction*a){(void)a;manual=YES;chosen=YES;}]];
     [chooser addAction:[UIAlertAction actionWithTitle:@"Join room" style:UIAlertActionStyleDefault handler:^(UIAlertAction*a){(void)a;code=chooser.textFields.firstObject.text;chosen=YES;}]];
-    [controller presentViewController:chooser animated:NO completion:nil];
+#if TARGET_OS_SIMULATOR
+    // Explicit simulator launch settings make real-engine smoke tests repeatable.
+    NSDictionary *environment=NSProcessInfo.processInfo.environment;
+    NSString *test_room=environment[@"HALO_IOS_TEST_ROOM"];
+    if (test_room.length) {code=test_room;chosen=YES;}
+    else if ([environment[@"HALO_IOS_TEST_MENUS"] isEqualToString:@"1"]) {manual=YES;chosen=YES;}
+#endif
+    if (!chosen) [controller presentViewController:chooser animated:NO completion:nil];
     while (!chosen) [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.01]];
     if (manual) {room_window.hidden=YES;return;}
     [NSUserDefaults.standardUserDefaults setObject:code forKey:@"haloRoom"];

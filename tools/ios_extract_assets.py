@@ -10,7 +10,7 @@ from pathlib import Path
 def map_entries(image):
     """Read bounded XDVDFS directory trees and return map file extents."""
     length=image.seek(0,2)
-    for base in (0,0xFD90000,0x2080000):
+    for base in (0,0xFD90000,0x2080000,0x18300000):
         image.seek(base+32*2048);header=image.read(2048)
         if header[:20]==b'MICROSOFT*XBOX*MEDIA':break
     else:raise ValueError('No Xbox filesystem header found')
