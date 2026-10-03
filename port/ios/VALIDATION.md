@@ -68,7 +68,9 @@ pass with the `HALO_IOS_BROWSER` feature guard and reject original failure cases
 - SDL hardware-controller routing retains the connected primary gamepad,
   balances its owned open/close reference, logs changes and automatically
   hides/restores touch controls. The simulator's gamepad triggers hiding;
-  Backbone/Xbox/PlayStation hardware behavior remains unverified.
+  the user subsequently confirmed an Xbox Series X controller works on the
+  phone. Backbone/PlayStation hardware behavior remains unverified. The touch
+  visibility toggle now hides along with the controls while connected.
 - The iPhone 15 Pro is excluded from further device testing at the user's
   request. Physical-device tests now target only the iPhone 13 Pro.
 

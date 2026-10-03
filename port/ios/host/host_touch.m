@@ -177,7 +177,11 @@ void host_ios_touch_reset(void) {
     [self controllerChanged];
     return self;
 }
-- (void)controllerChanged { [self setControlsHidden:primary_hardware!=0]; }
+- (void)controllerChanged {
+    BOOL connected=primary_hardware!=0;
+    self.toggle.hidden=connected;
+    [self setControlsHidden:connected];
+}
 - (void)setControlsHidden:(BOOL)hidden {
     [self reset];
     self.moveStick.hidden=self.lookStick.hidden=hidden;

@@ -183,8 +183,8 @@ The USB-C Backbone requires a compatible USB-C device; it cannot plug directly
 into the Lightning iPhone 13 Pro.
 
 The first hardware controller shares player one with the on-screen controls.
-Touch controls hide when a gamepad connects and return when it disconnects;
-**Show controls** remains available to override hiding. Player one's controller
+Touch controls and their visibility toggle hide when a gamepad connects and
+return when it disconnects. Player one's controller
 stays selected while connected, even if another controller is attached.
 
 | Action | Xbox / standard labels | PlayStation labels |
@@ -198,7 +198,8 @@ stays selected while connected, even if another controller is attached.
 | Crouch / zoom | Left / right stick click | L3 / R3 |
 | Pause | Menu / Start | Options |
 
-Actual Backbone, Xbox and PlayStation hardware validation remains pending;
+The user confirmed an Xbox Series X controller works on the iPhone.
+Backbone and PlayStation hardware validation remains pending;
 controller model-specific capabilities such as haptics are not promised.
 Developer console messages, frame counters, profiling text and the menu's build label are omitted
 from the game picture. Diagnostic log files remain available in Documents.
