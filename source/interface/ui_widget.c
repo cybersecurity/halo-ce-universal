@@ -3694,6 +3694,16 @@ static void widget_instance_initialize(
 	widget->render_regardless_of_controller_index =
 		TEST_FLAG(definition->flags, _widget_render_regardless_of_controller_index_bit);
 	widget->pause_game_time = TEST_FLAG(definition->flags, _widget_pause_game_time_bit);
+	/* port: the menus' screens (port/assets/menus) pause the game, as its
+	pause menu does, but not a network game, which its pause menu does not
+	pause (their SETTINGS: ui_pause_menu_loaded) */
+	if (widget->pause_game_time &&
+		pc_menu_tag(tag_index) &&
+		!we_are_at_the_main_menu &&
+		network_game_is_active())
+	{
+		widget->pause_game_time = FALSE;
+	}
 	widget->creation_time = widget_globals.current_system_milliseconds;
 	widget->milliseconds_to_auto_close = MAX(definition->milliseconds_to_auto_close, 0);
 	widget->auto_close_fade_time = MAX(definition->auto_close_fade_time, 0);
@@ -3831,6 +3841,144 @@ void ui_widget_port_go_back(
 	widget_instance_go_back_to_previous(widget);
 }
 
+/* ---------- SETTINGS in the pause menus (port)
+
+The full screen pause menus (the campaign's, and a network game's with one
+player here) get SETTINGS after RESUME GAME: the menus' own row for it
+(port/assets/menus/ce/in_game.xml), which menu_tags.c builds in the game's
+maps when the menus are there. It opens its screen as any widget opens
+another, so B comes back here, to SETTINGS. The rows are found by their tags'
+names, not their places, and spaced to fit the box (ui_pause_menu_rows_fit):
+a row added after SETTINGS is spaced with the others. */
+
+#define UI_PAUSE_MENU_SETTINGS_TAG "pc\\in_game\\settings_button"
+
+enum
+{
+	/* the body of the pause menus' box between the lines of its art
+	(ui\shell\bitmaps\pausebox2_*), and how far inside it the rows stay */
+	UI_PAUSE_BOX_BODY_TOP = 2,
+	UI_PAUSE_BOX_BODY_BOTTOM = 130,
+	UI_PAUSE_BOX_ROWS_MARGIN = 4
+};
+
+/* whether the widget is drawn from a tag whose name ends with the leaf */
+static boolean ui_pause_menu_tag_is(
+	struct widget_instance *widget,
+	char const *leaf)
+{
+	char const *name = tag_get_name(widget->definition_tag_index);
+	char const *last = name ? strrchr(name, '\\') : NULL;
+
+	return last && !csstrcmp(last + 1, leaf);
+}
+
+/* the rows spaced as the map spaces them, around the middle where it has
+them, if they fit in the box's body; else the widest spacing that fits */
+static void ui_pause_menu_rows_fit(
+	struct widget_instance *list,
+	struct widget_instance *box)
+{
+	struct ui_widget_definition *definition = ui_widget_definition_get(list->definition_tag_index);
+	struct ui_widget_child_reference *references =
+		(struct ui_widget_child_reference *)definition->child_widgets.address;
+	struct ui_widget_definition *row_definition;
+	struct widget_instance *row;
+	short row_count = 0;
+	short row_height, pitch, middle_twice, body_top, body_bottom, span, top;
+
+	for (row = list->child; row; row = row->next)
+		row_count++;
+	if (definition->child_widgets.count < 2 || row_count < 2)
+		return;
+	row_definition = ui_widget_definition_get(list->child->definition_tag_index);
+	row_height = row_definition->bounds.y1 - row_definition->bounds.y0;
+	pitch = references[1].vertical_offset - references[0].vertical_offset;
+	/* (on the screen, as the list's place and the box's are) */
+	middle_twice = 2 * list->vertical_offset + references[0].vertical_offset +
+		references[definition->child_widgets.count - 1].vertical_offset + row_height;
+	body_top = box->vertical_offset + UI_PAUSE_BOX_BODY_TOP + UI_PAUSE_BOX_ROWS_MARGIN;
+	body_bottom = box->vertical_offset + UI_PAUSE_BOX_BODY_BOTTOM - UI_PAUSE_BOX_ROWS_MARGIN;
+	if ((row_count - 1) * pitch + row_height > body_bottom - body_top)
+		pitch = (body_bottom - body_top - row_height) / (row_count - 1);
+	span = (row_count - 1) * pitch + row_height;
+	top = PIN((middle_twice - span) / 2, body_top, body_bottom - span);
+	row_count = 0;
+	for (row = list->child; row; row = row->next)
+		row->vertical_offset = top - list->vertical_offset + row_count++ * pitch;
+
+	return;
+}
+
+static void ui_pause_menu_loaded(
+	struct widget_instance *root)
+{
+	static char const *const pause_menus[] =
+	{
+		"ui\\shell\\solo_game\\pause_game\\pause_game",
+		"ui\\shell\\multiplayer_game\\pause_game\\1p_pause_game",
+	};
+	char const *name = tag_get_name(root->definition_tag_index);
+	long settings_tag_index;
+	struct widget_instance *box = NULL;
+	struct widget_instance *list = NULL;
+	struct widget_instance *resume = NULL;
+	struct widget_instance *child;
+	struct widget_instance *settings;
+	short index;
+
+	for (index = 0; name && index < (short)NUMBEROF(pause_menus); index++)
+	{
+		if (!csstrcmp(name, pause_menus[index]))
+			break;
+	}
+	/* (and with one player here: the campaign's falls back on its full
+	screen pause menu for more, ui_check_for_pause_game) */
+	if (!name || index == (short)NUMBEROF(pause_menus) || local_player_count() > 1)
+		return;
+	settings_tag_index = tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_PAUSE_MENU_SETTINGS_TAG);
+	if (settings_tag_index == NONE)
+		return;
+	for (child = root->child; child; child = child->next)
+	{
+		if (ui_pause_menu_tag_is(child, "pause_dialog_bkd"))
+		{
+			box = child;
+		}
+		else if (child->type == _ui_widget_type_column_list && !resume)
+		{
+			for (resume = child->child; resume; resume = resume->next)
+			{
+				if (ui_pause_menu_tag_is(resume, "resume_game_button"))
+					break;
+			}
+			if (resume)
+				list = child;
+		}
+	}
+	if (!box || !list)
+		return;
+	settings = ui_widget_load_by_name_or_tag(
+		NULL,
+		settings_tag_index,
+		list,
+		list->local_player_index,
+		NONE,
+		NONE,
+		NONE);
+	if (!settings)
+		return;
+	settings->horizontal_offset = resume->horizontal_offset;
+	settings->previous = resume;
+	settings->next = resume->next;
+	if (resume->next)
+		resume->next->previous = settings;
+	resume->next = settings;
+	ui_pause_menu_rows_fit(list, box);
+
+	return;
+}
+
 struct widget_instance *ui_widget_load_by_name_or_tag(
 	char const *name,
 	long tag_index,
@@ -3925,6 +4073,10 @@ struct widget_instance *ui_widget_load_by_name_or_tag(
 				tag_index,
 				local_player_index,
 				widget_stack);
+			/* port: SETTINGS in the pause menus, unless a created handler
+			closed the widget */
+			if (!parent && widget_globals.active_widgets[widget_stack] == widget)
+				ui_pause_menu_loaded(widget);
 		}
 		else
 		{
@@ -7180,6 +7332,11 @@ static boolean ui_check_for_pause_game(
 				else
 				{
 					ui_widget_delete(widget_globals.active_widgets[controller_index]);
+					/* port: and the screens B would have gone back to (the
+					pause menu, from its SETTINGS), as the campaign's START
+					closes them all (ui_widgets_close_all) */
+					if (widget_globals.widget_stack[controller_index])
+						dispose_widget_stack(&widget_globals.widget_stack[controller_index]);
 				}
 			}
 		}

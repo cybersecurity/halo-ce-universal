@@ -23,6 +23,11 @@ game keeps its own menus.
 The tag table cannot grow where it is (the tags' names follow it), so it
 is copied, with ours after it; every existing tag keeps its index. All of it
 is let go in scenario_tags_unload, before the next map's tags load.
+
+The game's maps get the in-game widgets (in_game/..., which ui.map has not:
+they are drawn with the pause menus' art, which only the game's maps have),
+and only what they lead to: the settings screens they open, with their
+bitmaps and strings (ui_widget.c adds SETTINGS to the pause menus).
 */
 
 #include "cseries.h"
@@ -58,6 +63,7 @@ boolean pc_menu_tag(long tag_index);
 /* ---------- constants */
 
 #define PC_MENU_TAG_PREFIX "pc\\"
+#define IN_GAME_WIDGET_PREFIX "in_game/"
 #define UI_WIDGET_DEFINITION_TAG 'DeLa'
 #define UNICODE_STRING_LIST_TAG 'ustr'
 #define FONT_TAG 'font'
@@ -334,6 +340,8 @@ static char const *const port_function_names[] =
 	"mp profile init indicator opts", "mp profile set ctf rules", "mp profile set koth rules",
 	"mp profile set slayer rules", "mp profile set oddball rules", "mp profile set racing rules",
 	"mp profile set player options", "mp profile set item options", "mp profile set indicator opts",
+	/* (in a game: GAMEPADS on the player's active profile) */
+	"port active profile edit begin", "port active profile edit end",
 };
 
 /* the PC version's game data functions that the Xbox's have not, from
@@ -365,6 +373,8 @@ static struct
 	struct pc_menu_setting *settings;
 	long setting_count;
 	boolean loaded;
+	/* built in a game's map: the in-game widgets, not the main menu */
+	boolean in_game;
 	char root[300];
 } menu_tags;
 
@@ -382,6 +392,10 @@ static struct
 	long *strings_tags;
 	long *text_tags;
 	long *spinner_tags;
+	/* which widgets, bitmaps and string lists are built */
+	boolean *wanted_widgets;
+	boolean *wanted_bitmaps;
+	boolean *wanted_strings;
 	boolean failed;
 } build;
 
@@ -490,6 +504,70 @@ static char const *strings_name(long index) { return build.menus->string_lists[i
 static long widget_named(char const *name)
 {
 	return find(name, build.menus->widget_count, widget_name);
+}
+
+static boolean in_game_widget(char const *name)
+{
+	return !strncmp(name, IN_GAME_WIDGET_PREFIX, strlen(IN_GAME_WIDGET_PREFIX));
+}
+
+/* one of ours by its name (not the map's, with a backslash) wanted */
+static void want_named(char const *name, long count, char const *(*name_of)(long), boolean *wanted)
+{
+	long index = name && !strchr(name, '\\') ? find(name, count, name_of) : NONE;
+
+	if (index != NONE)
+		wanted[index] = TRUE;
+}
+
+static void want_widget(long index);
+
+static void want_widget_named(char const *name)
+{
+	long index = name && !strchr(name, '\\') ? widget_named(name) : NONE;
+
+	if (index != NONE)
+		want_widget(index);
+}
+
+/* a widget wanted, and what it names: its bitmaps and strings, its children,
+its description, the widgets its handlers open and its conditional ones */
+static void want_widget(long index)
+{
+	struct halo_menus const *menus = build.menus;
+	struct halo_menu_widget const *widget = &menus->widgets[index];
+	long child, handler, conditional;
+
+	if (build.wanted_widgets[index])
+		return;
+	build.wanted_widgets[index] = TRUE;
+	want_named(widget->bitmap, menus->bitmap_count, bitmap_name, build.wanted_bitmaps);
+	want_named(widget->header_bitmap, menus->bitmap_count, bitmap_name, build.wanted_bitmaps);
+	want_named(widget->footer_bitmap, menus->bitmap_count, bitmap_name, build.wanted_bitmaps);
+	want_named(widget->string_list, menus->string_list_count, strings_name, build.wanted_strings);
+	want_widget_named(widget->description);
+	for (child = widget->first_child; child != HALO_MENU_NONE; child = menus->children[child].next)
+	{
+		if (menus->children[child].nested != HALO_MENU_NONE)
+			want_widget(menus->children[child].nested);
+		else
+			want_widget_named(menus->children[child].widget);
+	}
+	for (handler = widget->first_handler; handler != HALO_MENU_NONE; handler = menus->handlers[handler].next)
+	{
+		struct halo_menu_handler const *on = &menus->handlers[handler];
+
+		want_widget_named(on->open);
+		want_widget_named(on->replace);
+		want_widget_named(on->focus);
+		want_widget_named(on->widget);
+		want_widget_named(on->otherwise);
+	}
+	for (conditional = widget->first_conditional; conditional != HALO_MENU_NONE;
+		conditional = menus->conditionals[conditional].next)
+	{
+		want_widget_named(menus->conditionals[conditional].widget);
+	}
 }
 
 static long map_tag(long group_tag, char const *name, char const *file, long line)
@@ -1255,8 +1333,11 @@ void menu_tags_loaded(
 	struct halo_menus const *menus;
 	struct cache_file_tag_instance *instances;
 	long widget_count, own_lists = 0, total, index;
+	long widgets_built = 0, strings_built = 0, bitmaps_built = 0;
+	/* (any map but ui.map is a game's) */
+	boolean in_game = strcmp(map_name, "ui") != 0;
 
-	if (strcmp(map_name, "ui") || strcmp(config_string("display.menus"), "pc"))
+	if (strcmp(config_string("display.menus"), "pc"))
 		return;
 	menus = halo_menus_load();
 	if (!menus)
@@ -1269,33 +1350,64 @@ void menu_tags_loaded(
 	build.spinner_tags = malloc((widget_count + 1) * sizeof(long));
 	build.bitmap_tags = malloc((menus->bitmap_count + 1) * sizeof(long));
 	build.strings_tags = malloc((menus->string_list_count + 1) * sizeof(long));
+	build.wanted_widgets = malloc((widget_count + 1) * sizeof(boolean));
+	build.wanted_bitmaps = malloc((menus->bitmap_count + 1) * sizeof(boolean));
+	build.wanted_strings = malloc((menus->string_list_count + 1) * sizeof(boolean));
+	/* ui.map: all but the in-game widgets; a game's map: those, and what
+	they lead to */
+	for (index = 0; index < widget_count; index++)
+		build.wanted_widgets[index] = !in_game && !in_game_widget(menus->widgets[index].name);
+	for (index = 0; index < menus->bitmap_count; index++)
+		build.wanted_bitmaps[index] = !in_game;
+	for (index = 0; index < menus->string_list_count; index++)
+		build.wanted_strings[index] = !in_game;
+	for (index = 0; in_game && index < widget_count; index++)
+	{
+		if (in_game_widget(menus->widgets[index].name))
+			want_widget(index);
+	}
 	for (index = 0; index < widget_count; index++)
 	{
-		own_lists += (menus->widgets[index].text != NULL) + (menus->widgets[index].strings != NULL);
+		if (build.wanted_widgets[index])
+		{
+			widgets_built++;
+			own_lists += (menus->widgets[index].text != NULL) + (menus->widgets[index].strings != NULL);
+		}
 		/* (names are unique) */
 		if (widget_named(menus->widgets[index].name) != index)
 			problem(menus->widgets[index].file, menus->widgets[index].line, "two widgets are named",
 				menus->widgets[index].name);
 	}
-	total = widget_count + own_lists + menus->string_list_count + menus->bitmap_count;
+	for (index = 0; index < menus->string_list_count; index++)
+		strings_built += build.wanted_strings[index] != FALSE;
+	for (index = 0; index < menus->bitmap_count; index++)
+		bitmaps_built += build.wanted_bitmaps[index] != FALSE;
+	/* (a game's map with no in-game widgets: nothing to add) */
+	if (!widgets_built && !build.failed)
+		goto done;
+	total = widgets_built + own_lists + strings_built + bitmaps_built;
 	instances = build.failed ? NULL : instances_grow(total, &build.first_index, &build.first_salt);
 	if (!instances)
 		goto failed;
 	/* each new tag's index */
 	for (index = 0; index < widget_count; index++)
 	{
-		build.widget_tags[index] = next_tag();
-		build.text_tags[index] = menus->widgets[index].text ? next_tag() : NONE;
-		build.spinner_tags[index] = menus->widgets[index].strings ? next_tag() : NONE;
+		boolean wanted = build.wanted_widgets[index];
+
+		build.widget_tags[index] = wanted ? next_tag() : NONE;
+		build.text_tags[index] = wanted && menus->widgets[index].text ? next_tag() : NONE;
+		build.spinner_tags[index] = wanted && menus->widgets[index].strings ? next_tag() : NONE;
 	}
 	for (index = 0; index < menus->string_list_count; index++)
-		build.strings_tags[index] = next_tag();
+		build.strings_tags[index] = build.wanted_strings[index] ? next_tag() : NONE;
 	for (index = 0; index < menus->bitmap_count; index++)
-		build.bitmap_tags[index] = next_tag();
+		build.bitmap_tags[index] = build.wanted_bitmaps[index] ? next_tag() : NONE;
 	/* the tags: the bitmaps and strings first, which the widgets name; the
 	widgets' names in the table before any is built, which they find there */
 	for (index = 0; index < menus->bitmap_count && !build.failed; index++)
 	{
+		if (!build.wanted_bitmaps[index])
+			continue;
 		instance_set(instances, BITMAP_GROUP_TAG, build.bitmap_tags[index], menus->bitmaps[index].name, "",
 			bitmap_build(&menus->bitmaps[index], build.bitmap_tags[index]));
 	}
@@ -1303,6 +1415,8 @@ void menu_tags_loaded(
 	{
 		struct halo_menu_strings const *list = &menus->string_lists[index];
 
+		if (!build.wanted_strings[index])
+			continue;
 		instance_set(instances, UNICODE_STRING_LIST_TAG, build.strings_tags[index], list->name, "",
 			string_list_build(menus->strings + list->first, list->count));
 	}
@@ -1310,6 +1424,8 @@ void menu_tags_loaded(
 	{
 		struct halo_menu_widget const *widget = &menus->widgets[index];
 
+		if (!build.wanted_widgets[index])
+			continue;
 		if (widget->text)
 		{
 			instance_set(instances, UNICODE_STRING_LIST_TAG, build.text_tags[index], widget->name, " text",
@@ -1329,10 +1445,17 @@ void menu_tags_loaded(
 		goto failed;
 	cache_files_set_tag_instances(instances, build.first_index + total);
 	for (index = 0; index < widget_count && !build.failed; index++)
-		instances[DATUM_INDEX_TO_ABSOLUTE_INDEX(build.widget_tags[index])].base_address = widget_build(index);
+	{
+		if (build.wanted_widgets[index])
+			instances[DATUM_INDEX_TO_ABSOLUTE_INDEX(build.widget_tags[index])].base_address = widget_build(index);
+	}
 	if (build.failed)
 		goto failed;
-	if (widget_named(menus->root) != NONE)
+	if (in_game)
+	{
+		/* (no main menu here) */
+	}
+	else if (widget_named(menus->root) != NONE)
 	{
 		snprintf(menu_tags.root, sizeof(menu_tags.root), "%s%s", PC_MENU_TAG_PREFIX, menus->root);
 		for (index = 0; menu_tags.root[index]; index++)
@@ -1346,12 +1469,14 @@ void menu_tags_loaded(
 		platform_log("menus: there is no widget named %s, the main menu", menus->root);
 	}
 	menu_tags.loaded = TRUE;
+	menu_tags.in_game = in_game;
 	platform_log("menus: %ld widgets, %ld string lists and %ld bitmaps added to the map's %ld tags",
-		widget_count, own_lists + menus->string_list_count, menus->bitmap_count, build.first_index);
+		widgets_built, own_lists + strings_built, bitmaps_built, build.first_index);
 	goto done;
 
 failed:
-	platform_log("menus: not added; using the game's own menus");
+	platform_log(in_game ? "menus: not added; no SETTINGS in the pause menu" :
+		"menus: not added; using the game's own menus");
 	menu_tags_release();
 
 done:
@@ -1360,6 +1485,9 @@ done:
 	free(build.spinner_tags);
 	free(build.strings_tags);
 	free(build.bitmap_tags);
+	free(build.wanted_widgets);
+	free(build.wanted_bitmaps);
+	free(build.wanted_strings);
 	memset(&build, 0, sizeof(build));
 }
 
@@ -1377,7 +1505,7 @@ char const *pc_menus_root_name(
 	settings' screens) */
 	char const *open = config_string("debug.menu_open");
 
-	if (menu_tags.loaded && *open && build.menus == NULL)
+	if (menu_tags.loaded && !menu_tags.in_game && *open && build.menus == NULL)
 	{
 		static char name[300];
 		long index;
@@ -1442,7 +1570,7 @@ char const *pc_menus_screen(
 	};
 	short index;
 
-	if (!menu_tags.loaded)
+	if (!menu_tags.loaded || menu_tags.in_game)
 		return name;
 	for (index = 0; index < NUMBEROF(screens); index++)
 	{

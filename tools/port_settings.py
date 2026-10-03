@@ -745,3 +745,92 @@ def multiplayer_files() -> dict:
 
 
 REPLACED_FOLDERS = [f"{MT}/server_settings"]
+
+
+# ---------- in a game: SETTINGS in the pause menus
+
+# The game's pause menus are the maps' own, not these files', and ui.map has
+# none of their art, so these widgets (in_game/...) are built in the game's
+# maps instead, with the screens they open (port/linux/game/menu_tags.c);
+# ui_widget.c adds SETTINGS to the pause menus after RESUME GAME. Its screen
+# is the multiplayer pause menu's box and key, from the maps' own tags (every
+# campaign and multiplayer map has them), with rows as the pause menus have
+# them, named and ordered as Edit Profile has them. Each opens Edit Profile's
+# screen over the pause menu's dim (behind them, the main menu has its dark
+# backdrop, a game the game), and the screen saves config.toml's settings as
+# it does there; GAMEPADS, on OK, only the controller settings of the
+# player's active profile ("port active profile edit begin" and "end",
+# port/linux/game/menu_functions.c).
+# The desktop builds' only, for now.
+IG = "in_game"
+PAUSE_DIM = "ui\\shell\\bitmaps\\semi_transparent_grey"
+PAUSE_ROW = [("type", "text"), ("width", 202), ("height", 27), ("bitmap", "ui\\shell\\bitmaps\\menu_bkds"),
+             ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("align", "center"), ("text_y", 3)]
+DESKTOP = [("platform", "desktop")]
+# Edit Profile's setups: their rows' names (its profile_edit_options), and
+# the screens they open
+IN_GAME_SETUPS = [("controls_setup", 1, f"{PE}/controls_setup/controls_settings_screen"),
+                  ("gamepads", 2, f"{PE}/gamepad_setup/gamepad_setup_screen"),
+                  ("mouse_setup", 3, f"{PE}/mouse_settings/mouse_settings_screen"),
+                  ("audio_setup", 4, f"{PE}/audio_settings/audio_settings_screen"),
+                  ("video_setup", 5, f"{PE}/video_settings/video_settings_screen")]
+# the box where the multiplayer pause menu has it; the body of its art
+# (pausebox2_*) between its rows 2 and 130, the key's band below; the rows
+# that far inside it (ui_widget.c's UI_PAUSE_BOX_ROWS_MARGIN), spaced as the
+# multiplayer pause menu's at most
+BOX_Y, BOX_BODY_TOP, BOX_BODY_BOTTOM, ROWS_MARGIN, ROW_HEIGHT, ROW_SPACING = 164, 2, 130, 4, 27, 35
+
+
+def _pause_row(name: str, label: list, handlers: list) -> list:
+    return _widget(name, label + PAUSE_ROW + DESKTOP, handlers)
+
+
+def _opens(screen: str, run: str = None) -> list:
+    action = (f'run="{run}" ' if run else "") + f'open="{screen}"'
+    return [f'<on event="a" {action}/>', f'<on event="start" {action}/>']
+
+
+def _rows_place(count: int) -> tuple:
+    """the rows' top and spacing: in the middle of the box's body"""
+    body = BOX_BODY_BOTTOM - BOX_BODY_TOP
+    spacing = min(ROW_SPACING, (body - 2 * ROWS_MARGIN - ROW_HEIGHT) // (count - 1))
+    span = (count - 1) * spacing + ROW_HEIGHT
+    return BOX_Y + BOX_BODY_TOP + (body - span) // 2, spacing
+
+
+def in_game_files() -> dict:
+    """SETTINGS in the pause menus, its screen, and the setups' screens"""
+    top, spacing = _rows_place(len(IN_GAME_SETUPS))
+    lines = _pause_row(f"{IG}/settings_button", [("text", "SETTINGS")], _opens(f"{IG}/settings_screen"))
+    lines += _widget(f"{IG}/settings_screen",
+                     [("width", 640), ("height", 480), ("flags", "pass_unhandled_to_focused_child pause_game"),
+                      ("bitmap", PAUSE_DIM)] + DESKTOP,
+                     ['<on event="b" back="true"/>', '<on event="back" back="true"/>',
+                      f'<child widget="{IG}/settings_box" x="210" y="{BOX_Y}"/>',
+                      f'<child widget="{IG}/settings_list" x="218" y="{top}"/>',
+                      '<child widget="ui\\shell\\main_menu\\button_key_sm" x="235" y="298"/>'])
+    lines += _widget(f"{IG}/settings_box", [("width", 226), ("height", 154)] + DESKTOP,
+                     ['<child widget="ui\\shell\\solo_game\\pause_game\\pausebox2_left" x="-4"/>',
+                      '<child widget="ui\\shell\\solo_game\\pause_game\\pausebox2_left_center" x="12"/>',
+                      '<child widget="ui\\shell\\solo_game\\pause_game\\pausebox2_right" x="206"/>'])
+    lines += _widget(f"{IG}/settings_list",
+                     [("type", "column_list"), ("width", 202),
+                      ("height", (len(IN_GAME_SETUPS) - 1) * spacing + ROW_HEIGHT),
+                      ("flags", "pass_unhandled_to_focused_child up_down_tabs_items")] + DESKTOP,
+                     [f'<child widget="{IG}/{key}_button" y="{index * spacing}"/>'
+                      for index, (key, _, _) in enumerate(IN_GAME_SETUPS)])
+    for key, string_index, screen in IN_GAME_SETUPS:
+        # (GAMEPADS sets the profile's controller settings: the player's
+        # active profile, being edited while its screen is up)
+        gamepads = key == "gamepads"
+        lines += _pause_row(f"{IG}/{key}_button",
+                            [("string_list", f"{PE}/profile_edit_options"), ("string_index", string_index)],
+                            _opens(f"{IG}/{key}_screen", "port active profile edit begin" if gamepads else None))
+        lines += _widget(f"{IG}/{key}_screen",
+                         [("width", 640), ("height", 480), ("flags", "pass_unhandled_to_focused_child"),
+                          ("bitmap", PAUSE_DIM)] + DESKTOP,
+                         (['<on event="deleted" run="port active profile edit end"/>'] if gamepads else []) +
+                         [f'<child widget="{screen}"/>'])
+    return {"in_game.xml": ['<?xml version="1.0" encoding="UTF-8"?>',
+                            "<!-- The port's SETTINGS in the game's pause menus (tools/port_settings.py) -->",
+                            "<menus>", *lines, "</menus>", ""]}

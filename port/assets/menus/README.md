@@ -22,6 +22,19 @@ the full screen, the frame rate, the volumes, internet play, the
 multiplayer HUD), the profile's controller settings, and the keyboard and
 mouse's controls.
 
+In a game, the pause menus are the maps' own. The widgets named `in_game/...`
+(`ce/in_game.xml`, also from `tools/port_settings.py`) are built in the game's
+maps instead of `ui.map`, with only what they lead to (the screens they open,
+and their bitmaps and strings): they are drawn with the pause menus' art,
+which `ui.map` has not. `in_game/settings_button` is SETTINGS, which the full
+screen pause menus (the campaign's, and a network game's with one player
+here) get after RESUME GAME (`source/interface/ui_widget.c`), on the
+desktop. Its screen opens Edit Profile's Controls Setup, Gamepads, Mouse
+Setup, Audio Setup and Video Setup over the pause menu's dim. They save to
+`config.toml` as they do from the main menu, but Gamepads, whose changes
+Edit Profile saves there, saves only its controller settings to the
+player's active profile, on OK (`port active profile edit begin` and `end`).
+
 To change the menus without building the game, put files in a `menus` folder
 next to `config.toml`. A file with the same path as one here replaces it. On
 the desktop, any other `.xml` file there is added too. A PNG that a `<frame>`

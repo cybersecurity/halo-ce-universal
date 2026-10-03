@@ -3,6 +3,7 @@
  "files": [
   "ce/bitmaps.xml",
   "ce/error.xml",
+  "ce/in_game.xml",
   "ce/main_menu.campaign_select.xml",
   "ce/main_menu.difficulty_select.xml",
   "ce/main_menu.gametype_select.xml",

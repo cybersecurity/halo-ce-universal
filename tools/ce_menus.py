@@ -567,7 +567,8 @@ def main() -> None:
             lines += widget_xml(tag, widgets[tag], tags, functions, inputs, fonts, {})
         lines.append("</menus>")
         (CE / f"{folder.replace('/', '.')}.xml").write_text("\n".join(lines) + "\n")
-    for name, lines in [*port_settings.settings_files().items(), *port_settings.multiplayer_files().items()]:
+    for name, lines in [*port_settings.settings_files().items(), *port_settings.multiplayer_files().items(),
+                        *port_settings.in_game_files().items()]:
         (CE / name).write_text("\n".join(lines))
     # their strings
     lines = ['<?xml version="1.0" encoding="UTF-8"?>',
