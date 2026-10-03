@@ -1,3 +1,4 @@
+#include "host_graphics.h"
 /*
 HOST_SDL.C
 
@@ -113,6 +114,7 @@ int64_t host_sdl_thread_id(void)
 
 uint32_t host_sdl_create_window(const char *title, int width, int height, int64_t flags)
 {
+	if(halo_graphics_metal())flags=(flags & ~SDL_WINDOW_OPENGL) | SDL_WINDOW_METAL;
 	return handle_new(_handle_window, SDL_CreateWindow(title, width, height, (SDL_WindowFlags)flags));
 }
 
@@ -135,6 +137,7 @@ int host_sdl_set_relative_mouse(uint32_t window, int enabled)
 
 int host_sdl_gl_set_attribute(int attribute, int value)
 {
+	if(halo_graphics_metal())return 1;
 	/* EAGL exposes ES 3.0; capabilities are queried from the created context. */
 	if (attribute == SDL_GL_CONTEXT_MINOR_VERSION) value = 0;
 	return SDL_GL_SetAttribute((SDL_GLAttr)attribute, value);
@@ -143,26 +146,27 @@ int host_sdl_gl_set_attribute(int attribute, int value)
 uint32_t host_sdl_gl_create_context(uint32_t window)
 {
 	SDL_Window *object = handle_get(window, _handle_window);
-	SDL_GLContext context = object ? SDL_GL_CreateContext(object) : NULL;
+	SDL_GLContext context = object ? (halo_graphics_metal()?halo_graphics_create(object):SDL_GL_CreateContext(object)) : NULL;
 	if (context) host_ios_touch_attach(object);
 	return handle_new(_handle_context, context);
 }
 
 int host_sdl_gl_make_current(uint32_t window, uint32_t context)
 {
+	if(halo_graphics_metal())return halo_graphics_make_current();
 	return SDL_GL_MakeCurrent(handle_get(window, _handle_window), handle_get(context, _handle_context));
 }
 
 int host_sdl_gl_set_swap_interval(int interval)
 {
-	return SDL_GL_SetSwapInterval(interval);
+	return halo_graphics_metal()?halo_graphics_swap_interval(interval):SDL_GL_SetSwapInterval(interval);
 }
 
 int host_sdl_gl_swap_window(uint32_t window)
 {
 	SDL_Window *object = handle_get(window, _handle_window);
 
-	return object ? SDL_GL_SwapWindow(object) : 0;
+	return object ? (halo_graphics_metal()?halo_graphics_swap():SDL_GL_SwapWindow(object)) : 0;
 }
 
 /* ---------- events */
@@ -395,6 +399,7 @@ void host_sdl_get_clipboard_text(char *buffer, uint32_t size)
 /* UIKit renders to a view framebuffer, rather than framebuffer zero. */
 uint32_t host_ios_default_framebuffer(void)
 {
+    if(halo_graphics_metal())return 0;
     for (unsigned i = 1; i < HANDLE_COUNT; i++)
         if (handles[i].type == _handle_window)
             return (uint32_t)SDL_GetNumberProperty(SDL_GetWindowProperties(handles[i].object),

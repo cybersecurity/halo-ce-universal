@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'build/ios/host'
 OUT.mkdir(parents=True,exist_ok=True)
 lines=['/* Generated typed bridges. */','#include "ios_host.h"','#include "guest_host.h"','#include "posix.h"',
-       '#include <SDL3/SDL.h>','#include <GLES3/gl32.h>','#include <GLES2/gl2ext.h>','#include <string.h>','#include "host_debug.h"']
+       '#include <SDL3/SDL.h>','#include <GLES3/gl32.h>','#include <GLES2/gl2ext.h>','#include <string.h>','#include "host_debug.h"','#include "host_graphics.h"']
 table=[]
 
 def declarations(path,pattern):
@@ -62,7 +62,7 @@ for name in gles_functions(str(ROOT/'port/linux/src/gl.h')):
     lines.append(f'static {ret} {bridge}({", ".join(decl) or "void"}) {{')
     signature=', '.join(t for t,_ in plist) or 'void'
     lines.append(f'    typedef {ret} (GL_APIENTRY *Function)({signature});')
-    lines.append(f'    static Function function; if(!function) function=(Function)SDL_GL_GetProcAddress("{name}");')
+    lines.append(f'    static Function function; if(!function) function=(Function)halo_graphics_proc("{name}");')
     lines.append(f'    if(!function) host_fatal("OpenGL ES entry point unavailable: {name}");')
     if name=='glBindFramebuffer':
         lines.append('    if(!a1) a1=host_ios_default_framebuffer();')

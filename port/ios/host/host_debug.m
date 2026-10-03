@@ -8,6 +8,7 @@
 #include <sys/utsname.h>
 #include "host_debug.h"
 #include "ios_host.h"
+#include "host_gl_dispatch.h"
 
 static atomic_bool recording;
 static NSMutableDictionary *shaderKeys,*sources,*attachments;
@@ -86,7 +87,7 @@ void halo_debug_forget(uint32_t object,int program) {
 }
 static void exportReport(UIViewController *presenter) {
     prepare();struct utsname device;uname(&device);
-    NSDictionary *report=@{@"schema":@1,@"renderer":@"OpenGL ES 3",@"gpu":glRenderer?:@"unknown",@"revision":@HALO_BUILD_REVISION,@"metalfx":@(halo_metalfx_enabled()!=0),@"device":[NSString stringWithUTF8String:device.machine],@"os":UIDevice.currentDevice.systemVersion,
+    NSDictionary *report=@{@"schema":@1,@"renderer":halo_graphics_metal()?@"Metal (ANGLE)":@"OpenGL ES (Apple)",@"gpu":glRenderer?:@"unknown",@"revision":@HALO_BUILD_REVISION,@"metalfx":@(halo_metalfx_enabled()!=0),@"device":[NSString stringWithUTF8String:device.machine],@"os":UIDevice.currentDevice.systemVersion,
         @"build":[NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleVersion"]?:@"unknown",@"threshold_ms":@2,
         @"note":@"CPU compile/link completion timings and synchronized first-use draw waits. First-use waits include draw cost and may include deferred driver compilation; they are not isolated shader-compiler timings. Shader sources can guide warm-up updates.",
         @"dropped":@(dropped),@"events":[events copy],@"sources":[sources copy]};
@@ -113,18 +114,37 @@ static void exportReport(UIViewController *presenter) {
 - (void)presentationControllerDidDismiss:(UIPresentationController *)presentationController {
     (void)presentationController;debugController=nil;host_ios_touch_focus();
 }
-- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {(void)table;(void)section;return 4;}
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {(void)table;(void)section;return halo_graphics_prefer_metal()?5:4;}
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
     (void)table;UITableViewCell *cell=[[UITableViewCell alloc]initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
     cell.detailTextLabel.numberOfLines=0;
-    if(path.row<2) {
-        UISwitch *toggle=[UISwitch new];toggle.tag=path.row;
-        if(!path.row){cell.textLabel.text=@"MetalFX spatial upscaling";toggle.enabled=halo_metalfx_supported();toggle.on=halo_metalfx_enabled();cell.detailTextLabel.text=toggle.enabled?@"Render at 720p, then upscale with MetalFX.":@"Unavailable on this device.";}
-        else{cell.textLabel.text=@"Record shader stalls";toggle.on=atomic_load(&recording);cell.detailTextLabel.text=@"Capture compile/link and first-use waits ≥ 2 ms. Adds GPU synchronization overhead.";}
+    BOOL selectedMetal=halo_graphics_prefer_metal();
+    if(path.row==0) {
+        cell.textLabel.text=@"Renderer";
+        BOOL pending=selectedMetal!=halo_graphics_metal();
+        cell.detailTextLabel.text=pending?@"Relaunch the app to use this renderer.":(halo_graphics_metal()?@"Metal via ANGLE. Changes apply after relaunch.":@"OpenGL ES. Changes apply after relaunch.");
+        UISegmentedControl *choice=[[UISegmentedControl alloc]initWithItems:@[@"OpenGL",@"Metal"]];
+        choice.selectedSegmentIndex=selectedMetal?1:0;
+        [choice addTarget:self action:@selector(rendererChanged:) forControlEvents:UIControlEventValueChanged];cell.accessoryView=choice;
+    } else if(selectedMetal && path.row==1) {
+        UISwitch *toggle=[UISwitch new];toggle.tag=0;
+        toggle.enabled=halo_graphics_metal() && halo_metalfx_supported();toggle.on=halo_metalfx_enabled();
+        cell.textLabel.text=@"MetalFX spatial upscaling";
+        cell.detailTextLabel.text=toggle.enabled?@"Render at up to 720p, then upscale with MetalFX.":(!halo_graphics_metal()?@"Select Metal and relaunch to enable.":@"Unavailable on this device.");
         [toggle addTarget:self action:@selector(changed:) forControlEvents:UIControlEventValueChanged];cell.accessoryView=toggle;
-    } else if(path.row==2){cell.textLabel.text=@"Share shader report…";cell.detailTextLabel.text=@"Choose AirDrop in the share sheet to send it to your Mac.";}
-    else{cell.textLabel.text=@"Clear recorded events";cell.detailTextLabel.text=[NSString stringWithFormat:@"%lu events; %lu dropped",(unsigned long)events.count,(unsigned long)dropped];}
+    } else {
+        NSInteger action=path.row-(selectedMetal?2:1);
+        if(action==0) {
+            UISwitch *toggle=[UISwitch new];toggle.tag=1;toggle.on=atomic_load(&recording);
+            cell.textLabel.text=@"Record shader stalls";cell.detailTextLabel.text=@"Capture compile/link and first-use waits ≥ 2 ms. Adds GPU synchronization overhead.";
+            [toggle addTarget:self action:@selector(changed:) forControlEvents:UIControlEventValueChanged];cell.accessoryView=toggle;
+        } else if(action==1){cell.textLabel.text=@"Share shader report…";cell.detailTextLabel.text=@"Choose AirDrop in the share sheet to send it to your Mac.";}
+        else{cell.textLabel.text=@"Clear recorded events";cell.detailTextLabel.text=[NSString stringWithFormat:@"%lu events; %lu dropped",(unsigned long)events.count,(unsigned long)dropped];}
+    }
     return cell;
+}
+- (void)rendererChanged:(UISegmentedControl *)sender {
+    halo_graphics_set_preference(sender.selectedSegmentIndex==1);[self.tableView reloadData];
 }
 - (void)changed:(UISwitch *)sender {
     if(!sender.tag)halo_metalfx_set_enabled(sender.on);else {atomic_store(&recording,sender.on);[drawnPrograms removeAllObjects];}
@@ -132,8 +152,9 @@ static void exportReport(UIViewController *presenter) {
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)path {
     [table deselectRowAtIndexPath:path animated:YES];
-    if(path.row==2)exportReport(self);
-    else if(path.row==3){[events removeAllObjects];[drawnPrograms removeAllObjects];dropped=0;[table reloadData];}
+    NSInteger action=path.row-(halo_graphics_prefer_metal()?2:1);
+    if(action==1)exportReport(self);
+    else if(action==2){[events removeAllObjects];[drawnPrograms removeAllObjects];dropped=0;[table reloadData];}
 }
 @end
 void halo_debug_present(void) {

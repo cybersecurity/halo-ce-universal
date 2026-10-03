@@ -17,7 +17,7 @@ set(HALO_INFO_PLIST Info.plist)
 set(HALO_DEVICE_FAMILY "1,2")
 add_executable(HaloCE MACOSX_BUNDLE
     ${HALO_PLATFORM_SOURCES} "${ROOT}/port/runtime/xiso.c"
-    host/host_main.m host/host_memory.c host/host_loader.c host/host_syscall.c host/host_gl.c host/host_debug.m host/host_metalfx.m host/guest_call.S
+    host/host_main.m host/host_memory.c host/host_loader.c host/host_syscall.c host/host_gl.c host/host_debug.m host/host_metalfx.m host/host_graphics.m host/guest_call.S
     host/host_thread.c host/host_sdl.c network/host_room.m network/room_bridge.c
     "${ROOT}/port/web/src/web_net.c"
     "${ROOT}/port/linux/src/posix_files.c" host/posix_net.c
@@ -56,3 +56,18 @@ endif()
 execute_process(COMMAND git describe --always --dirty WORKING_DIRECTORY "${ROOT}"
     OUTPUT_VARIABLE HALO_BUILD_REVISION OUTPUT_STRIP_TRAILING_WHITESPACE)
 target_compile_definitions(HaloCE PRIVATE HALO_BUILD_REVISION="${HALO_BUILD_REVISION}")
+
+# Embed without linking: explicit symbol dispatch keeps Apple's GLES symbols
+# separate from ANGLE's identically named entry points.
+set(ANGLE_SLICE ios-arm64)
+if(CMAKE_OSX_SYSROOT MATCHES "[Ss]imulator")
+    set(ANGLE_SLICE ios-arm64-simulator)
+endif()
+set(ANGLE_ROOT "${ROOT}/build/third_party/angle/dist")
+set_target_properties(HaloCE PROPERTIES
+    XCODE_EMBED_FRAMEWORKS "${ANGLE_ROOT}/EGL.xcframework/${ANGLE_SLICE}/libEGL.framework;${ANGLE_ROOT}/GLESv2.xcframework/${ANGLE_SLICE}/libGLESv2.framework"
+    XCODE_EMBED_FRAMEWORKS_CODE_SIGN_ON_COPY YES
+    XCODE_EMBED_FRAMEWORKS_REMOVE_HEADERS_ON_COPY YES
+    XCODE_ATTRIBUTE_LD_RUNPATH_SEARCH_PATHS "@executable_path/Frameworks"
+    XCODE_ATTRIBUTE_COPY_PHASE_STRIP NO)
+target_link_libraries(HaloCE PRIVATE "-framework IOSurface")

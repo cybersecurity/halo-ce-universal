@@ -1,3 +1,4 @@
+#include "host_graphics.h"
 #include "host_debug.h"
 /* Start the statically compiled guest on the iOS UI thread and persist its log. */
 #import <Foundation/Foundation.h>
@@ -64,6 +65,7 @@ int main(int argc,char **argv) {
         SDL_SetHint(SDL_HINT_TV_REMOTE_AS_JOYSTICK,"0");
         if(!SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_GAMEPAD))host_fatal("SDL initialization: %s",SDL_GetError());
         host_ios_touch_initialize();
+        halo_graphics_initialize();
         halo_debug_initialize();
         host_ios_room_prepare();
         const SDL_DisplayMode *mode=SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());

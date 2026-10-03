@@ -134,3 +134,25 @@ cases above are still unverified. Keep the PR in draft until those checks pass.
 - Runtime ABI, memory, audio, display sizing, 16 XISO tests, and room bridge
   regression checks pass. Full signed-device and simulator host builds pass.
 - macOS menu routing and a separate native macOS renderer remain unvalidated.
+
+## Persisted renderer selection (2026-10-03)
+
+- Default startup selects ANGLE's Metal backend. Simulator logs identify its
+  Metal renderer; iPhone 13 Pro logs identify the Apple A15 Metal GPU. The
+  alternative path uses Apple's EAGL/OpenGL ES driver, with separate symbol
+  dispatch throughout guest rendering, shader diagnostics, and presentation.
+- MetalFX runs on the iPhone 13 Pro using an ANGLE IOSurface → MetalFX handoff
+  at 1558×720 → 2532×1170. It is unavailable in OpenGL mode and in the simulator.
+- Normalize decoded texture uploads to RGBA on iOS. This fixes the red/blue
+  reversal seen with texture swizzling in the ANGLE simulator. Silent
+  Cartographer now shows blue sky, textured geometry and water ripples.
+- Simulator UI control actions save OpenGL and remove the MetalFX row; the
+  following launch logs OpenGL. Metal selection restores the row and the next launch logs Metal; it is saved
+  independently of the upscaling preference. Changes apply on relaunch.
+- Signed device, simulator, and unsigned IPA builds pass. The public IPA
+  contains unsigned embedded framework copies and bundled license notices.
+  Native runtime/layout, memory, audio, display, XISO and room checks pass.
+- A Metal shader-report export identifies the ANGLE backend and validates
+  all source references (13 shader sources, 7 recorded events in the menu run).
+- This adds a Metal backend via ANGLE, not a handwritten Metal renderer.
+  Extended campaign/crossplay performance and all-device coverage remain open.

@@ -1,16 +1,17 @@
+#include "host_graphics.h"
 /* GLES services whose pointers or state cannot cross the 32-bit guest ABI. */
 #include "ios_host.h"
 #include <SDL3/SDL.h>
 #include <GLES3/gl32.h>
 #include <string.h>
-#define GL_FUNCTION(ret,name,args) static ret (GL_APIENTRY *name) args; if(!name)name=(void*)SDL_GL_GetProcAddress(#name)
+#define GL_FUNCTION(ret,name,args) static ret (GL_APIENTRY *name) args; if(!name)name=(void*)halo_graphics_proc(#name)
 void host_gl_get_string(uint32_t name,int index,char *buffer,uint32_t size) {
     GL_FUNCTION(const GLubyte *,glGetString,(GLenum));
     GL_FUNCTION(const GLubyte *,glGetStringi,(GLenum,GLuint));
     const GLubyte *text=index<0?glGetString(name):glGetStringi(name,index);
     if(size)SDL_strlcpy(buffer,text?(const char *)text:"",size);
 }
-int host_gl_has_extension(const char *name) {return SDL_GL_ExtensionSupported(name);}
+int host_gl_has_extension(const char *name) {return halo_graphics_has_extension(name);}
 uint32_t host_gl_read_buffer_word(uint32_t buffer,uint32_t offset) {
     GL_FUNCTION(void,glBindBuffer,(GLenum,GLuint));GL_FUNCTION(void *,glMapBufferRange,(GLenum,GLintptr,GLsizeiptr,GLbitfield));
     GL_FUNCTION(GLboolean,glUnmapBuffer,(GLenum));GL_FUNCTION(void,glGetIntegerv,(GLenum,GLint *));

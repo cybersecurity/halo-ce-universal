@@ -19,3 +19,14 @@ materials. The icon adapts supplied Halo artwork using image generation; see
 [ICON.md](ICON.md). No game maps, disc images, Microsoft signing material, or
 Xbox SDK are distributed in the app. This is an unofficial community port,
 unaffiliated with Microsoft, Bungie, or Halo Studios.
+
+## ANGLE Metal backend
+
+The Metal renderer bundles [ANGLE](https://github.com/google/angle) at
+`c053bf85793bbb83016b1196d04e5df3594b9bcc` (BSD 3-clause), using the
+`v2.1.28252` iOS/device and simulator frameworks published by
+[EdgeFirstAI/angle-package](https://github.com/EdgeFirstAI/angle-package).
+The download is pinned by SHA-256 in `tools/ios_angle.py`. ANGLE and translator
+dependency notices (xxHash, ceval, glslang, SPIR-V headers/tools/cross, Abseil,
+and zlib) are copied into the app's `Licenses` directory. ANGLE receives only
+native graphics calls; it is not a browser or a WASM runtime.

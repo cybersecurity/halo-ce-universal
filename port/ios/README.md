@@ -360,12 +360,18 @@ also registers **Debug → Graphics Debug…** (⇧⌘D) for the iPad app on an 
 Silicon Mac. This branch does not yet contain a separate AppKit/macOS target;
 that menu route has not been verified on a Mac.
 
-- **MetalFX spatial upscaling** renders at up to 720 lines and upscales to the
+- **Renderer** persists the choice between **Metal** (the default) and
+  **OpenGL**. Metal uses ANGLE's Metal backend for game rendering; OpenGL
+  uses Apple's OpenGL ES driver. Relaunch the app after changing renderers.
+  Shader/texture/command translation still starts from the shared GLES API;
+  this is not a separate handwritten Metal engine.
+- **MetalFX spatial upscaling** is shown only when Metal is selected. It renders at up to 720 lines and upscales to the
   display resolution. It is opt-in, requires a supported physical device, and
-  is unavailable in Apple's simulator SDK. The game still uses GLES: a shared
-  IOSurface carries its image to MetalFX. Cross-API synchronization adds cost,
+  is unavailable in Apple's simulator SDK. ANGLE translates GLES calls and shaders to Metal. A shared
+  IOSurface carries its image to MetalFX. Explicit synchronization adds cost,
   so enabling it is not a guarantee of higher frame rates. It is spatial, not
-  temporal upscaling. Allocation or command-buffer failure returns to GLES.
+  temporal upscaling. Allocation or command-buffer failure disables upscaling and returns to
+  normal Metal presentation. OpenGL mode never enables MetalFX.
 - **Record shader stalls** records compile/link completion times and each
   program's first draw after recording starts, keeping events ≥ 2 ms and
   compile/link failures. First-use measurements drain earlier GPU work and
@@ -379,7 +385,7 @@ that menu route has not been verified on a Mac.
   Capture retains up to 32 MiB of sources and 4096 events; dropped records are
   counted. The five latest exports are retained in Caches/ShaderReports.
 
-Both switches persist across launches. For useful reports, enable recording,
+The renderer and both switches persist across launches. For useful reports, enable recording,
 restart the app, visit the affected level, then share the report. Turn recording
 off again for normal play. Clear resets events and first-use tracking.
 Reports provide inputs for future shader warm-up updates; this GLES renderer
@@ -390,3 +396,16 @@ first-use stalls.
 For automated diagnostics, launch environments `HALO_IOS_TEST_DEBUG_UI=1`,
 `HALO_IOS_TEST_SHADER_CAPTURE=1`, and `HALO_IOS_TEST_METALFX=1` open the panel,
 start capture, or request MetalFX respectively, without changing saved settings.
+
+`HALO_IOS_TEST_RENDERER=metal` or `opengl` overrides the renderer for that
+launch only. It does not change the user's saved preference.
+
+The game and host are built from source. `tools/ios_angle.py` downloads the
+pinned ANGLE runtime frameworks packaged by
+[EdgeFirstAI/angle-package](https://github.com/EdgeFirstAI/angle-package),
+version `v2.1.28252` / source `c053bf85793bbb83016b1196d04e5df3594b9bcc`.
+The archive's SHA-256 is checked before extraction. Device and simulator
+slices are embedded separately; device frameworks are signed with the app's
+team. Public unsigned IPAs strip the vendor signatures from the embedded
+copies. Framework binaries stay in ignored build directories. The package's
+build scripts and pinned source revision are available upstream for rebuilding.

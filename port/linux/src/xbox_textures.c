@@ -597,7 +597,7 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 	converted = description->compressed && !decode_compressed ? NULL : malloc(largest * sizeof(unsigned long));
 	glBindTexture(target, texture);
 	xgpu_gl_state_invalidate();
-#if (defined(HALO_ANDROID) || defined(HALO_IOS)) && !defined(HALO_WEB)
+#if defined(HALO_ANDROID) && !defined(HALO_WEB)
 	/* converted texels are BGRA in memory (32-bit ARGB words); ES takes
 	RGBA */
 	glTexParameteri(target, GL_TEXTURE_SWIZZLE_R, converted ? GL_BLUE : GL_RED);
@@ -635,8 +635,9 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 				else
 #endif
 				decode_level(description, level, source, palette, converted);
-#ifdef HALO_WEB
-				/* WebGL has no texture swizzle: the texels become RGBA here */
+#if defined(HALO_WEB) || defined(HALO_IOS)
+				/* Normalize decoded BGRA on the CPU for WebGL and both iOS
+				   drivers, avoiding driver-dependent texture swizzling. */
 				{
 					unsigned long texel, count = (unsigned long)width * (unsigned long)height * (unsigned long)depth;
 

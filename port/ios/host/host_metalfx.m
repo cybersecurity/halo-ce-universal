@@ -7,17 +7,18 @@ void halo_metalfx_set_enabled(int enabled) {(void)enabled;}
 unsigned int host_ios_render_height(void) {return 0;}
 int host_ios_metalfx_present(unsigned int t,unsigned int w,unsigned int h,unsigned int ow,unsigned int oh) {(void)t;(void)w;(void)h;(void)ow;(void)oh;return 0;}
 #else
-/* Optional GLES -> IOSurface -> MetalFX presentation. Both APIs share the
+/* Optional ANGLE Metal -> IOSurface -> MetalFX presentation. Both APIs share the
    input image; explicit completion fences protect ownership across APIs. */
 #import <UIKit/UIKit.h>
 #import <OpenGLES/ES3/gl.h>
 #import <OpenGLES/ES3/glext.h>
-#import <OpenGLES/EAGL.h>
+
 #import <CoreVideo/CoreVideo.h>
 #import <Metal/Metal.h>
 #import <MetalFX/MTLFXSpatialScaler.h>
 #import <QuartzCore/CAMetalLayer.h>
 #include "ios_host.h"
+#include "host_gl_dispatch.h"
 #include "host_debug.h"
 
 static BOOL enabled;
@@ -25,10 +26,10 @@ static id<MTLDevice> device;
 static id<MTLCommandQueue> queue;
 static id<MTLCommandBuffer> pending;
 static id<MTLFXSpatialScaler> scaler;
-static CVOpenGLESTextureCacheRef glCache;
+
 static CVMetalTextureCacheRef metalCache;
 static CVPixelBufferRef pixels;
-static CVOpenGLESTextureRef glImage;
+static GLuint sharedTexture;
 static CVMetalTextureRef metalImage;
 static id<MTLTexture> output;
 static UIView *surface;
@@ -42,17 +43,16 @@ int halo_metalfx_supported(void) {
 }
 int halo_metalfx_enabled(void) {return enabled;}
 void halo_metalfx_set_enabled(int value) {
-    enabled=value && halo_metalfx_supported();
+    enabled=value && halo_graphics_metal() && halo_metalfx_supported();
     if(!enabled)surface.hidden=YES;
     host_logf(HOST_LOG_INFO,"MetalFX spatial upscaling %s",enabled?"enabled":"disabled");
 }
 unsigned int host_ios_render_height(void) {return enabled?720:0;}
 static void releaseImages(void) {
     [pending waitUntilCompleted];pending=nil;
-    if(glImage){CFRelease(glImage);glImage=NULL;}
+    halo_graphics_shared_destroy();sharedTexture=0;
     if(metalImage){CFRelease(metalImage);metalImage=NULL;}
     if(pixels){CFRelease(pixels);pixels=NULL;}
-    if(glCache)CVOpenGLESTextureCacheFlush(glCache,0);
     if(metalCache)CVMetalTextureCacheFlush(metalCache,0);
     scaler=nil;output=nil;inputW=inputH=outputW=outputH=0;
 }
@@ -60,11 +60,11 @@ static BOOL configure(unsigned w,unsigned h,unsigned ow,unsigned oh) {
     releaseImages();
     if(!queue)queue=[device newCommandQueue];
     if(!queue)return NO;
-    if(!glCache && CVOpenGLESTextureCacheCreate(NULL,NULL,EAGLContext.currentContext,NULL,&glCache)!=kCVReturnSuccess)return NO;
     if(!metalCache && CVMetalTextureCacheCreate(NULL,NULL,device,NULL,&metalCache)!=kCVReturnSuccess)return NO;
-    NSDictionary *attributes=@{(id)kCVPixelBufferIOSurfacePropertiesKey:@{},(id)kCVPixelBufferMetalCompatibilityKey:@YES,(id)kCVPixelBufferOpenGLESCompatibilityKey:@YES};
+    NSDictionary *attributes=@{(id)kCVPixelBufferIOSurfacePropertiesKey:@{},(id)kCVPixelBufferMetalCompatibilityKey:@YES};
     if(CVPixelBufferCreate(NULL,w,h,kCVPixelFormatType_32BGRA,(__bridge CFDictionaryRef)attributes,&pixels)!=kCVReturnSuccess)return NO;
-    if(CVOpenGLESTextureCacheCreateTextureFromImage(NULL,glCache,pixels,NULL,GL_TEXTURE_2D,GL_RGBA,w,h,GL_BGRA_EXT,GL_UNSIGNED_BYTE,0,&glImage)!=kCVReturnSuccess)return NO;
+    sharedTexture=halo_graphics_shared_create(CVPixelBufferGetIOSurface(pixels),w,h);
+    if(!sharedTexture)return NO;
     MTLFXSpatialScalerDescriptor *desc=[MTLFXSpatialScalerDescriptor new];
     desc.inputWidth=w;desc.inputHeight=h;desc.outputWidth=ow;desc.outputHeight=oh;
     desc.colorTextureFormat=desc.outputTextureFormat=MTLPixelFormatBGRA8Unorm;
@@ -80,7 +80,7 @@ static BOOL configure(unsigned w,unsigned h,unsigned ow,unsigned oh) {
     if(!readFBO)glGenFramebuffers(1,&readFBO);
     if(!writeFBO)glGenFramebuffers(1,&writeFBO);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER,writeFBO);
-    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,CVOpenGLESTextureGetName(glImage),0);
+    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,sharedTexture,0);
     if(glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)return NO;
     inputW=w;inputH=h;outputW=ow;outputH=oh;
     host_logf(HOST_LOG_INFO,"MetalFX configured %ux%u -> %ux%u",w,h,ow,oh);
@@ -102,17 +102,19 @@ int host_ios_metalfx_present(unsigned int texture,unsigned int w,unsigned int h,
             if(root){surface=[[UIView alloc]initWithFrame:root.bounds];surface.userInteractionEnabled=NO;surface.autoresizingMask=UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight;layer=[CAMetalLayer layer];layer.device=device;layer.pixelFormat=MTLPixelFormatBGRA8Unorm;layer.framebufferOnly=NO;[surface.layer addSublayer:layer];[root insertSubview:surface atIndex:0];}
             else success=NO;
         }
+        if(success)success=halo_graphics_shared_begin();
         if(success) {
             glBindFramebuffer(GL_READ_FRAMEBUFFER,readFBO);glFramebufferTexture2D(GL_READ_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,texture,0);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER,writeFBO);glDisable(GL_SCISSOR_TEST);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER,writeFBO);
+            glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,sharedTexture,0);glDisable(GL_SCISSOR_TEST);
             /* Guest row zero already denotes the top, as Metal expects. */
             glBlitFramebuffer(0,0,w,h,0,0,w,h,GL_COLOR_BUFFER_BIT,GL_NEAREST);
-            glFinish();
+            success=halo_graphics_shared_end();
             layer.frame=surface.bounds;layer.contentsScale=surface.window.screen.scale;
             CGSize size=CGSizeMake(round(surface.bounds.size.width*layer.contentsScale),round(surface.bounds.size.height*layer.contentsScale));
             if(!CGSizeEqualToSize(layer.drawableSize,size))layer.drawableSize=size;
             id<CAMetalDrawable> drawable=[layer nextDrawable];
-            if(drawable && ow<=drawable.texture.width && oh<=drawable.texture.height) {
+            if(success && drawable && ow<=drawable.texture.width && oh<=drawable.texture.height) {
                 id<MTLCommandBuffer> commands=[queue commandBuffer];
                 [scaler encodeToCommandBuffer:commands];
                 MTLRenderPassDescriptor *pass=[MTLRenderPassDescriptor renderPassDescriptor];

@@ -9,11 +9,15 @@ import shutil
 import subprocess
 import sys
 import urllib.request
+import ios_angle
 
 ROOT = Path(__file__).resolve().parents[1]
 GL_REVISION = '1cdd228e34966dd6b95bd203e9f84faba0f371a1'
 EGL_REVISION = 'db3425b8246136faccb5e2782b5694960bd6edf1'
 HEADERS = {
+    'EGL/egl.h': ('EGL-Registry', EGL_REVISION, 'api/EGL/egl.h'),
+    'EGL/eglext.h': ('EGL-Registry', EGL_REVISION, 'api/EGL/eglext.h'),
+    'EGL/eglplatform.h': ('EGL-Registry', EGL_REVISION, 'api/EGL/eglplatform.h'),
     'GLES3/gl32.h': ('OpenGL-Registry', GL_REVISION, 'api/GLES3/gl32.h'),
     'GLES3/gl3platform.h': ('OpenGL-Registry', GL_REVISION, 'api/GLES3/gl3platform.h'),
     'GLES2/gl2platform.h': ('OpenGL-Registry', GL_REVISION, 'api/GLES2/gl2platform.h'),
@@ -51,6 +55,7 @@ def main():
         parser.error('--bundle-id must be a reverse-DNS identifier (e.g. com.example.halo)')
     if args.jobs < 1:
         parser.error('--jobs must be positive')
+    ios_angle.prepare()
     include=ROOT/'build/ios/gl_include'
     for name,(registry,revision,source) in HEADERS.items():
         target=include/name;target.parent.mkdir(parents=True,exist_ok=True)
@@ -86,6 +91,12 @@ def main():
     run(*command)
     app = build/f'Release-{sdk}/HaloCE.app'
     print(f'App: {app}')
+    if args.unsigned:
+        # Public unsigned IPAs must not retain the prebuilt vendor's signatures.
+        # Operate only on the embedded build copies, never the verified archive.
+        for framework in (app/'Frameworks').glob('*.framework'):
+            run('codesign','--remove-signature',framework)
+            shutil.rmtree(framework/'_CodeSignature', ignore_errors=True)
     if args.ipa:
         command = [sys.executable, 'tools/ios_package.py', app, args.ipa.resolve()]
         if args.unsigned: command.append('--require-unsigned')
