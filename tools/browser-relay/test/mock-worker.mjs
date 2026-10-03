@@ -17,7 +17,7 @@ process.stdin.on('data', (bytes) => {
       process.stdout.write(ready.subarray(0, 2));
       setTimeout(() => {
         process.stdout.write(ready.subarray(2));
-        process.stdout.write(record(3, JSON.stringify({ type: 'peer', identifier: data.toString().slice(0, 12),
+        process.stdout.write(record(3, JSON.stringify({ type: 'peer', identifier: ((parseInt(data.toString().slice(0, 2), 16) & 0xfc) | 2).toString(16).padStart(2, '0') + data.toString().slice(2, 12),
           address: 0x03004064, connected: true })));
       }, 5);
     } else if (type === 2 && invited) {

@@ -71,7 +71,8 @@ native.stdout.on('data', (bytes) => decoder.push(bytes, (type, data) => {
 native.on('error', (error) => events.fail(error));
 native.on('exit', (code, signal) => events.fail(new Error(`Native fixture exited (${signal || code})`)));
 try {
-  assert.equal((await events.take()).type, 'ready');
+  const hostReady = await events.take();
+  assert.equal(hostReady.type, 'ready');
   const invitation = await events.take();
   assert.equal(invitation.type, 'test_invite');
   const invite = invitation.invite.replace('halo://join/', '');
@@ -88,7 +89,7 @@ try {
   browser.send(JSON.stringify({ type: 'join', invite, accessToken }));
   const ready = await inbox.take(), peer = await inbox.take();
   assert.equal(ready.type, 'ready'); assert.equal(peer.type, 'peer'); assert.equal(peer.connected, true);
-  assert.equal(peer.identifier, invite.slice(0, 12));
+  assert.equal(peer.identifier, hostReady.identifier);
   const source = ready.address, destination = peer.address;
   for (const address of [destination, 0xffffffff]) {
     const data = Buffer.from(Array.from({ length: 256 }, (_, i) => i));

@@ -149,7 +149,9 @@ export function createRelay(options = {}) {
         // Never give the worker the relay's capability token or operator config.
         env: { PATH: process.env.PATH || '/usr/bin:/bin', LANG: 'C', ...(config.workerEnv || {}) },
       });
-      const hostIdentifier = invite.slice(0, 12);
+      // Match p2p_identifier_from_hash: locally administered unicast address.
+      const hostIdentifier = ((parseInt(invite.slice(0, 2), 16) & 0xfc) | 2)
+        .toString(16).padStart(2, "0") + invite.slice(2, 12);
       worker.on('error', () => stop(1011, 'Native worker unavailable'));
       worker.on('exit', () => stop(1011, 'Native worker stopped'));
       worker.on('close', () => clients.delete(client));

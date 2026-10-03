@@ -81,7 +81,7 @@ int main(void) {
     assert(!game_engine_should_end_game()); /* opponent present */
     players[1].quit_out_of_game = TRUE;
     assert(players_in_game() == 2 && !multiple_teams_alive());
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
     assert(!game_engine_should_end_game()); /* opponent reloads/leaves */
 #else
     assert(game_engine_should_end_game()); /* original native behavior */
@@ -90,7 +90,7 @@ int main(void) {
        a last-player win. Their data is never deleted by this predicate. */
     for (int i = 2; i < 20; i++) players[i] = (struct player_datum){ TRUE, NONE, i };
     player_count = 20;
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
     assert(!game_engine_should_end_game());
 #else
     assert(game_engine_should_end_game());
@@ -127,14 +127,14 @@ with tempfile.TemporaryDirectory(prefix="halo-solo-host-") as directory:
         output = path / name
         subprocess.run([os.environ.get("CC", "clang"), "-std=c11", "-Wall", "-Wextra", "-Werror",
                         "-Wno-unused-function", "-fsanitize=address,undefined",
-                        *(["-DHALO_WEB=1"] if web else []), str(source), "-o", str(output)], check=True)
+                        *(["-DHALO_IOS_BROWSER=1"] if web == "ios" else ["-DHALO_WEB=1"] if web else []), str(source), "-o", str(output)], check=True)
         return subprocess.run([str(output)], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    for web in (False, True):
+    for web in (False, True, "ios"):
         result = run("web" if web else "native", FUNCTIONS, web)
         assert result.returncode == 0, result.stderr
         print(result.stdout.strip())
-    mutant, count = re.subn(r"#ifdef HALO_WEB\n.*?#endif\n", "", FUNCTIONS, flags=re.S)
+    mutant, count = re.subn(r"#if defined\(HALO_WEB\) \|\| defined\(HALO_IOS_BROWSER\)\n.*?#endif\n", "", FUNCTIONS, flags=re.S)
     assert count == 1
     original = run("original-last-team-control", mutant, True)
     assert original.returncode != 0 and "Assertion" in original.stderr, original.stderr

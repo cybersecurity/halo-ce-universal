@@ -125,7 +125,7 @@ static boolean idle_success=TRUE;
 static boolean fail_connection_allocation;
 '''
 HEADER = (ROOT / "source/networking/network_migration.h").read_text()
-WIRE = HEADER[HEADER.index("enum { NETWORK_MIGRATION_MESSAGE"):HEADER.index("#ifdef HALO_WEB")]
+WIRE = HEADER[HEADER.index("enum { NETWORK_MIGRATION_MESSAGE"):HEADER.index("#if defined(HALO_WEB)")]
 STUBS = r'''
 static struct network_migration_message sent[260];
 static boolean network_connection_active(struct network_connection *c) { return c && c->active; }
@@ -499,6 +499,10 @@ def main():
         folder = Path(directory)
         source, binary = folder / "test.c", folder / "test"
         source.write_text(BOUNDARY + WIRE + STUBS + FUNCTIONS + TESTS)
+        subprocess.run([os.environ.get("CC", "clang"), "-std=c11", "-O1", "-Wall", "-Wextra", "-Werror", str(source), "-o", str(binary)], check=True)
+        subprocess.run([str(binary)], check=True)
+        # Exercise the same production state machine with the iOS feature guard.
+        source.write_text(BOUNDARY.replace("#define HALO_WEB 1", "#define HALO_IOS_BROWSER 1") + WIRE + STUBS + FUNCTIONS + TESTS)
         subprocess.run([os.environ.get("CC", "clang"), "-std=c11", "-O1", "-Wall", "-Wextra", "-Werror", str(source), "-o", str(binary)], check=True)
         subprocess.run([str(binary)], check=True)
         # Reintroduce the original existing-server rejection. The retained

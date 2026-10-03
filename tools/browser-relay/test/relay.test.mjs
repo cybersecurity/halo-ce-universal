@@ -140,7 +140,7 @@ test('mock worker handshake, framed datagram roundtrip and disconnect cleanup', 
   const { ws, messages } = await connect(url);
   await until(() => messages.some((m) => m.type === 'peer'));
   assert.deepEqual(messages[0], { type: 'ready', protocol: 1, identifier: '112233445566', address: LOCAL });
-  assert.equal(messages[1].identifier, INVITE.slice(0, 12));
+  assert.equal(messages[1].identifier, 'aacdef012345');
   ws.send(frame());
   await until(() => messages.some(Buffer.isBuffer));
   const reply = messages.find(Buffer.isBuffer);

@@ -139,7 +139,7 @@ entry(42 * sector, 'ui.map', 43, sector, 0);
 iso.set(map, 43 * sector);
 const imported = launcher();
 const messages = [];
-const worker = { Uint8Array, Blob, TextEncoder, navigator: { storage: imported.data },
+const worker = { onmessage: null, Uint8Array, Blob, TextEncoder, navigator: { storage: imported.data },
   postMessage: message => messages.push(message) };
 vm.runInNewContext(workerSource, worker);
 await worker.onmessage({ data: { file: new Blob([iso]) } });
