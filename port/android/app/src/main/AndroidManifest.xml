@@ -17,6 +17,10 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <!-- installing a new version of the game (Updater) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- finding an Xbox disc image in shared storage to import on the device -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 
     <application
         android:label="@string/app_name"
@@ -25,7 +29,8 @@
         android:isGame="true"
         android:appCategory="game"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
-        android:hardwareAccelerated="true">
+        android:hardwareAccelerated="true"
+        android:requestLegacyExternalStorage="true">
 
         <!-- a game, for the system (isGame and appCategory above; the game
              modes' configuration) and for launchers that look for this -->
@@ -57,6 +62,26 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="halo" android:host="join" />
+            </intent-filter>
+            <!-- an Xbox disc image opened with, or shared to, Halo -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/x-iso9660-image" />
+                <data android:mimeType="application/x-raw-disk-image" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="file" android:host="*" android:pathPattern=".*\\.iso" />
+                <data android:scheme="file" android:host="*" android:pathPattern=".*\\.xiso" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/x-iso9660-image" />
             </intent-filter>
         </activity>
 

@@ -82,13 +82,35 @@ final class XisoExtractor {
     private static final long[] PARTITION_OFFSETS = { 0, 0x0FD90000L, 0x02080000L, 0x18300000L };
 
     interface Progress {
-        void report(String file, long done, long total);
+        /** called as the copy goes; returns false to stop */
+        boolean report(String file, long done, long total);
     }
 
     /** a reason the player can act on */
     static final class ExtractException extends IOException {
         ExtractException(String message) {
             super(message);
+        }
+    }
+
+    /** what probing an image found: whether it is a Halo disc and how whole it is */
+    static final class Info {
+        boolean halo;
+        int mapCount;
+        long dataBytes;
+        long fileBytes;
+        boolean complete;
+
+        String summary() {
+            if (!halo)
+                return "NOT A HALO DISC  ·  " + human(fileBytes);
+            return mapCount + " MAPS  ·  " + human(dataBytes) + (complete ? "  ·  READY" : "  ·  INCOMPLETE");
+        }
+
+        private static String human(long bytes) {
+            if (bytes >= 1L << 30)
+                return String.format(java.util.Locale.US, "%.1f GB", bytes / (double) (1L << 30));
+            return String.format(java.util.Locale.US, "%.0f MB", bytes / (double) (1L << 20));
         }
     }
 
@@ -114,6 +136,53 @@ final class XisoExtractor {
     /** copies the image's maps folder to destination/maps */
     static void extractMaps(FileChannel image, File destination, Progress progress) throws IOException {
         new XisoExtractor(image).extract(destination, progress);
+    }
+
+    /**
+     * Reads an image far enough to tell a Halo disc from another ROM, and
+     * whether every map it names lies inside the file.
+     */
+    static Info probe(FileChannel image) {
+        Info info = new Info();
+        try {
+            info.fileBytes = image.size();
+            XisoExtractor extractor = new XisoExtractor(image);
+            long[] root = extractor.findVolume();
+            ByteBuffer table = extractor.readDirectory(root[0], root[1], "The disc image's file system is damaged.");
+            List<Entry> directories = new ArrayList<>();
+            walk(table, 0, 0, true, directories, new int[1]);
+            Entry maps = find(directories, "maps");
+            if (maps == null)
+                return info;
+            table = extractor.readDirectory(maps.sector, maps.size, "The disc image's maps folder is damaged.");
+            List<Entry> files = new ArrayList<>();
+            walk(table, 0, 0, false, files, new int[1]);
+            if (find(files, "ui.map") == null)
+                return info;
+            info.halo = true;
+            info.mapCount = files.size();
+            long length = image.size();
+            long total = 0;
+            boolean complete = true;
+            for (Entry file : files) {
+                total += file.size;
+                if (extractor.partition + file.sector * SECTOR_SIZE + file.size > length)
+                    complete = false;
+            }
+            info.dataBytes = total;
+            info.complete = complete;
+        } catch (IOException | RuntimeException exception) {
+            // not readable as an Xbox disc
+        }
+        return info;
+    }
+
+    private static Entry find(List<Entry> entries, String name) {
+        for (Entry entry : entries) {
+            if (entry.name.equalsIgnoreCase(name))
+                return entry;
+        }
+        return null;
     }
 
     private void readAt(long offset, ByteBuffer buffer) throws IOException {
@@ -250,7 +319,8 @@ final class XisoExtractor {
                     offset += count;
                     remaining -= count;
                     done += count;
-                    progress.report(file.name, done, total);
+                    if (!progress.report(file.name, done, total))
+                        throw new ExtractException("The copy was stopped.");
                 }
             } catch (ExtractException e) {
                 throw new ExtractException("Could not read " + file.name + " from the disc image (is it complete?).");
