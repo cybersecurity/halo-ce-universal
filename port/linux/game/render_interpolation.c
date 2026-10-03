@@ -2,7 +2,7 @@
 RENDER_INTERPOLATION.C
 
 Frames between the game's 30 Hz ticks, for the native ports (port/linux,
-port/android, port/windows; see port/linux/README.md, "Frame rate").
+port/ios, port/windows; see port/linux/README.md, "Frame rate").
 
 The game simulates in 30 Hz ticks and originally drew one frame per tick.
 The ports draw at the display's refresh rate instead, and every frame shows
@@ -668,7 +668,7 @@ static struct observer_result const *render_interpolation_direct_camera(
 	short local_player_index,
 	struct observer_result const *observer)
 {
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) || defined(HALO_IOS)
 	(void)local_player_index;
 	return observer;
 #else

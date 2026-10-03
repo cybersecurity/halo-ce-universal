@@ -197,7 +197,7 @@ symbols in this file:
 #include "game/game_engine.h"
 #include "game/players.h"
 #include "networking/network_client_manager.h"
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 #include "network_migration.h"
 #endif
 #include "networking/network_client_message_handler.h"
@@ -480,7 +480,7 @@ boolean network_game_client_handle_message(
 		0x2F,
 		client && message && (message_size == GET_MESSAGE_SIZE(*message)) && source_address);
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	if (GET_MESSAGE_TYPE(*message) == 2 && network_game_client_handle_migration(client, message, message_size, source_address))
 		return TRUE;
 #endif

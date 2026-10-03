@@ -1,4 +1,4 @@
-# Halo: Combat Evolved for Linux, Windows, Android and the web (iOS)
+# Halo: Combat Evolved for Linux, Windows, Android, the web and iOS
 
 [![Join our Discord](https://invidget.switchblade.xyz/9gqcHyr5km)](https://discord.gg/9gqcHyr5km)
 
@@ -11,6 +11,11 @@ Windows and Android. The decompilation is of the Xbox build 2342
 
 The port starts from the decompilation of [bnunu/halo-1](https://github.com/bnunu/halo-1).
 That project is a fork of [punpckhdq/halo](https://github.com/punpckhdq/halo).
+
+Native iPhone/iPad ARM64 support and browser-room integration are in draft.
+See [iOS build instructions](port/ios/README.md) and the
+[validation record](port/ios/VALIDATION.md). Full native/browser gameplay has
+not yet been validated on this branch.
 
 ## Download
 
@@ -61,6 +66,7 @@ Each platform has its own instructions:
 | Linux (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/linux/README.md](port/linux/README.md) |
 | Windows (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/windows/README.md](port/windows/README.md) |
 | Android (arm64 app, OpenGL ES 3, SDL3) | [port/android/README.md](port/android/README.md) |
+| iOS (ARM64 iPhone/iPad, OpenGL ES 3, SDL3; draft browser crossplay) | [port/ios/README.md](port/ios/README.md) |
 | Browser (local runner for the published Apollo WASM beta) | [BROWSER_LOCAL.md](BROWSER_LOCAL.md) |
 | Browser (static hosting / GitHub Pages) | [GITHUB_PAGES.md](GITHUB_PAGES.md) |
 | Browser invitations for native multiplayer (relay preview) | [BROWSER_NATIVE_INVITES.md](BROWSER_NATIVE_INVITES.md) |

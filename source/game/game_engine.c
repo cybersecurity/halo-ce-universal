@@ -567,7 +567,7 @@ symbols in this file:
 #include "math/integer_math.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 #include "networking/network_migration.h"
 #include "../../port/web/src/web_ping.h"
 #endif
@@ -786,7 +786,7 @@ typedef char verify_game_engine_stage_size[
 
 /* ---------- prototypes */
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 boolean web_quick_play_pistol_starts(void);
 #endif
 
@@ -1388,7 +1388,7 @@ static void rasterize_in_game_score_draw_line(
 {
 	rectangle2d bounds = render.camera.window_bounds;
 	short narrow_tab_stops[3
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 		+ 1
 #endif
 	];
@@ -1405,7 +1405,7 @@ static void rasterize_in_game_score_draw_line(
 	wide_tab_stops[0] = 130;
 	wide_tab_stops[1] = 195;
 	wide_tab_stops[2] = 315;
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	/* Leave room for the host label beside a full-length player name. */
 	narrow_tab_stops[2] += 50;
 	wide_tab_stops[2] += 50;
@@ -1584,7 +1584,7 @@ long populate_statistic_buffer(
 
 
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 static long game_engine_score_host_player(void)
 {
 	struct network_game_client *client = global_network_game_client_get();
@@ -1654,7 +1654,7 @@ static long select_players_to_display(
 	boolean debug = rasterizer_debug_options.pad3 == 'E';
 	long local_player_count = 0;
 	long statistic_index;
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	long host_player_index = game_engine_score_host_player();
 #endif
 
@@ -1679,7 +1679,7 @@ static long select_players_to_display(
 	{
 		long outside_range_count = 0;
 		struct statistic_buffer outside_range[MAXIMUM_LOCAL_PLAYERS
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 			+ 1
 #endif
 		];
@@ -1690,7 +1690,7 @@ static long select_players_to_display(
 			struct player_datum *player = player_get(statistic_buffer[statistic_index].player_index);
 
 			if (player && (player->local_player_index != NONE
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 				|| statistic_buffer[statistic_index].player_index == host_player_index
 #endif
 				))
@@ -1716,7 +1716,7 @@ static long select_players_to_display(
 				struct player_datum *player = player_get(statistic_buffer[insertion_index].player_index);
 
 				if (player->local_player_index == NONE
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 					&& statistic_buffer[insertion_index].player_index != host_player_index
 #endif
 					)
@@ -2127,7 +2127,7 @@ static void game_engine_rasterize_scoreboard(
 			else
 				usprintf(ping_string, L"%ld", ping);
 		}
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 		usnprintf(row_string, NUMBEROF(row_string), L"\t%s\t%s%s\t%s\t%s",
 			get_place_string(entry), player->name,
 			entry->player_index == game_engine_score_host_player() ? L" (HOST)" : L"",
@@ -2180,7 +2180,7 @@ static void game_engine_rasterize_in_game_score(
 	long string_list_index;
 	wchar_t *column_name;
 	wchar_t *score_name;
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	long host_player_index = game_engine_score_host_player();
 #endif
 
@@ -2221,7 +2221,7 @@ static void game_engine_rasterize_in_game_score(
 		score_name = L"";
 
 	game_engine->format_score_name(score_string);
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	usnprintf(row_string, NUMBEROF(row_string), L"\t%s\t%s\t%s\tPing", column_name, score_name, score_string);
 #else
 	usprintf(row_string, L"\t%s\t%s\t%s", column_name, score_name, score_string);
@@ -2282,7 +2282,7 @@ static void game_engine_rasterize_in_game_score(
 
 			place_string = get_place_string(&entries[entry_index]);
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 			{
 				wchar_t ping_string[16];
 				int ping = game_engine_score_host_ping(entry_player_index);
@@ -4880,7 +4880,7 @@ boolean game_engine_should_end_game(
 {
 	boolean should_end_game = FALSE;
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	/* A browser Slayer host starts alone and stays open for late joiners.
 	Departed players retain their score datums, so the legacy last-team
 	check would end that match when its first opponent leaves. Score and
@@ -8074,7 +8074,7 @@ static void handle_custom_starting_equipment(
 					long weapon_index;
 					struct object_placement_data placement_data;
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 					/* Change only the automatic lobby's plasma-pistol start. */
 					if (web_quick_play_pistol_starts() && definition_index != NONE &&
 						definition_index == tag_loaded('weap', "weapons\\plasma pistol\\plasma pistol"))

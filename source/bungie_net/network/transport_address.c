@@ -104,11 +104,11 @@ symbols in this file:
 
 /* ---------- globals */
 
-#ifndef HALO_ANDROID /* Mach-O section names differ; the default is .bss anyway */
+#ifndef HALO_ILP32 /* Mach-O section names differ; the default is .bss anyway */
 #pragma bss_seg(".bss")
 #endif
 static char transport_address_string[256];
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) && !defined(HALO_IOS)
 #pragma bss_seg()
 #endif
 

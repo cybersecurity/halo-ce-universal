@@ -391,7 +391,7 @@ symbols in this file:
 #include "networking/network_messages.h"
 #include "networking/network_server_manager.h"
 #include "text/unicode.h"
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 #include "network_migration.h"
 #include "../../port/linux/game/network_distributed.h"
 #endif
@@ -794,7 +794,7 @@ struct network_game_client network_game_client_dont_use_directly;
 boolean allow_out_of_sync = FALSE;
 boolean network_game_client_dont_use_directly_in_use = FALSE;
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 static struct
 {
 	boolean reconnecting, acknowledged;
@@ -1054,7 +1054,7 @@ void network_game_client_game_shutdown(
 		0x3FC,
 		client);
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	if (client->state == _network_game_client_state_ingame && web_match_migration_enabled())
 	{
 		web_match_migration_lost();
@@ -1909,7 +1909,7 @@ boolean network_game_client_update_local_player_data(
 	return success;
 }
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 static void network_game_client_sync_added_machine(struct network_game_client *client,
 	struct network_player const *player)
 {
@@ -1941,7 +1941,7 @@ boolean network_game_client_add_player_to_game(
 
 		if (success)
 		{
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 			/* A late join can reuse a departed host's slot. The player packet
 			also admits that machine to this client's preserved session roster. */
 			network_game_client_sync_added_machine(client, player);
@@ -2229,7 +2229,7 @@ struct network_game_client *network_game_client_create(
 	void)
 {
 	struct network_game_client *client = &network_game_client_dont_use_directly;
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	csmemset(&client_migration, 0, sizeof(client_migration));
 	client_migration.epoch = web_quick_play_initial_epoch();
 #endif
@@ -2851,7 +2851,7 @@ static boolean network_game_client_idle_pregame(
 	return success;
 }
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 static boolean network_game_client_idle_migration(struct network_game_client *client)
 {		unsigned long now = system_milliseconds();
 	if (!client->connection || !network_connection_active(client->connection) ||
@@ -2908,7 +2908,7 @@ static boolean network_game_client_idle_ingame(
 	struct network_game_client *client)
 {
 	boolean success = TRUE;
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	if (client_migration.reconnecting)
 		return network_game_client_idle_migration(client);
 #endif
@@ -2921,7 +2921,7 @@ static boolean network_game_client_idle_ingame(
 	if (!client->connection || !network_connection_active(client->connection) ||
 		!network_connection_connected(client->connection))
 	{
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 		if (web_match_migration_lost())
 			return TRUE;
 #endif
@@ -2979,7 +2979,7 @@ static boolean network_game_client_idle_ingame(
 			if (!network_connection_active(client->connection) ||
 				!network_connection_connected(client->connection))
 			{
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 				if (web_match_migration_lost())
 					return TRUE;
 #endif
@@ -2992,7 +2992,7 @@ static boolean network_game_client_idle_ingame(
 		}
 	}
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	if (!success && web_match_migration_enabled())
 	{
 		web_match_migration_lost();
@@ -3166,7 +3166,7 @@ boolean network_game_client_join_first_available_game(
 	return FALSE;
 }
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 short network_game_client_quick_join(unsigned long target_address)
 {
 	struct network_game_client *client = global_network_game_client_get();
@@ -3249,7 +3249,7 @@ boolean network_game_client_set_team(
 	}
 	return success;
 }
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 unsigned long network_game_migration_epoch(void)
 {
 	return client_migration.epoch;

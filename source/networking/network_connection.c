@@ -1624,7 +1624,7 @@ boolean network_connection_idle(
 		0x21D,
 		connection);
 
-#ifndef HALO_WEB
+#if !defined(HALO_WEB) && !defined(HALO_IOS_BROWSER)
 	SET_FLAG(connection->flags, _connection_going_stale_bit, FALSE);
 	if (timeout)
 	{
@@ -1697,7 +1697,7 @@ boolean network_connection_idle(
 		}
 	}
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	/* Browser scheduling can pause while healthy RTC packets queue up. */
 	if (success)
 	{

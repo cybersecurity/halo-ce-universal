@@ -602,7 +602,7 @@ void player_ui_fast_setup_network_server(
 	dispose_global_network_game_server();
 	dispose_global_network_game_client();
 	game_connection_set(_game_connection_local);
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	/* Quick play supplies its initial map before playlist initialization;
 	ordinary System Link retains its original default selection. */
 	{

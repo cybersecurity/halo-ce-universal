@@ -1198,7 +1198,7 @@ static struct update *update_client_get_update(
 	return NULL;
 }
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 void update_queues_migrate(void)
 {
 	struct data_iterator iterator;

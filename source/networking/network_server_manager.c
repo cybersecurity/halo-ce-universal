@@ -472,7 +472,7 @@ symbols in this file:
 #include "text/unicode.h"
 
 #include "cache/cache_files.h"
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 #include "network_migration.h"
 #endif
 
@@ -763,7 +763,7 @@ static void network_game_server_remove_players_gone_while_loading(
 struct network_game_server network_game_server_memory_do_not_use_directly;
 boolean network_game_server_memory_do_not_use_directly_in_use = FALSE;
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 static struct
 {
 	boolean adopting;
@@ -1153,7 +1153,7 @@ struct network_game_server *network_game_server_create(
 		0xE0,
 		!network_game_server_memory_do_not_use_directly_in_use);
 	network_game_server_memory_do_not_use_directly_in_use = TRUE;
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	csmemset(&server_migration, 0, sizeof(server_migration));
 #endif
 
@@ -1365,7 +1365,7 @@ boolean network_game_server_idle(
 	struct network_game_server *server)
 {
 	boolean success = TRUE;
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	network_game_server_migration_expire_disconnected(server);
 #endif
 
@@ -1877,7 +1877,7 @@ boolean network_game_server_accept_client_machine_into_game(
 {
 	boolean success = FALSE;
 	long machine_index;
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	if (server_migration.adopting)
 		return FALSE;
 #endif
@@ -1943,7 +1943,7 @@ boolean network_game_server_accept_client_machine_into_game(
 					&address,
 					FALSE);
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 				if (server_migration.epoch)
 				{
 					server_migration.disconnected_at[machine_index] = 0;
@@ -2265,7 +2265,7 @@ boolean network_game_server_add_player_to_game(
 
 		/* (the name comes from the wire) */
 		player->name[NETWORK_PLAYER_NAME_LENGTH - 1] = 0;
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 		if (network_game_player_name_is_blank(player->name))
 #else
 		if (!player->name[0])
@@ -2933,7 +2933,7 @@ boolean server_has_enough_machines(
 	long machine_count = 0;
 	long client_machine_index;
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	if (network_game_distributed())
 		minimum_machine_count = 1;
 #endif
@@ -3195,7 +3195,7 @@ void network_game_server_change_game_variant(
 	return;
 }
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 boolean network_game_server_enable_quick_play(struct network_game_server *server)
 {
 	if (!server || server->state != _network_game_server_state_pregame || !network_game_distributed() ||
@@ -3216,7 +3216,7 @@ boolean network_game_server_remove_client_machine_from_game(
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x22F, server);
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x230, client);
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	if ((server_migration.epoch || (server->state == _network_game_server_state_ingame && web_match_migration_enabled())) &&
 		!TEST_FLAG(client->flags, _network_client_machine_validated_bit))
 	{
@@ -3385,7 +3385,7 @@ boolean network_game_server_remove_machine_from_game(
 
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x299, server);
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	if (server_migration.epoch || (server->state == _network_game_server_state_ingame && web_match_migration_enabled()))
 	{
 		int pending;
@@ -3641,7 +3641,7 @@ void network_game_server_update_countdown(
 				else
 				{
 					if (network_game_should_accept_remote_connections() == FALSE ||
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 						(network_game_distributed() && server_has_enough_machines(server)) ||
 #endif
 						network_game_server_get_client_machine_count(server) > 1)
@@ -3872,7 +3872,7 @@ static boolean network_game_server_setup_game_from_playlist(
 		server->game.name[NETWORK_GAME_NAME_LENGTH - 1] = L'\0';
 		server->game.map.version = 0;
 		server->game.minimum_players = 2;
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 		/* A browser host can play while waiting for peers. Distributed
 		netcode admits players in progress; lockstep still needs two. The
 		countdown retains its team and per-machine readiness checks. */
@@ -3964,7 +3964,7 @@ static boolean network_game_server_add_new_client(
 					else
 					{
 						server->client_machines[i].connection = new_connection;
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 						/* Reattach transports reserve no new roster/player slot. */
 						if (!server_migration.epoch && !(server->state == _network_game_server_state_ingame && web_match_migration_enabled()))
 #endif
@@ -4056,7 +4056,7 @@ static boolean network_game_server_remove_disconnected_client(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *client)
 {
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	/* A quick-play transport can disappear before the first migration epoch
 	   reaches the native host. Retain its roster and owner for reattachment. */
 	if (server_migration.epoch || (server->state == _network_game_server_state_ingame && web_match_migration_enabled()))
@@ -4660,7 +4660,7 @@ boolean network_game_server_reset_to_pregame(
 	return success;
 }
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 struct network_game_server *network_game_server_adopt_match(struct network_game_client *client, unsigned long epoch)
 {
 	struct network_game_server *server = &network_game_server_memory_do_not_use_directly;
@@ -4938,7 +4938,7 @@ void network_game_server_migration_finish(struct network_game_server *server)
 }
 #endif
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 void network_game_server_release_migration_transport(struct network_game_server *server)
 {
 	if (!server)

@@ -16,7 +16,7 @@ Windows it is __stdcall too, and SDL would include windows.h without it) */
 #ifndef _WIN32
 #undef APIENTRY
 #endif
-#ifdef HALO_ANDROID
+#ifdef HALO_ILP32
 #include <GLES3/gl32.h>
 #include <GLES2/gl2ext.h>
 #define GLAPIENTRY GL_APIENTRY
@@ -25,10 +25,10 @@ Windows it is __stdcall too, and SDL would include windows.h without it) */
 #endif
 #pragma pop_macro("APIENTRY")
 
-#ifdef HALO_ANDROID
-/* OpenGL ES 3.2 (port/android/README.md); tools/android_gl_stubs.py reads
+#ifdef HALO_ILP32
+/* OpenGL ES 3.2 (port/ios/README.md); tools/guest_gl_stubs.py reads
 this list to generate the guest's entry points */
-/* ANDROID_GL_FUNCTIONS_BEGIN */
+/* GLES_FUNCTIONS_BEGIN */
 #define GL_FUNCTIONS(X) \
 	X(glGetString) \
 	X(glGetIntegerv) \
@@ -129,7 +129,7 @@ this list to generate the guest's entry points */
 	X(glBeginQuery) \
 	X(glEndQuery) \
 	X(glGetQueryObjectuiv)
-/* ANDROID_GL_FUNCTIONS_END */
+/* GLES_FUNCTIONS_END */
 #else
 #define GL_FUNCTIONS(X) \
 	X(glGetString) \
@@ -244,7 +244,7 @@ GL_FUNCTIONS(GL_DECLARE_FUNCTION)
 /* call sites use the ordinary names; gl_functions.c, which defines the
 pointers, sees the declarations without these aliases */
 #ifndef GL_FUNCTIONS_DEFINE
-#ifdef HALO_ANDROID
+#ifdef HALO_ILP32
 #define glGetString halo_glGetString
 #define glGetIntegerv halo_glGetIntegerv
 #define glCopyImageSubData halo_glCopyImageSubData

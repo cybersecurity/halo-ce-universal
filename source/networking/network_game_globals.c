@@ -107,7 +107,7 @@ symbols in this file:
 #include "main/main.h"
 #include "memory/data_packet_groups.h"
 #include "network_client_manager.h"
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 #include "network_migration.h"
 #include "../../port/linux/game/network_distributed.h"
 #endif
@@ -592,7 +592,7 @@ boolean network_game_client_end_frame(
 	}
 	else if (network_game_client_get_state(global_network_game_client, NULL) == _network_game_client_state_ingame)
 	{
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 		/* There is no gameplay write until the same player has reattached. */
 		if (network_game_client_migration_waiting(global_network_game_client))
 			return TRUE;
@@ -787,7 +787,7 @@ boolean create_global_network_game_server(
 
 /* ---------- private code */
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 boolean create_global_network_game_server_from_migration(unsigned long epoch)
 {
 	if (!global_network_game_client || !epoch || !network_distributed_migration_ready())
@@ -814,7 +814,7 @@ boolean create_global_network_game_server_from_migration(unsigned long epoch)
 }
 #endif
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 void network_game_demote_migration_host(void)
 {
 	if (global_network_game_server)

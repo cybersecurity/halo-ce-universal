@@ -58,7 +58,7 @@ includes software developed by in <in@fishtank.com>.
 */
 
 /* (the desktop ports only: the Android app imports the game data itself) */
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) && !defined(HALO_IOS)
 
 #include "platform.h"
 #include "posix.h"

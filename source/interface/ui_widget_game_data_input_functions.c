@@ -1358,7 +1358,7 @@ static void network_pregame_status_screen_update(
 				global_network_game_client_get());
 			boolean waiting_for_machines = (global_network_game_server_get() &&
 				game->machine_count <
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 				(network_game_distributed() ? 1 : 2)
 #else
 				2
@@ -2023,6 +2023,9 @@ static void set_textbox_to_build_number(
 	   the function is unattested. January corroborates: .bss +0x28, referenced only here. */
 	static wchar_t build_number_string[64];
 
+#ifndef HALO_IOS
+	/* The iOS menu leaves this developer build label blank. Save and map
+	   version checks still use their original build numbers. */
 	if (!build_number_string[0])
 	{
 		ascii_to_wide(
@@ -2030,6 +2033,7 @@ static void set_textbox_to_build_number(
 			build_number_string,
 			sizeof(build_number_string));
 	}
+#endif
 
 	if (!widget->parameters.text_box.text)
 	{
@@ -2907,7 +2911,7 @@ static void multiplayer_game_directions(
 		boolean waiting_for_machines = !network_game_is_splitscreen_local() &&
 			game &&
 			game->machine_count <
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 				(network_game_distributed() ? 1 : 2)
 #else
 				2

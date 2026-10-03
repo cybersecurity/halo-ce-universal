@@ -38,7 +38,7 @@ struct network_migration_membership
 	struct network_migration_machine machines[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
 };
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 unsigned long network_game_migration_epoch(void);
 boolean create_global_network_game_server_from_migration(unsigned long epoch);
 boolean network_game_client_begin_migration(struct network_game_client *client,

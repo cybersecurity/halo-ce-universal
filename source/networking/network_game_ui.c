@@ -26,7 +26,7 @@ symbols in this file:
 
 /* ---------- public code */
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 boolean network_game_player_name_is_blank(wchar_t const *name)
 {
 	short index;
@@ -56,7 +56,7 @@ wchar_t const *network_game_get_random_player_name(
 		struct string_list *string_list = unicode_string_list_definition_get(string_list_index);
 
 		if (string_list
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 			&& string_list->strings.count > 0
 #endif
 			)
@@ -69,7 +69,7 @@ wchar_t const *network_game_get_random_player_name(
 		}
 	}
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	/* Late joins happen after the UI map (and its random-name tag) unloads.
 	Use local randomness so naming never changes the gameplay RNG sequence. */
 	if (network_game_player_name_is_blank(player_name))

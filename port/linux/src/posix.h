@@ -14,9 +14,9 @@ made only of 32-bit members so both sides agree on the layout.
 #ifndef __HALO_LINUX_POSIX_H
 #define __HALO_LINUX_POSIX_H
 
-/* 32-bit on both sides of the boundary. The Android port compiles these
+/* 32-bit on both sides of the boundary. The Android/iOS ports compiles these
 files into its 64-bit host, where long is 64-bit, and calls them from its
-ILP32 guest (port/android/README.md). */
+ILP32 guest (port/android/README.md and port/ios/README.md). */
 #ifdef __LP64__
 typedef int posix_long;
 typedef unsigned int posix_ulong;
@@ -145,7 +145,7 @@ void posix_upnp_stop_forwarding_udp(unsigned short external_port);
 /* ---------- the process and the desktop (internet play, p2p.c) */
 
 /* copies the command line argument at index (0 is the program) into buffer;
-returns 0 if there is none (always, on Android) */
+returns 0 if there is none (always, on Android/iOS) */
 int posix_command_line_argument(int index, char *buffer, posix_ulong size);
 posix_ulong posix_process_id(void);
 /* registers this executable as the desktop's handler of links with this
@@ -158,7 +158,7 @@ there is none (always, on Android) */
 int posix_user_secret(unsigned char *secret, int size);
 
 /* a connection to the Discord desktop client's local socket or pipe, or -1
-if none is running (always, on Android) */
+if none is running (always, on Android/iOS) */
 int posix_discord_connect(void);
 /* writes what it can of buffer without waiting; returns the bytes written
 (0 if none could be now), or -1 if the connection failed */

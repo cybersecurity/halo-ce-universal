@@ -140,7 +140,7 @@ static void operand(struct xgpu_text *text, const DWORD *instruction, char which
 }
 
 static const char shader_prologue[] =
-#ifdef HALO_ANDROID
+#ifdef HALO_ILP32
 	/* the #version line comes first, from the context's capabilities */
 	"precision highp float;\n"
 	"precision highp int;\n"
@@ -200,7 +200,7 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 	struct xgpu_text text = { 0 };
 	unsigned long index;
 
-#ifdef HALO_ANDROID
+#ifdef HALO_ILP32
 	xgpu_text_append(&text, "#version %s\n", xgpu_capabilities.shading_language);
 #endif
 	xgpu_text_append(&text, "%s", shader_prologue);
@@ -232,7 +232,7 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		"\tvec4 oFog = vec4(1.0), oPts = vec4(point_size), oUnused = vec4(0.0);\n"
 		"\tint a0 = 0;\n"
 		"\tvec4 A, B, C, mac, ilu;\n");
-#ifdef HALO_ANDROID
+#ifdef HALO_ILP32
 	xgpu_text_append(&text, "\tvec4 clip_position = vec4(0.0);\n\tbool clip_captured = false;\n");
 #endif
 
@@ -286,7 +286,7 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		case _ilu_lit: xgpu_text_append(&text, "\tilu = nv2a_lit(C);\n"); break;
 		default: xgpu_text_append(&text, "\tilu = vec4(0.0);\n"); break;
 		}
-#ifdef HALO_ANDROID
+#ifdef HALO_ILP32
 		/* the screen-space conversion takes the reciprocal of the clip-space
 		position's w (rcc of r12.w); keep the position it converts */
 		if (ilu == _ilu_rcc && field(instruction, 3, 28, 2) == _mux_temporary &&
@@ -340,7 +340,7 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		/* Direct3D 8 puts pixel centres on integer screen coordinates (the
 		game offsets its screen-space quads by -0.5 to match), OpenGL on
 		half-integers */
-#ifdef HALO_ANDROID
+#ifdef HALO_ILP32
 		/* The conversion is screen = clip * c[-38] * rcc(w) + c[-37]; undoing
 		it by multiplying by w again is lossy near the camera plane, where
 		rcc clamps and 1/w rounds differently on each GPU (Mali put vertices
@@ -355,7 +355,7 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		"\tvec3 ndc = (vec3(oPos.xy + vec2(0.5 + screen_offset, 0.5), oPos.z) - viewport_offset.xyz) / scale;\n"
 		"\tgl_Position = vec4(ndc * oPos.w, oPos.w);\n"
 #endif
-#ifdef HALO_ANDROID
+#ifdef HALO_ILP32
 		/* what glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE) does on desktop
 		GL: rows from the top, depth 0..1 */
 		"\tgl_Position.y = -gl_Position.y;\n"
@@ -372,7 +372,7 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		"\txT3 = oT3;\n"
 		"\txFog = oFog.x;\n"
 		"}\n"
-#ifdef HALO_ANDROID
+#ifdef HALO_ILP32
 		, XGPU_VERTEX_CONSTANT_BIAS - 38, XGPU_VERTEX_CONSTANT_BIAS - 37
 #endif
 		);

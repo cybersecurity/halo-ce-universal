@@ -1,7 +1,7 @@
 /* Browser quick play uses the normal session and player APIs. Host migration
 adopts the running world on this thread; it never generates player input.
 Cancellation and ordinary match endings leave the menus in control. */
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 
 #ifdef HALO_QUICK_PLAY_TEST
 #include "quick_play_test_stubs.h"
@@ -152,6 +152,9 @@ void quick_play_update(boolean main_menu_loaded)
 	unsigned int migration_epoch;
 
 	/* Explicit cancellation wins over any queued election or hold. */
+#ifdef HALO_IOS_BROWSER
+	{ void ios_room_pump(void); ios_room_pump(); }
+#endif
 	if (web_quick_play_take_cancel() && quick_play.phase != QUICK_OFF)
 	{
 		quick_play_finish("menu", "Returned to the main menu.", TRUE);

@@ -1,5 +1,5 @@
 /* Thread-safe quick-play control; the engine consumes requests on its own thread. */
-#ifdef HALO_QUICK_PLAY_TEST
+#if defined(HALO_QUICK_PLAY_TEST) || defined(HALO_IOS_BROWSER)
 #define EMSCRIPTEN_KEEPALIVE
 double emscripten_get_now(void);
 #else

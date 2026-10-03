@@ -3120,14 +3120,14 @@ static void distributed_send_game_state(
 
 static unsigned long distributed_migration_epoch(void)
 {
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	return network_game_migration_epoch();
 #else
 	return 0;
 #endif
 }
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 static boolean distributed_checkpoint_validate_ownership(struct migration_checkpoint_state const *state)
 {
 	long index, other;
@@ -3168,7 +3168,7 @@ static boolean distributed_checkpoint_validate(byte const *buffer, long size)
 		state.engine_size <= 0 || state.engine_size > MAXIMUM_GAME_STATE_SIZE ||
 		state.object_size <= 0 || state.damage_size <= 0)
 		return FALSE;
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	if (!distributed_checkpoint_validate_ownership(&state))
 		return FALSE;
 #endif
@@ -3194,7 +3194,7 @@ static boolean distributed_checkpoint_validate(byte const *buffer, long size)
 
 static void distributed_checkpoint_notify(void)
 {
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	void web_quick_play_checkpoint(unsigned long epoch, long tick, unsigned long seed);
 	struct migration_checkpoint_state state;
 	memcpy(&state, migration_checkpoint_store.complete, sizeof(state));
@@ -3210,7 +3210,7 @@ static int distributed_checkpoint_validate_received(void const *buffer, unsigned
 
 static void distributed_send_checkpoint(void)
 {
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	struct migration_checkpoint_state state;
 	struct migration_checkpoint_message message;
 	long offset = sizeof(state);
@@ -3302,7 +3302,7 @@ static void distributed_receive_checkpoint(void const *message, word size)
 	{
 		struct migration_checkpoint_state state;
 		memcpy(&state, migration_checkpoint_store.complete, sizeof(state));
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 		network_game_client_migration_set_machines(&state.membership, sizeof(state.membership));
 		network_game_client_migration_routes(state.machine_addresses, HALO_PORT_MAXIMUM_NETWORK_MACHINES);
 		network_game_client_migration_set_host_machine((short)state.host_machine_index);

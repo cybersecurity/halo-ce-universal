@@ -389,7 +389,7 @@ symbols in this file:
 #include "text/font_group.h"
 #include "tag_files/files.h"
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 /* called without a prototype in scope; a WebAssembly call must match the
 definition's signature */
 boolean cache_files_give_time_to_precache(char const *map_name);
@@ -663,7 +663,7 @@ typedef char screenshot_and_framerate_globals_size_assert[
 	sizeof(struct _screenshot_and_framerate_globals) == 0x38B ? 1 : -1];
 
 void network_test_update(boolean main_menu_loaded, real seconds);
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 void quick_play_update(boolean main_menu_loaded);
 boolean web_match_migration_enabled(void);
 boolean web_match_migration_lost(void);
@@ -3198,7 +3198,7 @@ void main_loop(
 		event_manager_update();
 		telnet_console_process();
 
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 		/* Production quick play owns only session setup, never player input. */
 		quick_play_update(main_globals.main_menu_scenario_loaded);
 #endif
@@ -3214,7 +3214,7 @@ void main_loop(
 			{
 				if (!network_game_client_start_frame())
 				{
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 					if (!web_match_migration_lost())
 #endif
 					{
@@ -3228,7 +3228,7 @@ void main_loop(
 			{
 				if (!network_game_client_start_frame())
 				{
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 					if (!web_match_migration_lost())
 #endif
 					{
@@ -3239,7 +3239,7 @@ void main_loop(
 				}
 				else if (!network_game_server_start_frame())
 				{
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 					if (!web_match_migration_lost())
 #endif
 					{
@@ -3281,7 +3281,7 @@ void main_loop(
 					connection = main_globals.connection;
 					if (connection>_game_connection_local && connection<=_game_connection_network_server && !network_game_client_end_frame())
 					{
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 						if (!web_match_migration_lost())
 #endif
 						{

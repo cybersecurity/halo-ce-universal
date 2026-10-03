@@ -108,7 +108,7 @@ const char *platform_data_root(void)
 						snprintf(root, sizeof(root), "%s", executable);
 				}
 			}
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) && !defined(HALO_IOS)
 			if (!has_maps(root) && executable_directory[0] && platform_offer_game_data(executable_directory) &&
 				has_maps(executable_directory))
 			{

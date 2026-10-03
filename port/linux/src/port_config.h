@@ -3,9 +3,9 @@ PORT_CONFIG.H
 
 The native ports' settings, read from config.toml (port_config.c): next to
 the executable on the desktop, in the data folder (the one holding maps/)
-on Android. A missing file is written with the defaults. Each setting can
+on Android/iOS. A missing file is written with the defaults. Each setting can
 also be set for one run with its HALO_* environment variable, which wins
-over the file (the tools and the Android app pass settings that way).
+over the file (the tools and the Android/iOS apps pass settings that way).
 
 Settings are named "section.key", as in the file: "display.vsync".
 */

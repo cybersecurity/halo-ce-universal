@@ -47,7 +47,7 @@ short network_game_client_get_state(
 	short *state_data);
 boolean network_game_client_join_first_available_game(
 	void);
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 /* 0: still searching; 1: joining; -1: incompatible; -2: closed; -3: failed.
 The optional address uses transport_address order, as transport_client_start
 writes it (IPv4 octets from the most significant to least significant byte). */

@@ -321,7 +321,7 @@ unsigned int _clearfp(void)
 {
 	return 0;
 }
-#elif defined(HALO_ANDROID)
+#elif defined(HALO_ANDROID) || defined(HALO_IOS)
 /* AArch64: the rounding mode lives in FPCR.RMode, the sticky exception
 flags in FPSR. Precision control and exception unmasking have no
 equivalent; the rest of the MSVC control word is only remembered. */

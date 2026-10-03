@@ -47,8 +47,8 @@ enum config_environment
 enum
 {
 	_platform_desktop = 1,
-	_platform_android = 2,
-	_platform_all = _platform_desktop | _platform_android,
+	_platform_mobile = 2,
+	_platform_all = _platform_desktop | _platform_mobile,
 };
 
 struct config_setting
@@ -63,6 +63,14 @@ struct config_setting
 	const char *comment;
 };
 
+#ifdef HALO_IOS
+#define DEFAULT_INTERNET_PLAY "false"
+#define DEFAULT_CLIPBOARD_JOIN "false"
+#else
+#define DEFAULT_INTERNET_PLAY "true"
+#define DEFAULT_CLIPBOARD_JOIN "true"
+#endif
+
 static const struct config_setting config_settings[] =
 {
 	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
@@ -70,9 +78,15 @@ static const struct config_setting config_settings[] =
 		"starts in a window, which draws the Xbox's 640x480. F11 switches." },
 	{ "display.window_scale", _config_integer, "2", "HALO_WINDOW_SCALE", _environment_value, _platform_desktop,
 		"The window's size as a multiple of 640x480 (it can be resized)." },
-	{ "display.screen_width", _config_integer, "0", "HALO_SCREEN_WIDTH", _environment_value, _platform_android,
+	{ "display.screen_width", _config_integer, "0", "HALO_SCREEN_WIDTH", _environment_value, _platform_mobile,
 		"Columns of the 480-line picture: 0 for the display's shape, 640 for the\n"
 		"Xbox's 4:3." },
+#ifdef HALO_IOS
+	{ "display.render_height", _config_integer, "0", "HALO_RENDER_HEIGHT", _environment_value, _platform_mobile,
+		"Internal rendering height in physical pixels: 0 (default) uses native\n"
+		"display resolution. Try 1080, 720 or 480 for lower GPU/battery use.\n"
+		"The selected aspect ratio is preserved; changes apply on relaunch." },
+#endif
 	{ "display.vsync", _config_boolean, "true", "HALO_NO_VSYNC", _environment_set_is_false, _platform_all,
 		"Wait for the display between frames; false draws as fast as possible." },
 	{ "display.max_fps", _config_integer, "0", "HALO_MAX_FPS", _environment_value, _platform_desktop,
@@ -150,7 +164,7 @@ static const struct config_setting config_settings[] =
 	{ "network.address", _config_string, "\"\"", "HALO_NET_ADDRESS", _environment_value, _platform_all,
 		"This machine's IPv4 address for system link, for a machine on several\n"
 		"networks; empty chooses one." },
-#ifdef HALO_WEB
+#if defined(HALO_WEB) || defined(HALO_IOS_BROWSER)
 	{ "network.quick_play", _config_string, "\"\"", "HALO_QUICK_PLAY", _environment_value, _platform_all,
 		"Browser quick play: host starts Beaver Creek Slayer; join finds the chosen host.\n"
 		"Empty keeps the normal game menus. This runs only once per launch." },
@@ -161,12 +175,12 @@ static const struct config_setting config_settings[] =
 		"Comma-separated IPv4 addresses system link sends its announcements to\n"
 		"instead of the local network's broadcast address (for VPNs); empty for\n"
 		"the local network." },
-	{ "network.online", _config_boolean, "true", "HALO_NET_ONLINE", _environment_value, _platform_all,
+	{ "network.online", _config_boolean, DEFAULT_INTERNET_PLAY, "HALO_NET_ONLINE", _environment_value, _platform_all,
 		"Internet play: hosting makes an invite link (logged, and put on the\n"
 		"clipboard) that lets whoever has it join over the internet; opening a\n"
 		"link (or copying one before switching to the game) joins. Only people\n"
 		"with the invite can join. Off keeps system link to the local network." },
-	{ "network.join_from_clipboard", _config_boolean, "true", "HALO_NET_JOIN_FROM_CLIPBOARD", _environment_value,
+	{ "network.join_from_clipboard", _config_boolean, DEFAULT_CLIPBOARD_JOIN, "HALO_NET_JOIN_FROM_CLIPBOARD", _environment_value,
 		_platform_all,
 		"Join the game of an invite link found on the clipboard when the game\n"
 		"comes to the front." },
@@ -275,15 +289,15 @@ static const struct config_setting config_settings[] =
 		"Log texture uploads." },
 	{ "debug.texture_no_cache", _config_boolean, "false", "HALO_TEXTURE_NO_CACHE", _environment_set_is_true, _platform_all,
 		"Upload textures again every time they are used." },
-	{ "debug.sample_seconds", _config_real, "0.0", "HALO_SAMPLE", _environment_value, _platform_android,
+	{ "debug.sample_seconds", _config_real, "0.0", "HALO_SAMPLE", _environment_value, _platform_mobile,
 		"Log where every game thread is this often, in seconds (read by the\n"
 		"app, port/android/host/host_debug.c); 0 never." },
 };
 
 #define NUMBER_OF_CONFIG_SETTINGS (sizeof(config_settings) / sizeof(config_settings[0]))
 
-#ifdef HALO_ANDROID
-#define CONFIG_PLATFORM _platform_android
+#ifdef HALO_ILP32
+#define CONFIG_PLATFORM _platform_mobile
 #else
 #define CONFIG_PLATFORM _platform_desktop
 #endif
@@ -304,8 +318,8 @@ static pthread_mutex_t config_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void config_path(char *path, size_t size)
 {
-#ifdef HALO_ANDROID
-	/* the data folder, which the app names (port/android/host/host_main.c) */
+#ifdef HALO_ILP32
+	/* the data folder, which the app names (port/ios/host/host_main.m) */
 	const char *root = getenv("HALO_DATA_ROOT");
 
 	snprintf(path, size, "%s/config.toml", root && *root ? root : ".");
@@ -320,7 +334,7 @@ static void config_path(char *path, size_t size)
 /* the whole file, NUL terminated, or NULL; free() it */
 static char *config_read_file(const char *path, size_t *size)
 {
-#ifdef HALO_ANDROID
+#ifdef HALO_ILP32
 	FILE *file = fopen(path, "rb");
 	char *text = NULL;
 	long length;
@@ -363,7 +377,7 @@ static char *config_read_file(const char *path, size_t *size)
 
 static int config_write_file(const char *path, const char *text)
 {
-#ifdef HALO_ANDROID
+#ifdef HALO_ILP32
 	FILE *file = fopen(path, "wb");
 	int written;
 
@@ -432,8 +446,8 @@ static void config_append_setting(struct config_text *text, const struct config_
 		if (*line)
 			line++;
 	}
-#ifndef HALO_ANDROID
-	/* (Android apps have no environment to set) */
+#ifndef HALO_ILP32
+	/* (iOS apps have no environment to set) */
 	switch (setting->environment_style)
 	{
 	case _environment_value:
@@ -459,7 +473,7 @@ static char *config_default_text(void)
 	char section[32] = "";
 	size_t index;
 
-#ifdef HALO_ANDROID
+#ifdef HALO_ILP32
 	config_append(&text,
 		"# Halo settings\n"
 		"#\n"

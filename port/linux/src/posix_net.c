@@ -20,7 +20,9 @@ with the host ABI.
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#ifndef __APPLE__
 #include <sys/random.h>
+#endif
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <time.h>
@@ -471,7 +473,7 @@ posix_ulong posix_local_ipv4_address(void)
 	posix_ulong result = 0;
 	int probe;
 
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(HALO_IOS)
 	/* a phone's default route may be its mobile data (on Wi-Fi without the
 	internet, or sharing its connection), which the local network cannot
 	reach: first the local network's interface (Wi-Fi, or the one it
@@ -568,7 +570,7 @@ posix_ulong posix_resolve_ipv4(const char *host)
 
 int posix_command_line_argument(int index, char *buffer, posix_ulong size)
 {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(HALO_IOS)
 	(void)index;
 	(void)buffer;
 	(void)size;
@@ -605,7 +607,7 @@ posix_ulong posix_process_id(void)
 
 int posix_user_secret(unsigned char *secret, int size)
 {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(HALO_IOS)
 	(void)secret;
 	(void)size;
 	return 0;
@@ -664,7 +666,7 @@ int posix_user_secret(unsigned char *secret, int size)
 #endif
 }
 
-#ifndef __ANDROID__
+#if !defined(__ANDROID__) && !defined(HALO_IOS)
 /* runs a program with its arguments and waits for it; its exit status, or -1 */
 static int run_program(char *const arguments[])
 {
@@ -682,7 +684,7 @@ static int run_program(char *const arguments[])
 
 int posix_register_url_scheme(const char *scheme, const char *description)
 {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(HALO_IOS)
 	(void)scheme;
 	(void)description;
 	return 0;
@@ -746,7 +748,7 @@ int posix_register_url_scheme(const char *scheme, const char *description)
 
 int posix_discord_connect(void)
 {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(HALO_IOS)
 	return -1;
 #else
 	/* where Discord (and its Flatpak and Snap packages) put discord-ipc-N */

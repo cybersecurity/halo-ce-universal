@@ -25,7 +25,7 @@ struct halo_ui_pointer
 
 /* frees the mouse for the menus while menus_active, and captures it again
 for aiming when not; while menus are active returns nonzero and what the
-pointer did since the last call. Always 0 on Android. */
+pointer did since the last call. Always 0 on iOS. */
 int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer);
 
 #endif
