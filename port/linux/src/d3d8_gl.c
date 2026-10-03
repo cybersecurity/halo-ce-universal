@@ -3657,6 +3657,11 @@ static void write_screenshot(struct render_target_entry *target)
 	free(pixels);
 }
 
+/**
+ * @brief Shows the back buffer: blits it letterboxed to the window and
+ * swaps. Ends the frame for the texture cache and the write tracking.
+ * @param source_rectangle,destination_rectangle,unused,unused2 ignored
+ */
 void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destination_rectangle,
 	void *unused, void *unused2)
 {
@@ -3702,6 +3707,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 			x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 		platform_video_swap();
 		xgpu_gl_state_invalidate();
+		memory_watch_begin_frame();
 		xgpu_texture_cache_begin_frame();
 #ifdef HALO_ANDROID
 		host_gl_fence_frame((unsigned int)device.buffer_ring);

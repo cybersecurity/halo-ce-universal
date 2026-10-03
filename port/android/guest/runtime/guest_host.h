@@ -46,6 +46,8 @@ unsigned int host_memory_watch_generation(unsigned int address, unsigned int siz
 unsigned int host_memory_watch_serial(void);
 void host_memory_watch_prepare_write(unsigned int address, unsigned int size);
 void host_memory_watch_forget(unsigned int address, unsigned int size);
+/* memory_watch_begin_frame (port/linux/src/platform.h) */
+void host_memory_watch_begin_frame(void);
 
 /* ---------- SDL (guest/runtime/guest_sdl.c)
 

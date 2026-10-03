@@ -31,6 +31,7 @@ that runs here.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/system_properties.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <time.h>
@@ -181,6 +182,46 @@ static int config_sample_seconds(const char *path, char *text, size_t size)
 	return found;
 }
 
+/**
+ * @brief Reads a boolean setting of config.toml.
+ * @param path the file
+ * @param name the dotted setting name, e.g. "debug.memory_watch"
+ * @param otherwise the value when the file, the setting or a boolean is
+ * missing
+ * @return 0 or 1
+ */
+static int config_boolean_or(const char *path, const char *name, int otherwise)
+{
+	toml_result_t result = toml_parse_file_ex(path);
+	int value = otherwise;
+
+	if (!result.ok)
+		return otherwise;
+	{
+		toml_datum_t datum = toml_seek(result.toptab, name);
+
+		if (datum.type == TOML_BOOLEAN)
+			value = datum.u.boolean ? 1 : 0;
+	}
+	toml_free(result);
+	return value;
+}
+
+/**
+ * @brief Whether the app runs through an ARM translator. The x86 emulator
+ * runs the app's ARM code through one, which ro.dalvik.vm.native.bridge
+ * names; it cannot deliver the page faults of the write tracking to the
+ * app (host_memory.c).
+ * @return nonzero if a native bridge is named
+ */
+static int native_bridge_active(void)
+{
+	char value[PROP_VALUE_MAX] = "";
+
+	__system_property_get("ro.dalvik.vm.native.bridge", value);
+	return value[0] && strcmp(value, "0") != 0;
+}
+
 /* POSIX TZ for the current local offset (the guest's musl has no zone
 database) */
 static void time_zone(char *buffer, size_t size)
@@ -233,6 +274,14 @@ static uint32_t make_boot(const struct environment *environment)
 
 #define MAIN_STACK_SIZE (16 * 1024 * 1024)
 
+/**
+ * @brief The thread that runs the game: passes the display and the
+ * settings to the guest through its environment, chooses the write tracking
+ * (page protection, or page hashes when translated or when
+ * debug.memory_watch is false), and runs the guest's main.
+ * @param unused the thread argument, not used
+ * @return never returns normally
+ */
 static void *game_main(void *unused)
 {
 	struct environment environment = { { 0 }, 0 };
@@ -295,6 +344,20 @@ static void *game_main(void *unused)
 
 		if (config_sample_seconds(path, seconds, sizeof(seconds)))
 			host_debug_start_sampler(seconds);
+	}
+	if (native_bridge_active())
+	{
+		host_memory_watch_use_hashes();
+		host_logf(HOST_LOG_INFO, "write tracking: page hashes (ARM translation)");
+	}
+	else if (!config_boolean_or(path, "debug.memory_watch", 1))
+	{
+		host_memory_watch_use_hashes();
+		host_logf(HOST_LOG_INFO, "write tracking: page hashes (debug.memory_watch = false)");
+	}
+	else
+	{
+		host_logf(HOST_LOG_INFO, "write tracking: page protection");
 	}
 	boot = make_boot(&environment);
 	host_logf(HOST_LOG_INFO, "data %s, saves %s", data_root, save_root);

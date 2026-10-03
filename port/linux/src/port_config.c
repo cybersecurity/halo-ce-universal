@@ -283,6 +283,9 @@ static const struct config_setting config_settings[] =
 		_platform_all,
 		"The port of the script console (telnet_console); the Xbox's was 23, which\n"
 		"only the administrator can listen on." },
+	{ "debug.solo_game", _config_boolean, "false", "HALO_SOLO_GAME", _environment_set_is_true, _platform_all,
+		"Let a system link or split screen game start with one player (to test\n"
+		"multiplayer maps without a second machine)." },
 	{ "debug.network_latency", _config_real, "0.0", "HALO_NETWORK_LATENCY", _environment_value, _platform_all,
 		"Milliseconds everything received is held back (a round trip between two\n"
 		"machines of twice it), to test the netcode as over the internet; 0 none." },
@@ -338,6 +341,12 @@ static const struct config_setting config_settings[] =
 	{ "debug.sample_seconds", _config_real, "0.0", "HALO_SAMPLE", _environment_value, _platform_android,
 		"Log where every game thread is this often, in seconds (read by the\n"
 		"app, port/android/host/host_debug.c); 0 never." },
+	{ "debug.memory_watch", _config_boolean, "true", "HALO_MEMORY_WATCH", _environment_value, _platform_android,
+		"Notice the game's writes to cached textures and vertices by page\n"
+		"protection; false compares page contents once a frame instead, which is\n"
+		"slower. Under ARM translation (the x86 emulator) the app always compares\n"
+		"contents. Read by the app from the file only (port/android/host/host_main.c):\n"
+		"HALO_MEMORY_WATCH has no effect." },
 };
 
 #define NUMBER_OF_CONFIG_SETTINGS (sizeof(config_settings) / sizeof(config_settings[0]))

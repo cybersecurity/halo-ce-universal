@@ -2792,12 +2792,19 @@ void network_game_server_begin_game_start_countdown(
 	return;
 }
 
+/**
+ * @brief Whether a team game lacks a player on one of its teams, which
+ * holds back the start. Never with debug.solo_game.
+ * @param server the server whose game is asked about
+ * @return TRUE if the start has to wait for more players
+ */
 boolean server_needs_more_teams(
 	struct network_game_server *server)
 {
 	boolean needs_more_teams = FALSE;
 
-	if (server->game.variant.universal_variant.teams)
+	if (server->game.variant.universal_variant.teams
+		&& !network_game_solo_game())
 	{
 		short player_count_by_team[NUMBER_OF_MULTIPLAYER_TEAMS] = { 0, 0 };
 		long player_index;
@@ -2870,11 +2877,18 @@ boolean server_has_a_player_on_each_machine(
 	return TRUE;
 }
 
+/**
+ * @brief Whether enough machines joined to start: two, or one for a
+ * splitscreen game or with debug.solo_game.
+ * @param server the server whose game is asked about
+ * @return TRUE if the game may start with the machines that joined
+ */
 boolean server_has_enough_machines(
 	struct network_game_server *server)
 {
 	boolean has_enough_machines;
 	long minimum_machine_count =
+		network_game_solo_game() ||
 		network_game_is_splitscreen_local() ? 1 : 2;
 	long machine_count = 0;
 	long client_machine_index;
@@ -3474,6 +3488,13 @@ static void network_game_server_dump(
 	return;
 }
 
+/**
+ * @brief Starts, adjusts or stops the pregame countdown on an event.
+ * With debug.solo_game a lone machine starts the countdown without a
+ * remote client.
+ * @param server the server, in the pregame state
+ * @param countdown_event a _network_game_server_countdown_event_*
+ */
 void network_game_server_update_countdown(
 	struct network_game_server *server,
 	short countdown_event)
@@ -3546,6 +3567,7 @@ void network_game_server_update_countdown(
 				else
 				{
 					if (network_game_should_accept_remote_connections() == FALSE ||
+						network_game_solo_game() ||
 						network_game_server_get_client_machine_count(server) > 1)
 					{
 						unsigned long countdown;
@@ -3809,6 +3831,13 @@ static void network_game_server_variant_options(
 		game_variant_options_default(variant, options);
 }
 
+/**
+ * @brief Opens the server's game for the stage its variant names. The
+ * minimum player count is 1 with debug.solo_game, else 2.
+ * @param server the server
+ * @return TRUE if the game was opened; FALSE if the stage is not found
+ * (probably a missing playlist)
+ */
 static boolean network_game_server_setup_game_from_playlist(
 	struct network_game_server *server)
 {
@@ -3825,7 +3854,7 @@ static boolean network_game_server_setup_game_from_playlist(
 		ustrncpy(server->game.name, machine_name, NETWORK_GAME_NAME_LENGTH - 1);
 		server->game.name[NETWORK_GAME_NAME_LENGTH - 1] = L'\0';
 		server->game.map.version = 0;
-		server->game.minimum_players = 2;
+		server->game.minimum_players = network_game_solo_game() ? 1 : 2;
 		server->game.maximum_players = MAXIMUM_NETWORK_PLAYER_COUNT;
 		network_game_server_port_settings_apply(server);
 		network_game_server_variant_options(&server->game.variant, &server->game.variant_options);
