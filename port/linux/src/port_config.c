@@ -66,13 +66,19 @@ struct config_setting
 static const struct config_setting config_settings[] =
 {
 	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
-		"Start fullscreen, drawing at the display's resolution and shape; false\n"
+		"Where display.mode is empty: start fullscreen, as \"fullscreen\" does; false\n"
 		"starts in a window, which draws the Xbox's 640x480. F11 switches." },
 	{ "display.mode", _config_string, "\"\"", "HALO_DISPLAY_MODE", _environment_value, _platform_desktop,
-		"\"fullscreen\" takes the display at its desktop resolution, \"borderless\"\n"
-		"is a window over the whole desktop (both draw at the display's\n"
-		"resolution), \"windowed\" a window of the Xbox's 640x480, scaled. Empty:\n"
-		"display.fullscreen's (true: borderless). F11 switches to the window and back." },
+		"\"fullscreen\" is a borderless window over the whole desktop (the display's\n"
+		"mode is not changed; \"borderless\" is the same), \"windowed\" a window of the\n"
+		"Xbox's 640x480, scaled. Empty: display.fullscreen's. F11 switches to the\n"
+		"window and back." },
+	{ "display.resolution_width", _config_integer, "0", "HALO_RESOLUTION_WIDTH", _environment_value, _platform_desktop,
+		"The resolution fullscreen draws at, scaled to the display\n"
+		"(its mode is not changed): 640x480 or more, no more than the display; 0\n"
+		"for the display's own." },
+	{ "display.resolution_height", _config_integer, "0", "HALO_RESOLUTION_HEIGHT", _environment_value,
+		_platform_desktop, "The height of display.resolution_width's resolution; 0 for the display's own." },
 	{ "display.window_scale", _config_integer, "2", "HALO_WINDOW_SCALE", _environment_value, _platform_desktop,
 		"The window's size as a multiple of 640x480 (it can be resized)." },
 	{ "display.screen_width", _config_integer, "0", "HALO_SCREEN_WIDTH", _environment_value, _platform_android,

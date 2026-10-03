@@ -39,6 +39,7 @@ is let go in scenario_tags_unload, before the next map's tags load.
 /* the platform layer's (port/linux/src) */
 void platform_log(char const *format, ...);
 char const *config_string(char const *name);
+int platform_display_resolutions(int *widths, int *heights, int maximum, int *native);
 
 /* cache_files.c's (port) */
 void *cache_files_tag_instances(long *count);
@@ -382,6 +383,9 @@ static struct
 	long *strings_tags;
 	long *text_tags;
 	long *spinner_tags;
+	/* the display's resolutions as a spinner's strings and values
+	(spinner_text), once asked for */
+	char *resolutions[2];
 	boolean failed;
 } build;
 
@@ -673,6 +677,37 @@ static long split(char const *text, char const **pieces)
 	return count;
 }
 
+/* a spinner's "|"-separated strings, or its values: its own, but for Video
+Setup's resolution (display.resolution) the display's (sdl_platform.c),
+shown "1920 X 1080" and set "1920x1080", the display's own set "0x0" */
+static char const *spinner_text(struct halo_menu_widget const *widget, boolean values)
+{
+	boolean resolution = widget->setting && !strcmp(widget->setting, "display.resolution");
+
+	if (resolution && !build.resolutions[0])
+	{
+		int widths[MAXIMUM_STRINGS], heights[MAXIMUM_STRINGS], native;
+		long count = platform_display_resolutions(widths, heights, MAXIMUM_STRINGS, &native);
+		long kind, index;
+
+		for (kind = 0; count > 0 && kind < 2; kind++)
+		{
+			long size = count * 32, length = 0;
+			char *text = allocate(size);
+
+			for (index = 0; text && index < count; index++)
+			{
+				length += snprintf(text + length, size - length, kind ? "%s%dx%d" : "%s%d X %d", index ? "|" : "",
+					kind && index == native ? 0 : widths[index], kind && index == native ? 0 : heights[index]);
+			}
+			build.resolutions[kind] = text;
+		}
+	}
+	if (resolution && build.resolutions[values ? 1 : 0])
+		return build.resolutions[values ? 1 : 0];
+	return values ? widget->values : widget->strings;
+}
+
 static void *bitmap_build(struct halo_menu_bitmap const *source, long tag_index)
 {
 	struct bitmap_group *group = allocate(sizeof(struct bitmap_group));
@@ -879,7 +914,7 @@ static void setting_add(struct halo_menu_widget const *source, long definition_i
 	setting->definition_index = definition_index;
 	setting->setting = source->setting;
 	setting->loaded_index = NONE;
-	setting->value_count = split(source->values, setting->values);
+	setting->value_count = split(spinner_text(source, TRUE), setting->values);
 }
 
 /* a font: large, small, terminal, or the map's by its path */
@@ -1318,7 +1353,7 @@ void menu_tags_loaded(
 		if (widget->strings)
 		{
 			char const *pieces[MAXIMUM_STRINGS];
-			long count = split(widget->strings, pieces);
+			long count = split(spinner_text(widget, FALSE), pieces);
 
 			instance_set(instances, UNICODE_STRING_LIST_TAG, build.spinner_tags[index], widget->name, " strings",
 				string_list_build(pieces, count));

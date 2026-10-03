@@ -6,7 +6,8 @@ PC version had (no connection speed or texture quality: a window or the full
 screen, the frame rate, the keyboard's own controls).
 
 A row's spinner sets one of config.toml's settings (setting=, values=), or of
-the profile being edited ("profile.<field>": the controller's settings), by
+the profile being edited ("profile.<field>": the controller's settings), or
+Video Setup's resolution ("display.resolution": two of config.toml's), by
 port/linux/game/menu_functions.c: "port setting load" shows its value,
 "port settings save" (OK) writes those changed and applies them, "port
 settings defaults" shows the defaults. Controls Setup binds the keyboard and
@@ -29,14 +30,21 @@ SCREENS = {
         "screen": "video_settings_screen",
         "header": ("header_profile_video_settings", f"{PE}/video_settings/header_profile_video_settings"),
         "spacing": 26,
+        # (Window Scale in Resolution's place: port/linux/game/menu_functions.c
+        # shows the one the display mode chosen uses)
+        "same_slot": ["display.window_scale"],
         "rows": [
             ("DISPLAY MODE:", "display.mode",
-             [("FULLSCREEN", "fullscreen"), ("BORDERLESS", "borderless"), ("WINDOWED", "windowed")],
-             "Fullscreen and borderless draw at the display's\nresolution; windowed, 640x480 scaled. F11: window.",
+             [("FULLSCREEN", "fullscreen"), ("WINDOWED", "windowed")],
+             "Fullscreen covers the desktop, its mode unchanged;\nwindowed, 640x480 scaled. F11 switches.",
              "desktop"),
-            ("WINDOW SIZE:", "display.window_scale",
-             [("640 x 480", "1"), ("1280 x 960", "2"), ("1920 x 1440", "3"), ("2560 x 1920", "4")],
-             "The window's size when windowed (its edges can\nalso be dragged).", "desktop"),
+            # (display.resolution_width and _height; port/linux/game/menu_tags.c
+            # puts the display's resolutions in place of this one)
+            ("RESOLUTION:", "display.resolution", [("NATIVE", "0x0")],
+             "What fullscreen draws at, scaled to the display\n(its mode is not changed).", "desktop"),
+            ("WINDOW SCALE:", "display.window_scale",
+             [(str(scale), str(scale)) for scale in range(1, 5)],
+             "The window's size, as a multiple of 640x480 (its\nedges can also be dragged).", "desktop"),
             ("V-SYNC:", "display.vsync", ON_OFF,
              "Wait for the display between frames, so that the\npicture never tears.", None),
             ("FRAME RATE LIMIT:", "display.max_fps",
@@ -190,8 +198,11 @@ def _screen(folder: str, spec: dict, rows: list, list_inputs: list, list_handler
                                       ("height", 60), ("string_list", f"{base}/help_strings"),
                                       ("font", "ui\\large_ui"), ("color", "#FFFFFFFF")], [])
     children = [f'<data input="{name}"/>' for name in list_inputs] + list_handlers
-    for index, (row, platform) in enumerate(rows):
-        children.append(f'<child{attributes([("widget", row), ("x", 54), ("y", 73 + index * spec["spacing"]), ("platform", platform)])}/>')
+    slot = -1
+    for row, platform, *same_slot in rows:
+        # (a row in the previous one's place: the menus show one of them)
+        slot += 0 if same_slot and same_slot[0] else 1
+        children.append(f'<child{attributes([("widget", row), ("x", 54), ("y", 73 + slot * spec["spacing"]), ("platform", platform)])}/>')
     children.append(f'<child{attributes([("widget", f"{base}/button_bar"), ("y", 414)])}/>')
     lines += _widget(f"{base}/options_menu",
                      [("type", "column_list"), ("width", 640), ("height", 480),
@@ -213,7 +224,7 @@ def _setting_screen(folder: str, spec: dict) -> list:
     for index, (label, setting, choices, _, platform) in enumerate(spec["rows"]):
         key = setting.split(".", 1)[1]
         row = f"{base}/op_{key}"
-        rows.append((row, platform))
+        rows.append((row, platform, setting in spec.get("same_slot", ())))
         extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
                                ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF"), ("platform", platform)],
                          [f'<child{attributes([("widget", f"{base}/{key}_label")])}/>',
