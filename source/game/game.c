@@ -182,6 +182,8 @@ struct game_options;
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
+/* port: a client drives the host's actors' units as the host sent them (port/linux/game/network_actors.c) */
+void network_actors_drive(void);
 
 /* ---------- constants */
 
@@ -325,6 +327,8 @@ void game_tick(
 	positions, and could place objects of their own) */
 	if (!network_game_distributed_client())
 		ai_update();
+	else
+		network_actors_drive();
 	players_update_before_game();
 
 	seconds_per_tick = game_globals->players_are_double_speed
