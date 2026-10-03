@@ -595,6 +595,8 @@ boolean network_game_distributed_client(void);
 /* port/linux/game/network_distributed.c's */
 void network_distributed_player_killed(long *killing_player_index, long *killing_object_index,
 	long dead_player_index, boolean *friendly_fire);
+/* port/linux/src/dsound_sdl.c */
+void port_play_triple_betrayal_sound(void);
 /* port/linux/game/network_damage.c's */
 boolean network_damage_killer_score(long player_index, long *score);
 
@@ -4372,6 +4374,14 @@ enum
 his next respawn: by the player's absolute index */
 static short game_engine_betrayal_penalty[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
 
+struct game_engine_betrayal_streak
+{
+	long first_kill_time;
+	byte count;
+};
+
+static struct game_engine_betrayal_streak game_engine_betrayal_streaks[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+
 void game_engine_player_killed(
 	long killing_player_index,
 	long killing_object_index,
@@ -4419,6 +4429,39 @@ void game_engine_player_killed(
 	else
 		valid_players = FALSE;
 	player_kill = !friendly_fire && valid_players && !same_player;
+	/* Keep this client-side: the host already synchronizes who killed whom,
+	so this cue changes neither scoring nor the network protocol. */
+	{
+		long now = game_time_get();
+		long dead_absolute = DATUM_INDEX_TO_ABSOLUTE_INDEX(dead_player_index);
+
+		if (dead_absolute < HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+			csmemset(&game_engine_betrayal_streaks[dead_absolute], 0,
+				sizeof(game_engine_betrayal_streaks[dead_absolute]));
+		if (friendly_fire && valid_players && !same_player && global_variant.universal_variant.teams)
+		{
+			long killer_absolute = DATUM_INDEX_TO_ABSOLUTE_INDEX(killing_player_index);
+
+			if (killer_absolute < HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+			{
+				struct game_engine_betrayal_streak *streak =
+					&game_engine_betrayal_streaks[killer_absolute];
+
+				if (streak->count && streak->first_kill_time >= now - 4 * TICKS_PER_SECOND)
+					streak->count++;
+				else
+			{
+					streak->count = 1;
+					streak->first_kill_time = now;
+				}
+				if (streak->count == 3)
+				{
+					streak->count = 0;
+					port_play_triple_betrayal_sound();
+				}
+			}
+		}
+	}
 
 	dead_player->respawn_timer =
 		dead_player->respawn_penalty + global_variant.universal_variant.respawn_time;
@@ -6782,6 +6825,7 @@ void game_engine_initialize_for_new_map(
 		csmemset(global_goal, 0, sizeof(global_goal));
 		game_engine_globals.next_team_index = 0;
 		csmemset(game_engine_betrayal_penalty, 0, sizeof(game_engine_betrayal_penalty));
+		csmemset(game_engine_betrayal_streaks, 0, sizeof(game_engine_betrayal_streaks));
 		game_engine_vehicle_home_count = NONE;
 		timeout_for_endgame_sound = 0;
 		game_engine_network_state_read = FALSE;
@@ -6814,7 +6858,11 @@ void game_engine_player_added(
 	initialize_player_multiplayer_data(player_index);
 	/* port: not the friendly fire penalty of the slot's last player */
 	if (DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index) < HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+	{
 		game_engine_betrayal_penalty[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)] = 0;
+		csmemset(&game_engine_betrayal_streaks[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)], 0,
+			sizeof(game_engine_betrayal_streaks[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)]));
+	}
 
 	if (game_engine)
 	{

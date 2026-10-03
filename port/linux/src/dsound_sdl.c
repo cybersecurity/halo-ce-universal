@@ -36,6 +36,7 @@ skips opening a device (port_config.c).
 
 #include <SDL3/SDL.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -75,6 +76,7 @@ struct sdl_stream
 	DWORD frequency;
 
 	BOOL paused;
+	BOOL one_shot;
 
 	/* 2D gains */
 	float volume;             /* SetVolume */
@@ -540,15 +542,159 @@ static void stream_complete_head(struct sdl_stream *stream, DWORD status, DWORD 
 
 static void streams_complete_finished(void)
 {
-	struct sdl_stream *stream;
+	struct sdl_stream **link;
 
 	pthread_mutex_lock(&mixer_lock);
-	for (stream = streams; stream; stream = stream->next)
+	link = &streams;
+	while (*link)
 	{
+		struct sdl_stream *stream = *link;
+
 		while (stream->packet_count && stream->packets[stream->packet_head].finished)
 			stream_complete_head(stream, XMEDIAPACKET_STATUS_SUCCESS, stream->packets[stream->packet_head].packet.dwMaxSize);
+		if (stream->one_shot && !stream->packet_count)
+		{
+			*link = stream->next;
+			free(stream);
+		}
+		else
+			link = &stream->next;
 	}
 	pthread_mutex_unlock(&mixer_lock);
+}
+
+static unsigned long wav_u32(const unsigned char *data)
+{
+	return (unsigned long)data[0] | ((unsigned long)data[1] << 8) |
+		((unsigned long)data[2] << 16) | ((unsigned long)data[3] << 24);
+}
+
+static unsigned short wav_u16(const unsigned char *data)
+{
+	return (unsigned short)(data[0] | (data[1] << 8));
+}
+
+/* The optional announcer cue is a local PCM WAV, so it does not add a
+copyrighted sound to the game's distributed files. */
+void port_play_triple_betrayal_sound(void)
+{
+	const char *configured_path = config_string("audio.triple_betrayal_sound");
+	char path[2048];
+	char folder[1024];
+	FILE *file = NULL;
+	unsigned char *data = NULL;
+	long file_length;
+	unsigned long file_size, offset, riff_size, channels = 0, sample_rate = 0;
+	unsigned long data_offset = 0, data_size = 0, frames = 0;
+	unsigned short format = 0, bits = 0, block_align = 0;
+	short *samples = NULL;
+	struct sdl_stream *stream = NULL;
+	BOOL queued = FALSE;
+	static BOOL error_reported;
+
+	if (!configured_path || !*configured_path)
+		return;
+	if (configured_path[0] == '/' || configured_path[0] == '\\' ||
+		(((configured_path[0] >= 'A' && configured_path[0] <= 'Z') ||
+		(configured_path[0] >= 'a' && configured_path[0] <= 'z')) && configured_path[1] == ':'))
+		snprintf(path, sizeof(path), "%s", configured_path);
+	else
+	{
+		config_folder(folder, sizeof(folder));
+		snprintf(path, sizeof(path), "%s%s", folder, configured_path);
+	}
+	file = fopen(path, "rb");
+	if (!file)
+		goto invalid;
+	if (fseek(file, 0, SEEK_END) != 0 || (file_length = ftell(file)) < 12 ||
+		file_length > 16L * 1024L * 1024L || fseek(file, 0, SEEK_SET) != 0)
+		goto done;
+	file_size = (unsigned long)file_length;
+	data = malloc(file_size);
+	if (!data || fread(data, 1, file_size, file) != file_size)
+		goto done;
+	if (memcmp(data, "RIFF", 4) || memcmp(data + 8, "WAVE", 4))
+		goto done;
+	riff_size = wav_u32(data + 4);
+	if (riff_size > file_size - 8)
+		goto done;
+	for (offset = 12; offset + 8 <= riff_size + 8;)
+	{
+		unsigned long chunk_size = wav_u32(data + offset + 4);
+		unsigned long chunk_data = offset + 8;
+
+		if (chunk_size > riff_size + 8 - chunk_data)
+			goto done;
+		if (!memcmp(data + offset, "fmt ", 4) && chunk_size >= 16)
+		{
+			format = wav_u16(data + chunk_data);
+			channels = wav_u16(data + chunk_data + 2);
+			sample_rate = wav_u32(data + chunk_data + 4);
+			block_align = wav_u16(data + chunk_data + 12);
+			bits = wav_u16(data + chunk_data + 14);
+		}
+		else if (!memcmp(data + offset, "data", 4))
+		{
+			data_offset = chunk_data;
+			data_size = chunk_size;
+		}
+		offset = chunk_data + chunk_size + (chunk_size & 1);
+	}
+	if (format != 1 || (channels != 1 && channels != 2) || bits != 16 ||
+		sample_rate < 8000 || sample_rate > 48000 || block_align != channels * 2 ||
+		!data_size || !data_offset)
+		goto done;
+	samples = decode_pcm(data + data_offset, data_size, channels, &frames);
+	if (!samples || !frames)
+		goto done;
+	stream = calloc(1, sizeof(*stream));
+	if (!stream)
+		goto done;
+	stream->channels = channels;
+	stream->sample_rate = sample_rate;
+	stream->frequency = sample_rate;
+	stream->volume = (float)config_real("audio.effects_volume");
+	if (stream->volume < 0.0f)
+		stream->volume = 0.0f;
+	if (stream->volume > 1.0f)
+		stream->volume = 1.0f;
+	stream->mix_left = stream->mix_right = 1.0f;
+	stream->minimum_distance = DS3D_DEFAULTMINDISTANCE;
+	stream->maximum_distance = DS3D_DEFAULTMAXDISTANCE;
+	stream->i3dl2_gain = 1.0f;
+	stream->one_shot = TRUE;
+	stream->packets[0].samples = samples;
+	stream->packets[0].frames = frames;
+	stream->packets[0].packet.dwMaxSize = data_size;
+	stream->packet_count = 1;
+	samples = NULL;
+	pthread_mutex_lock(&mixer_lock);
+	stream->next = streams;
+	streams = stream;
+	pthread_mutex_unlock(&mixer_lock);
+	stream = NULL;
+	queued = TRUE;
+
+done:
+	if (!queued && file && !error_reported)
+	{
+		platform_log("audio: configured triple-betrayal WAV '%s' is not supported or is invalid", path);
+		error_reported = TRUE;
+	}
+	free(stream);
+	free(samples);
+	free(data);
+	if (file)
+		fclose(file);
+	return;
+
+invalid:
+	if (!error_reported)
+	{
+		platform_log("audio: cannot open configured triple-betrayal WAV '%s'", path);
+		error_reported = TRUE;
+	}
+	goto done;
 }
 
 /* ---------- stream interface */

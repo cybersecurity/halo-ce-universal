@@ -130,6 +130,10 @@ static const struct config_setting config_settings[] =
 	{ "audio.effects_volume", _config_real, "1.0", "HALO_EFFECTS_VOLUME", _environment_value, _platform_all,
 		"The volume of every other sound (effects and speech), 0.0 to 1.0 (of\n"
 		"audio.volume)." },
+	{ "audio.triple_betrayal_sound", _config_string, "\"\"", "HALO_TRIPLE_BETRAYAL_SOUND", _environment_value,
+		_platform_all,
+		"A 16-bit PCM WAV file to play locally when you betray three teammates\n"
+		"within four seconds. Relative paths start beside config.toml; empty disables it." },
 
 	{ "input.mouse_sensitivity", _config_real, "1.0", "HALO_MOUSE_SENSITIVITY", _environment_value, _platform_desktop,
 		"How far the view turns for the mouse's movement." },
