@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include <arpa/inet.h>
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
