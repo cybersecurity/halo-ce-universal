@@ -110,6 +110,8 @@ static struct
 	float front[3];
 	float top[3];
 	float rolloff_factor;
+	/* meters a unit (SetDistanceFactor): the game sets 3.048, a world unit
+	being 10 feet. Only Doppler, which is not modelled, would use it */
 	float distance_factor;
 } listener = { { 0, 0, 0 }, { 0, 0, 1 }, { 0, 1, 0 }, 1.0f, 1.0f };
 
@@ -247,7 +249,10 @@ static void spatialize(const struct sdl_stream *stream, float *left, float *righ
 		side = dot3(offset, right_axis);
 		ahead = dot3(offset, listener.front);
 	}
-	distance = sqrtf(dot3(offset, offset)) * listener.distance_factor;
+	/* in the game's units, those of the minimum and maximum distances: the
+	distance factor turns units into meters for Doppler, and scaling by it
+	here put every 3D sound 3 times as far away, up to 10 dB quieter */
+	distance = sqrtf(dot3(offset, offset));
 
 	/* DirectSound's inverse distance law, held beyond the maximum distance */
 	attenuation = 1.0f;
