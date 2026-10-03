@@ -54,3 +54,5 @@ host_ios_room_report
 host_ios_room_ping
 
 host_ios_room_open
+host_ios_render_height
+host_ios_metalfx_present

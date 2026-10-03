@@ -104,4 +104,7 @@ int host_ios_room_poll(unsigned int *command);
 void host_ios_room_report(const char *json);
 int host_ios_room_ping(unsigned int address, unsigned int host, unsigned int epoch);
 
+unsigned int host_ios_render_height(void);
+int host_ios_metalfx_present(unsigned int texture, unsigned int width, unsigned int height, unsigned int output_width, unsigned int output_height);
+
 #endif

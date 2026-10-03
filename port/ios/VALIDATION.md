@@ -112,3 +112,25 @@ by default CI, because external signaling and GUI availability are variable.
 The user supplied a compatible original Xbox disc image. Real native/browser
 matches now have simulator evidence; physical-device behavior and the remaining
 cases above are still unverified. Keep the PR in draft until those checks pass.
+
+## Graphics diagnostics (2026-10-03)
+
+- Fixed GLES water draws losing their destination framebuffer after ripple
+  mipmap blits. A/B simulator runs of `levels\b30\b30` show a flat dark water
+  surface with the old ordering and ripples after restoring targets/raster
+  state following texture preparation. Other existing simulator scene artifacts
+  remain; this is not a claim of complete rendering correctness.
+- iPhone 13 Pro executed MetalFX spatial scaling from 1558×720 to 2532×1170.
+  The menu rendered with the Metal-backed presentation path. This establishes
+  execution, not a sustained-performance improvement.
+- Simulator debug panel and system share sheet rendered in landscape.
+  After dismissal the controls regain first-responder status; injecting the
+  UIKit shake event reopens the debug panel. Physical shake input remains a
+  user check.
+  An exported report parsed successfully with 57 source records and 44
+  first-use draw waits; every event source reference resolved. The simulator
+  correctly disables MetalFX. Actual AirDrop delivery requires user selection
+  on the phone and has not been tested by automation.
+- Runtime ABI, memory, audio, display sizing, 16 XISO tests, and room bridge
+  regression checks pass. Full signed-device and simulator host builds pass.
+- macOS menu routing and a separate native macOS renderer remain unvalidated.

@@ -1,0 +1,150 @@
+/* Shader-source diagnostics are exportable data, never game maps or saves. */
+#import <UIKit/UIKit.h>
+#import <QuartzCore/QuartzCore.h>
+#import <OpenGLES/ES3/gl.h>
+#import <CommonCrypto/CommonDigest.h>
+#include <stdatomic.h>
+#include <string.h>
+#include <sys/utsname.h>
+#include "host_debug.h"
+#include "ios_host.h"
+
+static atomic_bool recording;
+static NSMutableDictionary *shaderKeys,*sources,*attachments;
+static NSMutableArray *events;
+static NSMutableSet *drawnPrograms;
+static uint32_t currentProgram;
+static NSString *glRenderer;
+#ifndef HALO_BUILD_REVISION
+#define HALO_BUILD_REVISION "unknown"
+#endif
+static NSUInteger sourceBytes,dropped;
+static __weak UIViewController *debugController;
+void halo_debug_initialize(void) {
+    NSUserDefaults *settings=NSUserDefaults.standardUserDefaults;
+    atomic_store(&recording,[settings boolForKey:@"HaloRecordShaderStalls"] || [NSProcessInfo.processInfo.environment[@"HALO_IOS_TEST_SHADER_CAPTURE"] boolValue]);
+    halo_metalfx_set_enabled([settings boolForKey:@"HaloMetalFX"] || [NSProcessInfo.processInfo.environment[@"HALO_IOS_TEST_METALFX"] boolValue]);
+}
+static void prepare(void) {
+    if(!shaderKeys){shaderKeys=[NSMutableDictionary new];sources=[NSMutableDictionary new];attachments=[NSMutableDictionary new];events=[NSMutableArray new];drawnPrograms=[NSMutableSet new];}
+}
+void halo_debug_shader_source(uint32_t shader,int count,const char *const *strings,const int *lengths) {
+    prepare();if(!glRenderer){const GLubyte *name=glGetString(GL_RENDERER);if(name)glRenderer=[NSString stringWithUTF8String:(const char *)name];}
+    [shaderKeys removeObjectForKey:@(shader)];NSMutableData *data=[NSMutableData new];
+    for(int i=0;i<count;i++) {
+        NSUInteger length=lengths && lengths[i]>=0?(NSUInteger)lengths[i]:strlen(strings[i]);
+        if(length>1024*1024 || data.length+length>1024*1024){dropped++;return;}
+        [data appendBytes:strings[i] length:length];
+    }
+    unsigned char digest[CC_SHA256_DIGEST_LENGTH];CC_SHA256(data.bytes,(CC_LONG)data.length,digest);
+    NSMutableString *key=[NSMutableString new];for(int i=0;i<CC_SHA256_DIGEST_LENGTH;i++)[key appendFormat:@"%02x",digest[i]];
+    NSString *text=[[NSString alloc]initWithData:data encoding:NSUTF8StringEncoding];
+    if(!text)return;
+    if(!sources[key]) {
+        if(sourceBytes+data.length>32*1024*1024){dropped++;return;}
+        GLint type=0;glGetShaderiv(shader,GL_SHADER_TYPE,&type);
+        sources[key]=@{@"source":text,@"type":type==GL_VERTEX_SHADER?@"vertex":@"fragment"};sourceBytes+=data.length;
+    }
+    shaderKeys[@(shader)]=key;
+}
+void halo_debug_attach(uint32_t program,uint32_t shader) {
+    prepare();NSMutableArray *list=attachments[@(program)];
+    if(!list){list=[NSMutableArray new];attachments[@(program)]=list;}
+    NSString *key=shaderKeys[@(shader)];if(key && ![list containsObject:key])[list addObject:key];
+}
+double halo_debug_begin(void) {return atomic_load(&recording)?CACurrentMediaTime():0;}
+void halo_debug_end(uint32_t object,int program,double started) {
+    if(!started)return;
+    GLint ok=0;
+    if(program)glGetProgramiv(object,GL_LINK_STATUS,&ok);else glGetShaderiv(object,GL_COMPILE_STATUS,&ok);
+    double ms=(CACurrentMediaTime()-started)*1000;
+    if(ms<2 && ok)return;
+    prepare();if(events.count>=4096){dropped++;return;}
+    NSArray *keys=program?(attachments[@(object)]?:@[]):(shaderKeys[@(object)]?@[shaderKeys[@(object)]]:@[]);
+    [events addObject:@{@"stage":program?@"link":@"compile",@"milliseconds":@(ms),@"success":@(ok!=0),@"sources":keys,@"time":@([NSDate date].timeIntervalSince1970)}];
+}
+void halo_debug_use_program(uint32_t program) {currentProgram=program;}
+double halo_debug_draw_begin(void) {
+    if(!atomic_load(&recording) || !currentProgram)return 0;
+    prepare();if([drawnPrograms containsObject:@(currentProgram)])return 0;
+    [drawnPrograms addObject:@(currentProgram)];
+    /* Drain older work outside the timed interval. This is deliberately
+       intrusive diagnostics, never enabled during normal rendering. */
+    glFinish();return CACurrentMediaTime();
+}
+void halo_debug_draw_end(double started) {
+    if(!started)return;
+    glFinish();double ms=(CACurrentMediaTime()-started)*1000;
+    if(ms<2)return;
+    if(events.count>=4096){dropped++;return;}
+    [events addObject:@{@"stage":@"first_draw_wait",@"milliseconds":@(ms),@"sources":[attachments[@(currentProgram)] copy]?:@[],@"time":@([NSDate date].timeIntervalSince1970)}];
+}
+int halo_debug_is_presented(void) {return debugController!=nil;}
+void halo_debug_forget(uint32_t object,int program) {
+    if(program)[drawnPrograms removeObject:@(object)];
+    if(program)[attachments removeObjectForKey:@(object)];else [shaderKeys removeObjectForKey:@(object)];
+}
+static void exportReport(UIViewController *presenter) {
+    prepare();struct utsname device;uname(&device);
+    NSDictionary *report=@{@"schema":@1,@"renderer":@"OpenGL ES 3",@"gpu":glRenderer?:@"unknown",@"revision":@HALO_BUILD_REVISION,@"metalfx":@(halo_metalfx_enabled()!=0),@"device":[NSString stringWithUTF8String:device.machine],@"os":UIDevice.currentDevice.systemVersion,
+        @"build":[NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleVersion"]?:@"unknown",@"threshold_ms":@2,
+        @"note":@"CPU compile/link completion timings and synchronized first-use draw waits. First-use waits include draw cost and may include deferred driver compilation; they are not isolated shader-compiler timings. Shader sources can guide warm-up updates.",
+        @"dropped":@(dropped),@"events":[events copy],@"sources":[sources copy]};
+    NSError *error=nil;NSData *data=[NSJSONSerialization dataWithJSONObject:report options:NSJSONWritingPrettyPrinted error:&error];
+    NSURL *folder=[[NSFileManager.defaultManager URLsForDirectory:NSCachesDirectory inDomains:NSUserDomainMask].firstObject URLByAppendingPathComponent:@"ShaderReports" isDirectory:YES];
+    [NSFileManager.defaultManager createDirectoryAtURL:folder withIntermediateDirectories:YES attributes:nil error:&error];
+    NSArray<NSString *> *oldReports=[[NSFileManager.defaultManager contentsOfDirectoryAtPath:folder.path error:nil] filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(NSString *name,NSDictionary *bindings){(void)bindings;return [name hasPrefix:@"halo-shaders-"] && [name hasSuffix:@".json"];}]];
+    oldReports=[oldReports sortedArrayUsingSelector:@selector(compare:)];
+    for(NSUInteger i=0;i+4<oldReports.count;i++)[NSFileManager.defaultManager removeItemAtURL:[folder URLByAppendingPathComponent:oldReports[i]] error:nil];
+    NSURL *file=[folder URLByAppendingPathComponent:[NSString stringWithFormat:@"halo-shaders-%.0f.json",NSDate.date.timeIntervalSince1970]];
+    if(!data || ![data writeToURL:file options:NSDataWritingAtomic error:&error]){UIAlertController *alert=[UIAlertController alertControllerWithTitle:@"Export failed" message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];[alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];[presenter presentViewController:alert animated:YES completion:nil];return;}
+    UIActivityViewController *share=[[UIActivityViewController alloc]initWithActivityItems:@[file] applicationActivities:nil];
+    share.popoverPresentationController.sourceView=presenter.view;share.popoverPresentationController.sourceRect=CGRectMake(CGRectGetMidX(presenter.view.bounds),40,1,1);
+    [presenter presentViewController:share animated:YES completion:nil];
+}
+@interface HaloDebugController : UITableViewController <UIAdaptivePresentationControllerDelegate>
+@end
+@implementation HaloDebugController
+- (void)viewDidLoad {
+    [super viewDidLoad];self.title=@"Graphics debug";
+    self.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc]initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(done)];
+}
+- (void)done {[self dismissViewControllerAnimated:YES completion:^{debugController=nil;host_ios_touch_focus();}];}
+- (void)presentationControllerDidDismiss:(UIPresentationController *)presentationController {
+    (void)presentationController;debugController=nil;host_ios_touch_focus();
+}
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {(void)table;(void)section;return 4;}
+- (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
+    (void)table;UITableViewCell *cell=[[UITableViewCell alloc]initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
+    cell.detailTextLabel.numberOfLines=0;
+    if(path.row<2) {
+        UISwitch *toggle=[UISwitch new];toggle.tag=path.row;
+        if(!path.row){cell.textLabel.text=@"MetalFX spatial upscaling";toggle.enabled=halo_metalfx_supported();toggle.on=halo_metalfx_enabled();cell.detailTextLabel.text=toggle.enabled?@"Render at 720p, then upscale with MetalFX.":@"Unavailable on this device.";}
+        else{cell.textLabel.text=@"Record shader stalls";toggle.on=atomic_load(&recording);cell.detailTextLabel.text=@"Capture compile/link and first-use waits ≥ 2 ms. Adds GPU synchronization overhead.";}
+        [toggle addTarget:self action:@selector(changed:) forControlEvents:UIControlEventValueChanged];cell.accessoryView=toggle;
+    } else if(path.row==2){cell.textLabel.text=@"Share shader report…";cell.detailTextLabel.text=@"Choose AirDrop in the share sheet to send it to your Mac.";}
+    else{cell.textLabel.text=@"Clear recorded events";cell.detailTextLabel.text=[NSString stringWithFormat:@"%lu events; %lu dropped",(unsigned long)events.count,(unsigned long)dropped];}
+    return cell;
+}
+- (void)changed:(UISwitch *)sender {
+    if(!sender.tag)halo_metalfx_set_enabled(sender.on);else {atomic_store(&recording,sender.on);[drawnPrograms removeAllObjects];}
+    [NSUserDefaults.standardUserDefaults setBool:sender.on forKey:sender.tag?@"HaloRecordShaderStalls":@"HaloMetalFX"];
+}
+- (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)path {
+    [table deselectRowAtIndexPath:path animated:YES];
+    if(path.row==2)exportReport(self);
+    else if(path.row==3){[events removeAllObjects];[drawnPrograms removeAllObjects];dropped=0;[table reloadData];}
+}
+@end
+void halo_debug_present(void) {
+    if(debugController)return;prepare();
+    UIWindow *window=nil;for(UIScene *scene in UIApplication.sharedApplication.connectedScenes)if([scene isKindOfClass:UIWindowScene.class])for(UIWindow *w in ((UIWindowScene*)scene).windows)if(w.isKeyWindow)window=w;
+    UIViewController *presenter=window.rootViewController;
+    while(presenter.presentedViewController)presenter=presenter.presentedViewController;
+    if(!presenter)return;
+    host_ios_touch_reset();HaloDebugController *controller=[[HaloDebugController alloc]initWithStyle:UITableViewStyleInsetGrouped];
+    UINavigationController *navigation=[[UINavigationController alloc]initWithRootViewController:controller];
+    navigation.modalPresentationStyle=UIModalPresentationPageSheet;debugController=navigation;
+    [presenter presentViewController:navigation animated:YES completion:nil];
+    navigation.presentationController.delegate=controller;
+}

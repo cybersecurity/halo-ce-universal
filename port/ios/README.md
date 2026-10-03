@@ -352,3 +352,41 @@ a physical device.
   Keep the same ID when updating and back up `Documents/save` before uninstalling.
 - **Audio issues:** share device/OS and output route along with the runtime
   log. The regression suite checks PCM handoff; it does not test every route.
+
+## Graphics debug and shader reports
+
+Shake the iPhone/iPad to open **Graphics debug**. The UIKit main-menu builder
+also registers **Debug → Graphics Debug…** (⇧⌘D) for the iPad app on an Apple
+Silicon Mac. This branch does not yet contain a separate AppKit/macOS target;
+that menu route has not been verified on a Mac.
+
+- **MetalFX spatial upscaling** renders at up to 720 lines and upscales to the
+  display resolution. It is opt-in, requires a supported physical device, and
+  is unavailable in Apple's simulator SDK. The game still uses GLES: a shared
+  IOSurface carries its image to MetalFX. Cross-API synchronization adds cost,
+  so enabling it is not a guarantee of higher frame rates. It is spatial, not
+  temporal upscaling. Allocation or command-buffer failure returns to GLES.
+- **Record shader stalls** records compile/link completion times and each
+  program's first draw after recording starts, keeping events ≥ 2 ms and
+  compile/link failures. First-use measurements drain earlier GPU work and
+  wait for the draw, so recording adds overhead. They can reveal deferred
+  compilation but also include drawing cost; they are not isolated compiler
+  measurements and do not cover every driver pipeline variant.
+- **Share shader report…** opens the system share sheet. Choose AirDrop and
+  your Mac. Reports contain generated GLSL, source hashes/stages, program
+  combinations, timings, device/OS/GPU and build metadata. They contain no
+  game maps or saves. Nothing is sent until you choose a sharing destination.
+  Capture retains up to 32 MiB of sources and 4096 events; dropped records are
+  counted. The five latest exports are retained in Caches/ShaderReports.
+
+Both switches persist across launches. For useful reports, enable recording,
+restart the app, visit the affected level, then share the report. Turn recording
+off again for normal play. Clear resets events and first-use tracking.
+Reports provide inputs for future shader warm-up updates; this GLES renderer
+currently has no bundled precompiled pipeline catalog. A report is not a
+portable Metal binary archive, and cannot guarantee removal of all future
+first-use stalls.
+
+For automated diagnostics, launch environments `HALO_IOS_TEST_DEBUG_UI=1`,
+`HALO_IOS_TEST_SHADER_CAPTURE=1`, and `HALO_IOS_TEST_METALFX=1` open the panel,
+start capture, or request MetalFX respectively, without changing saved settings.

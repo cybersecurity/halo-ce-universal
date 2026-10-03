@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'build/ios/host'
 OUT.mkdir(parents=True,exist_ok=True)
 lines=['/* Generated typed bridges. */','#include "ios_host.h"','#include "guest_host.h"','#include "posix.h"',
-       '#include <SDL3/SDL.h>','#include <GLES3/gl32.h>','#include <GLES2/gl2ext.h>','#include <string.h>']
+       '#include <SDL3/SDL.h>','#include <GLES3/gl32.h>','#include <GLES2/gl2ext.h>','#include <string.h>','#include "host_debug.h"']
 table=[]
 
 def declarations(path,pattern):
@@ -71,7 +71,24 @@ for name in gles_functions(str(ROOT/'port/linux/src/gl.h')):
                       '    if(a1<0 || a1>16) host_fatal("invalid shader string count");',
                       '    for(int i=0;i<a1;i++) strings[i]=host_pointer(raw[i]);'])
         args[2]='strings'
-    lines.append(('    ' if ret=='void' else '    return ')+f'function({", ".join(args)});\n'+'}')
+    if name=='glShaderSource':
+        lines.append('    halo_debug_shader_source(a0,a1,strings,(const int *)host_pointer(a3));')
+    if name=='glUseProgram':
+        lines.append('    halo_debug_use_program(a0);')
+    if name in ('glDrawArrays','glDrawElements','glDrawElementsBaseVertex'):
+        lines.append('    double draw_started=halo_debug_draw_begin();')
+    if name=='glAttachShader':
+        lines.append('    halo_debug_attach(a0,a1);')
+    if name in ('glCompileShader','glLinkProgram'):
+        lines.append('    double started=halo_debug_begin();')
+    lines.append(('    ' if ret=='void' else '    return ')+f'function({", ".join(args)});')
+    if name in ('glCompileShader','glLinkProgram'):
+        lines.append(f'    halo_debug_end(a0,{int(name=="glLinkProgram")},started);')
+    if name in ('glDrawArrays','glDrawElements','glDrawElementsBaseVertex'):
+        lines.append('    halo_debug_draw_end(draw_started);')
+    if name in ('glDeleteShader','glDeleteProgram'):
+        lines.append(f'    halo_debug_forget(a0,{int(name=="glDeleteProgram")});')
+    lines.append('}')
     table.append(('hostgl_'+name,bridge))
 lines.extend(['void *host_resolve_import(const char *name) {',
               '    static const struct {const char *name; void *function;} table[]={'])

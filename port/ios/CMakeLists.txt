@@ -17,7 +17,7 @@ set(HALO_INFO_PLIST Info.plist)
 set(HALO_DEVICE_FAMILY "1,2")
 add_executable(HaloCE MACOSX_BUNDLE
     ${HALO_PLATFORM_SOURCES} "${ROOT}/port/runtime/xiso.c"
-    host/host_main.m host/host_memory.c host/host_loader.c host/host_syscall.c host/host_gl.c host/guest_call.S
+    host/host_main.m host/host_memory.c host/host_loader.c host/host_syscall.c host/host_gl.c host/host_debug.m host/host_metalfx.m host/guest_call.S
     host/host_thread.c host/host_sdl.c network/host_room.m network/room_bridge.c
     "${ROOT}/port/web/src/web_net.c"
     "${ROOT}/port/linux/src/posix_files.c" host/posix_net.c
@@ -29,7 +29,7 @@ target_compile_definitions(HaloCE PRIVATE HALO_IOS=1 HALO_IOS_BROWSER_HOST=1 st_
 target_compile_options(HaloCE PRIVATE -Wno-deprecated-declarations)
 target_compile_options(HaloCE PRIVATE "$<$<COMPILE_LANGUAGE:OBJC>:-fobjc-arc>")
 target_link_libraries(HaloCE PRIVATE SDL3::SDL3-static "-framework WebKit" "-framework QuartzCore" "-framework Foundation" "-framework UIKit" "-framework OpenGLES")
-target_link_libraries(HaloCE PRIVATE "-framework UniformTypeIdentifiers")
+target_link_libraries(HaloCE PRIVATE "-framework UniformTypeIdentifiers" "-framework Metal" "-framework CoreVideo")
 set_source_files_properties(Assets.xcassets PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 set_target_properties(HaloCE PROPERTIES XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon")
 file(GLOB HALO_LICENSES "${ROOT}/build/ios/licenses/*.txt")
@@ -48,3 +48,11 @@ endif()
 set(HALO_ROOM_SCRIPTS "${ROOT}/port/web/site/net.js" "${CMAKE_CURRENT_SOURCE_DIR}/network/room.js")
 target_sources(HaloCE PRIVATE ${HALO_ROOM_SCRIPTS})
 set_source_files_properties(${HALO_ROOM_SCRIPTS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/Network)
+
+if(NOT CMAKE_OSX_SYSROOT MATCHES "[Ss]imulator")
+    target_link_libraries(HaloCE PRIVATE "-framework MetalFX")
+endif()
+
+execute_process(COMMAND git describe --always --dirty WORKING_DIRECTORY "${ROOT}"
+    OUTPUT_VARIABLE HALO_BUILD_REVISION OUTPUT_STRIP_TRAILING_WHITESPACE)
+target_compile_definitions(HaloCE PRIVATE HALO_BUILD_REVISION="${HALO_BUILD_REVISION}")

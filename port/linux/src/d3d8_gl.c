@@ -26,6 +26,9 @@ Conventions carried over from the Xbox:
 #include "halo_ui_pointer.h"
 #include "port_config.h"
 #include "halo_display.h"
+#ifdef HALO_IOS
+#include "guest_host.h"
+#endif
 
 #include <math.h>
 #include <stdio.h>
@@ -118,7 +121,8 @@ static void screen_mode_choose(long *width, float scale[2])
 		drawable_height = pixels_y ? atoi(pixels_y) : SCREEN_HEIGHT;
 	}
 	pixels = halo_display_render_size(drawable_width, drawable_height, *width,
-		requested_width, config_integer("display.render_height"), screen_maximum_texture_size);
+		requested_width, host_ios_render_height() ? (long)host_ios_render_height() :
+		config_integer("display.render_height"), screen_maximum_texture_size);
 	scale[0] = (float)pixels.width / (float)*width;
 	scale[1] = (float)pixels.height / (float)SCREEN_HEIGHT;
 #else
@@ -2589,7 +2593,6 @@ static struct program_entry *prepare_draw(BOOL immediate)
 		stats.skipped_no_target++;
 		return NULL;
 	}
-	apply_raster_state(has_depth);
 
 	memset(&key, 0, sizeof(key));
 	memcpy(key.combiner_state, D3D__RenderState, sizeof(key.combiner_state));
@@ -2599,6 +2602,12 @@ static struct program_entry *prepare_draw(BOOL immediate)
 	key.combiner_state[D3DRS_PSFINALCOMBINERCONSTANT1] = 0;
 	key.texture_modes = D3D__RenderState[D3DRS_PSTEXTUREMODES];
 	bind_textures(&key, uniforms.texture_scale);
+	/* ES mipmap copies bind temporary framebuffers and disable scissoring.
+	   Restore the destination and raster state AFTER texture preparation,
+	   otherwise the water draw lands in the presentation framebuffer. */
+	if (!bind_targets(&has_depth))
+		return NULL;
+	apply_raster_state(has_depth);
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 	{
 		key.alpha_kill[stage] = D3D__TextureState[stage][D3DTSS_ALPHAKILL] == D3DTALPHAKILL_ENABLE;
@@ -3809,15 +3818,21 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		}
 		x = (window_width - width) / 2;
 		y = (window_height - height) / 2;
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-		glDisable(GL_SCISSOR_TEST);
-		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(back_buffer->target.texture, 0));
-		/* row 0 of the render target is the top of the picture */
-		glBlitFramebuffer(0, 0, (GLint)back_buffer->target.gl_width, (GLint)back_buffer->target.gl_height,
-			x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+#ifdef HALO_IOS
+		if (!host_ios_metalfx_present(back_buffer->target.texture,
+			back_buffer->target.gl_width, back_buffer->target.gl_height, width, height))
+#endif
+		{
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+			glDisable(GL_SCISSOR_TEST);
+			glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+			glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+			glClear(GL_COLOR_BUFFER_BIT);
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(back_buffer->target.texture, 0));
+			/* row 0 of the render target is the top of the picture */
+			glBlitFramebuffer(0, 0, (GLint)back_buffer->target.gl_width, (GLint)back_buffer->target.gl_height,
+				x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+		}
 		platform_video_swap();
 		xgpu_gl_state_invalidate();
 		xgpu_texture_cache_begin_frame();

@@ -1,3 +1,4 @@
+#include "host_debug.h"
 /* UIKit controls feed a standard SDL gamepad. The first hardware controller
    shares player one with touch; additional hardware controllers keep their ports. */
 #import <UIKit/UIKit.h>
@@ -59,6 +60,7 @@ int host_ios_gamepad_type(SDL_Gamepad *pad) {
     return SDL_GetGamepadID(pad)==touch_id?SDL_GAMEPAD_TYPE_XBOX360:SDL_GetGamepadType(pad);
 }
 int host_ios_gamepad_axis(SDL_Gamepad *pad,int axis) {
+    if(halo_debug_is_presented())return 0;
     int value=SDL_GetGamepadAxis(pad,axis);
     if(SDL_GetGamepadID(pad)==touch_id && primary_hardware) {
         int physical=SDL_GetGamepadAxis(primary_gamepad,axis);
@@ -67,6 +69,7 @@ int host_ios_gamepad_axis(SDL_Gamepad *pad,int axis) {
     return value;
 }
 int host_ios_gamepad_button(SDL_Gamepad *pad,int button) {
+    if(halo_debug_is_presented())return 0;
     return SDL_GetGamepadButton(pad,button) ||
         (SDL_GetGamepadID(pad)==touch_id && primary_hardware &&
          SDL_GetGamepadButton(primary_gamepad,button));
@@ -139,7 +142,22 @@ void host_ios_touch_reset(void) {
 @property(nonatomic,strong) NSMutableArray<HaloButton *> *buttons;
 @property(nonatomic,strong) UIButton *toggle;
 @end
+static __weak HaloControls *activeControls;
+void host_ios_touch_focus(void) {[activeControls becomeFirstResponder];}
 @implementation HaloControls
+- (BOOL)canBecomeFirstResponder {return YES;}
+- (void)motionEnded:(UIEventSubtype)motion withEvent:(UIEvent *)event {
+    if(motion==UIEventSubtypeMotionShake)halo_debug_present();
+    else [super motionEnded:motion withEvent:event];
+}
+- (void)openGraphicsDebug:(id)sender {(void)sender;halo_debug_present();}
+- (void)buildMenuWithBuilder:(id<UIMenuBuilder>)builder {
+    [super buildMenuWithBuilder:builder];
+    if(builder.system==UIMenuSystem.mainSystem) {
+        UIKeyCommand *command=[UIKeyCommand commandWithTitle:@"Graphics Debug…" image:nil action:@selector(openGraphicsDebug:) input:@"d" modifierFlags:UIKeyModifierCommand|UIKeyModifierShift propertyList:nil];
+        [builder insertSiblingMenu:[UIMenu menuWithTitle:@"Debug" image:nil identifier:@"halo.graphics-debug" options:0 children:@[command]] beforeMenuForIdentifier:UIMenuWindow];
+    }
+}
 - (HaloButton *)addButton:(NSString *)title label:(NSString *)label button:(int)button axis:(int)axis {
     HaloButton *b=[HaloButton buttonWithType:UIButtonTypeCustom];b.gameButton=button;b.gameAxis=axis;
     [b setTitle:title forState:UIControlStateNormal];b.titleLabel.font=[UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
@@ -236,5 +254,10 @@ void host_ios_touch_attach(SDL_Window *window) {
     UIView *root=native.rootViewController.view;
     HaloControls *controls=[[HaloControls alloc]initWithFrame:root.bounds];
     [root addSubview:controls];
+    activeControls=controls;
+    [controls becomeFirstResponder];
+    [UIMenuSystem.mainSystem setNeedsRebuild];
+    if([NSProcessInfo.processInfo.environment[@"HALO_IOS_TEST_DEBUG_UI"] boolValue])
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,NSEC_PER_SEC*3),dispatch_get_main_queue(),^{halo_debug_present();});
     host_logf(HOST_LOG_INFO,"touch controls attached, %.0fx%.0f",root.bounds.size.width,root.bounds.size.height);
 }
