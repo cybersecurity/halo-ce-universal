@@ -79,6 +79,9 @@ The game can play system link games on a local network and on the internet:
 
 ## Build the game
 
+An independent [Apple Silicon runtime memory probe](port/macos/README.md)
+is available for early macOS port development. It does not build or run the game.
+
 You do not need the Xbox SDK. The port supplies the SDK declarations that
 the game uses. Refer to [port/include/xdk](port/include/xdk/README.md).
 
