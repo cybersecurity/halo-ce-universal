@@ -12,6 +12,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include "p2p.h"
+#include "p2p_internal.h"
 #include "posix.h"
 
 #define MAX_RECORD 65536u
@@ -149,19 +150,21 @@ static void initialize_peer(void)
 }
 static void start_join(const unsigned char *code, size_t size)
 {
-    char invite[45];
-    if (joined || size != 44) fail("invalid_invite");
+    char invite[2 * (P2P_KEY_HASH_SIZE + P2P_TOKEN_SIZE) + 1];
+    unsigned char hash[P2P_KEY_HASH_SIZE];
+    if (joined || size != sizeof(invite) - 1) fail("invalid_invite");
     for (size_t i = 0; i < size; i++) {
         unsigned char c = code[i];
         if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
             fail("invalid_invite");
         invite[i] = (char)c;
     }
-    invite[44] = 0;
-    for (int i = 0; i < 6; i++) {
+    invite[size] = 0;
+    for (int i = 0; i < P2P_KEY_HASH_SIZE; i++) {
         char pair[3] = {invite[2*i], invite[2*i+1], 0};
-        host_identifier[i] = (unsigned char)strtoul(pair, NULL, 16);
+        hash[i] = (unsigned char)strtoul(pair, NULL, 16);
     }
+    p2p_identifier_from_hash(hash, host_identifier);
     initialize_peer();
     joined = 1; started = GetTickCount();
     if (!p2p_join_invite(invite)) fail("invalid_invite");

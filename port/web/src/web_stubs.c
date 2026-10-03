@@ -37,17 +37,6 @@ void posix_upnp_stop_forwarding_udp(unsigned short external_port)
 	(void)external_port;
 }
 
-void p2p_discord_update(void)
-{
-}
-
-void p2p_discord_set_hosting(const char *secret, int player_count, int maximum_player_count)
-{
-	(void)secret;
-	(void)player_count;
-	(void)maximum_player_count;
-}
-
 /* ---------- the C library (posix_net.c) */
 
 ssize_t getrandom(void *buffer, size_t size, unsigned int flags)

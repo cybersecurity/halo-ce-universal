@@ -126,7 +126,6 @@ PLATFORM_EXCLUDE = {
     "posix_upnp.c",
     "updater.c",
     "xiso.c",           # the page extracts the maps (port/web/site/xiso.js)
-    "p2p_discord.c",
 }
 
 LINK_FLAGS = [

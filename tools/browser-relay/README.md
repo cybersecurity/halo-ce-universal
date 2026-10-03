@@ -105,7 +105,7 @@ operator must keep the Node runtime and `ws` dependency updated.
 1. Connect to `/join` using an allowed exact `Origin`. Tokens are not URL
    parameters; unknown paths or any query string are rejected.
 2. Send a text frame:
-   `{"type":"join","invite":"<44 hexadecimal digits>","accessToken":"<capability>"}`.
+   `{"type":"join","invite":"<64 hexadecimal digits>","accessToken":"<capability>"}`.
 3. The worker returns `{"type":"ready","protocol":1,"identifier":"<12 hex>","address":N}`.
    The address is the native-generated IPv4 integer in the web engine's byte
    representation, inside `100.64.0.0/10`; it is not a browser-selected address.

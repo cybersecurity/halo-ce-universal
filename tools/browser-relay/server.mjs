@@ -118,7 +118,7 @@ export function createRelay(options = {}) {
           if (binary || data.length > 1024) throw new Error('Expected join request');
           const request = JSON.parse(data.toString());
           if (!request || request.type !== 'join' || typeof request.invite !== 'string' ||
-              !/^[a-f0-9]{44}$/i.test(request.invite) ||
+              !/^[a-f0-9]{64}$/i.test(request.invite) ||
               Object.keys(request).some((key) => !['type', 'invite', 'accessToken'].includes(key)) ||
               !tokenMatches(request.accessToken, config.accessToken)) throw new Error('Invalid join request');
           joined = true;

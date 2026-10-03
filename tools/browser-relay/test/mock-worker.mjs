@@ -8,7 +8,7 @@ if (mode === 'slow') setInterval(() => {}, 1000); // a deliberately stalled live
 let invited = false;
 process.stdin.on('data', (bytes) => {
   decoder.push(bytes, (type, data) => {
-    if (type === 1 && !invited && /^[a-f0-9]{44}$/.test(data.toString())) {
+    if (type === 1 && !invited && /^[a-f0-9]{64}$/.test(data.toString())) {
       invited = true;
       if (mode === 'exit') return process.exit(4);
       if (mode === 'silent') return;

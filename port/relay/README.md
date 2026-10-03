@@ -1,6 +1,6 @@
 # Native invite relay worker (prototype)
 
-This Linux worker joins one native `halo://join/<44 hexadecimal digits>` invite
+This Linux worker joins one native `halo://join/<64 hexadecimal digits>` invite
 and bridges its socket traffic to one browser session. It links the existing
 native P2P signalling, cryptography and KCP transport. It does not run Halo,
 load maps, host a match, or change the native peer's protocol.
@@ -45,7 +45,7 @@ There are no newline separators. Stdout contains only framed records.
 
 Input types:
 
-- `1`: exactly 44 ASCII hexadecimal bytes, sent once. This is the invite code,
+- `1`: exactly 64 ASCII hexadecimal bytes, sent once. This is the invite code,
   without `halo://join/`. Never put this secret in argv, URLs, logs or errors.
 - `2`: one Web network packet, as defined in `port/web/src/web_shared.h`.
 

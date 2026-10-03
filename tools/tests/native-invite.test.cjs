@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const { network } = require('./web-quick-play-fixture.cjs');
 const Invite = require('../../port/web/site/native-invite.js');
 const Gateway = require('../../port/web/site/gateway.js');
-const TOKEN = '0123456789ab' + 'c'.repeat(32);
+const TOKEN = '0123456789ab' + 'c'.repeat(52);
 const ADDRESS = 0x01024064;
 const EXPECTED_MAPS = [
   'ui', 'a10', 'a30', 'a50', 'b30', 'b40', 'c10', 'c20', 'c40', 'd20', 'd40',
@@ -349,7 +349,7 @@ test('an offline host after relay ready allows a fresh invite; in-game disconnec
   assert.equal(context.Module, undefined, 'offline host does not launch the engine');
   assert.equal(element('fatal').hidden, true);
 
-  const fresh = 'abcdefabcdef' + 'd'.repeat(32);
+  const fresh = 'abcdefabcdef' + 'd'.repeat(52);
   element('invite-input').value = fresh;
   const second = element('invite-connect').onclick();
   const live = FakeSocket.latest;
@@ -1109,4 +1109,11 @@ test('Main menu during native transport installation reloads manual mode before 
   assert.equal(socket.readyState, 3);
   assert.equal(manual.element('quick-panel').hidden, true);
   assert.equal(manual.element('quick-status').textContent, 'Main menu selected.');
+});
+
+test('obsolete short native invites cannot pass as full key-hash invitations', () => {
+  const legacy = '0123456789ab' + 'c'.repeat(32);
+  assert.equal(Invite.parse(legacy), null);
+  assert.equal(Invite.parse('halo://join/' + legacy), null);
+  assert.equal(Invite.parse('https://example.com/#join=' + legacy), null);
 });

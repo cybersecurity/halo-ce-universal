@@ -123,7 +123,7 @@ async def main():
     try:
         host = await Worker.start(executable, address, host=True)
         workers.append(host)
-        await host.event('ready')
+        host_ready = await host.event('ready')
         invitation = await host.event('test_invite')
         code = invitation['invite'].removeprefix('halo://join/')
         client = await Worker.start(executable, address)
@@ -132,7 +132,7 @@ async def main():
         ready = await client.event('ready')
         peer = await client.event('peer')
         assert len(ready['identifier']) == 12 and peer['connected'] is True
-        assert peer['identifier'] == code[:12]
+        assert peer['identifier'] == host_ready['identifier']
         source, destination = ready['address'], peer['address']
         for target in (destination, 0xffffffff):
             payload = b'udp native tunnel\x00\xff' + bytes(range(256))

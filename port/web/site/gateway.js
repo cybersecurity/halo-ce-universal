@@ -32,7 +32,7 @@ const HaloGateway = (() => {
       throw new Error('The game relay must use a secure WebSocket.');
     }
     if (url.username || url.password || url.search || url.hash) throw new Error('Invalid relay URL.');
-    if (!/^[a-f0-9]{44}$/.test(invite)) throw new Error('Invalid desktop invite.');
+    if (!/^[a-f0-9]{64}$/.test(invite)) throw new Error('Invalid desktop invite.');
     const socket = new WebSocket(url);
     socket.binaryType = 'arraybuffer';
     const peers = new Map(), queue = [];

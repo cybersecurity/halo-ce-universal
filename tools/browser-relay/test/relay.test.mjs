@@ -10,7 +10,7 @@ import { createRelay, validateConfig } from '../server.mjs';
 import { RecordDecoder, SessionPackets, record } from '../protocol.mjs';
 
 const ORIGIN = 'https://fqlx.github.io';
-const INVITE = 'abcdef012345' + '01'.repeat(16);
+const INVITE = 'abcdef012345' + '01'.repeat(26);
 const TOKEN = 'test-only-capability-'.repeat(3);
 const MOCK = fileURLToPath(new URL('./mock-worker.mjs', import.meta.url));
 const LOCAL = 0x02004064, PEER = 0x03004064;
