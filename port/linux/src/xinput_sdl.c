@@ -210,6 +210,7 @@ arrows, which move about it, enter (Done, once let go of since it came up)
 and escape (cancel) */
 static BOOL text_typing;
 static BOOL text_typing_enter_armed;
+static BOOL text_typing_enter_blocked;
 /* (the on-screen keyboard's, and a menu's text field's: menu_functions.c) */
 static BOOL text_typing_keyboard, text_typing_field;
 
@@ -219,6 +220,8 @@ static void text_typing_update(void)
 
 	if (typing && !text_typing)
 		text_typing_enter_armed = FALSE;
+	if (!typing && text_typing)
+		text_typing_enter_blocked = TRUE;
 	text_typing = typing;
 }
 
@@ -256,6 +259,12 @@ static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GA
 	BOOL mouse = !input->mouse_released;
 	const unsigned char *m = input->mouse_buttons;
 	int x = 0, y = 0;
+	BOOL enter = k[SDL_SCANCODE_RETURN] || k[SDL_SCANCODE_KP_ENTER];
+
+	/* The Enter that finished typing must be released before it can
+	   activate the menu underneath the keyboard. */
+	if (!enter)
+		text_typing_enter_blocked = FALSE;
 
 	if (text_typing)
 	{
@@ -284,8 +293,8 @@ static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GA
 
 	/* (escape backs out, as backspace does: the pause menu's B resumes the
 	game, the main menu's asks to quit; Start would choose, as A does) */
-	pad->bAnalogButtons[XINPUT_GAMEPAD_A] |= analog(k[SDL_SCANCODE_SPACE] || k[SDL_SCANCODE_RETURN] ||
-		k[SDL_SCANCODE_KP_ENTER]);
+	pad->bAnalogButtons[XINPUT_GAMEPAD_A] |= analog(k[SDL_SCANCODE_SPACE] ||
+		(enter && !text_typing_enter_blocked));
 	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(k[SDL_SCANCODE_ESCAPE] || k[SDL_SCANCODE_BACKSPACE] ||
 		(mouse && m[SDL_BUTTON_X1]));
 #ifdef HALO_ANDROID

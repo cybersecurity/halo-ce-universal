@@ -69,6 +69,7 @@ their handlers open opens.
 #include "text/unicode.h"
 
 #include "halo_menus.h"
+#include "halo_custom_maps.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -1645,7 +1646,6 @@ Xbox's networking, run by the engine's port entry points
 (ui_widget_event_handler_functions.c) on our lists */
 
 #define MAXIMUM_ADVERTISED_GAMES 9
-#define MULTIPLAYER_MAP_COUNT 13
 #define MAP_ROWS 11
 #define GAMETYPE_ROWS 10
 #define MAXIMUM_GAMETYPES 100
@@ -1767,6 +1767,9 @@ static struct
 	byte preview_key_id[8];
 	byte preview_xnaddr[12];
 } multiplayer = { 0, 0, 0, { 0 }, 0, { 0 }, 0, 0, 0, 0, { 0 }, NUMBEROF(maximum_players) - 1 };
+
+static char const *const *multiplayer_map_names;
+static short multiplayer_map_count;
 
 /* ---- a text field (Direct Link's link, the game's name): the keyboard
 types into it (Ctrl+V pastes), its row's A (enter) is done, B (escape)
@@ -1916,18 +1919,48 @@ static boolean multiplayer_host(struct widget_instance *widget, struct event_rec
 
 /* ---- the map list */
 
+static void map_name_text(char const *name, wchar_t *text)
+{
+	char caption[HALO_CUSTOM_MAP_NAME_SIZE];
+	short index;
+
+	native_map_display_name(name, caption, sizeof(caption));
+	for (index = 0; caption[index]; index++) text[index] = (unsigned char)caption[index];
+	text[index] = 0;
+}
+
+/* These preview boxes also show authored stock strings. Resize even when
+   one of those shorter strings already allocated their text buffer. */
+static void map_caption_set(struct widget_instance *widget, wchar_t const *caption)
+{
+	wchar_t *text;
+	if (!widget) return;
+	text = ui_widget_realloc(widget->parameters.text_box.text,
+		ROW_TEXT_LENGTH * sizeof(wchar_t), __FILE__, __LINE__);
+	if (!text) return;
+	widget->parameters.text_box.text = text;
+	ustrncpy(text, caption, ROW_TEXT_LENGTH - 1);
+	text[ROW_TEXT_LENGTH - 1] = 0;
+	widget->parameters.text_box.string_list_index = HALO_CUSTOM_MAP_TEXT;
+}
+
 static void map_row_text(short row, wchar_t *text)
 {
-	string_get("pc\\main_menu\\mp_map_list", (short)(multiplayer.map_first + row), text);
+	short map = (short)(multiplayer.map_first + row);
+	text[0] = 0;
+	if (map < 0 || map >= multiplayer_map_count) return;
+	if (map < HALO_STOCK_MULTIPLAYER_MAP_COUNT)
+		string_get("pc\\main_menu\\mp_map_list", map, text);
+	else
+		map_name_text(multiplayer_map_names[map], text);
 }
 
 /* "mp level list initialize" */
 static boolean map_list_initialize(struct widget_instance *list)
 {
-	char const *const *names;
-
-	ui_widget_port_multiplayer_maps(&names, &multiplayer.map_chosen);
-	multiplayer.map_first = (short)PIN(multiplayer.map_chosen - MAP_ROWS / 2, 0, MULTIPLAYER_MAP_COUNT - MAP_ROWS);
+	multiplayer_map_count = ui_widget_port_multiplayer_maps(&multiplayer_map_names, &multiplayer.map_chosen);
+	multiplayer.map_first = (short)PIN(multiplayer.map_chosen - MAP_ROWS / 2,
+		0, MAX(0, multiplayer_map_count - MAP_ROWS));
 	focus_row(list, (short)(multiplayer.map_chosen - multiplayer.map_first));
 	return TRUE;
 }
@@ -1937,11 +1970,23 @@ static void map_list_update(struct widget_instance *list)
 {
 	struct widget_instance *description = list->parameters.list.extended_description;
 	struct widget_instance *widget;
-	short map = list_scroll(list, &multiplayer.map_first, MULTIPLAYER_MAP_COUNT, MAP_ROWS);
+	short map = list_scroll(list, &multiplayer.map_first, multiplayer_map_count, MAP_ROWS);
+	wchar_t caption[ROW_TEXT_LENGTH];
 
-	if (map != NONE)
+	if (map >= 0 && map < multiplayer_map_count)
 		multiplayer.map_chosen = map;
-	rows_update(list, MAP_ROWS, map_row_text);
+	rows_update(list, (short)MIN(MAP_ROWS, MAX(0, multiplayer_map_count - multiplayer.map_first)), map_row_text);
+	if (multiplayer.map_chosen < 0 || multiplayer.map_chosen >= multiplayer_map_count) return;
+	if (multiplayer.map_chosen >= HALO_STOCK_MULTIPLAYER_MAP_COUNT)
+	{
+		map_name_text(multiplayer_map_names[multiplayer.map_chosen], caption);
+		map_caption_set(named(description, "mp_map_right_name", 0), caption);
+		map_caption_set(named(description, "mp_map_right_data", 0), L"Community map");
+		if ((widget = named(description, "mp_map_right_pic", 0)) != NULL)
+			widget->animation.current_frame_index = 19;
+		profile_name_show(description);
+		return;
+	}
 	if ((widget = named(description, "mp_map_right_name", 0)) != NULL)
 		widget->parameters.text_box.string_list_index = multiplayer.map_chosen;
 	if ((widget = named(description, "mp_map_right_pic", 0)) != NULL)
@@ -2359,9 +2404,12 @@ static void game_map_name(struct advertised_game const *game, wchar_t *text)
 
 	for (index = 0; index < count; index++)
 	{
-		if (!_stricmp(names[index], game->map_name))
+		if (!_stricmp(native_map_basename(names[index]), native_map_basename(game->map_name)))
 		{
-			string_get("pc\\main_menu\\mp_map_list", index, text);
+			if (index < HALO_STOCK_MULTIPLAYER_MAP_COUNT)
+				string_get("pc\\main_menu\\mp_map_list", index, text);
+			else
+				map_name_text(names[index], text);
 			return;
 		}
 	}
@@ -2540,13 +2588,23 @@ static void lobby_map_show(struct widget_instance *description, char const *map_
 
 	for (index = 0; index < count; index++)
 	{
-		if (!_stricmp(names[index], map_name))
+		if (index < HALO_STOCK_MULTIPLAYER_MAP_COUNT &&
+			!_stricmp(native_map_basename(names[index]), native_map_basename(map_name)))
 			map = index;
 	}
 	if ((widget = named(description, "lobby_map_pic", 0)) != NULL)
 		widget->animation.current_frame_index = map;
 	if ((widget = named(description, "lobby_map_name", 0)) != NULL)
-		widget->parameters.text_box.string_list_index = map;
+	{
+		if (map == 19 && native_map_is_custom(map_name))
+		{
+			wchar_t caption[ROW_TEXT_LENGTH];
+			map_name_text(map_name, caption);
+			map_caption_set(widget, caption);
+		}
+		else
+			widget->parameters.text_box.string_list_index = map;
+	}
 }
 
 /* "port lobby update" */

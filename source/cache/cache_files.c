@@ -583,6 +583,11 @@ boolean cache_file_header_verify(
 		header->footer_signature != CACHE_FILE_FOOTER_SIGNATURE ||
 		header->file_length < 0 ||
 		header->file_length > 0x11600000 ||
+#ifdef HALO_PORT_MULTIPLAYER_CACHE_SIZE
+		/* Direct/network precaching can reach a map without the menu scanner. */
+		(header->reserved60[0] == 1 && header->reserved60[1] == 0 &&
+			header->file_length > HALO_PORT_MULTIPLAYER_CACHE_SIZE) ||
+#endif
 		csstrlen(header->name) > 31)
 	{
 		if (fatal)

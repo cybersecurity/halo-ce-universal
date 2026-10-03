@@ -15,6 +15,10 @@ client's own objects take the upper half of the object array).
 #ifndef __HALO_PORT_CAPACITY_H
 #define __HALO_PORT_CAPACITY_H
 
+/* Multiplayer caches may exceed the Xbox's 47 MiB disk slots. This does
+   not enlarge the original 22 MiB tag arena. */
+#define HALO_PORT_MULTIPLAYER_CACHE_SIZE 0x08000000
+
 /* ---------- game state
 
 The Xbox game state is 0x345000 bytes at 0x80061000 and ends where the tag

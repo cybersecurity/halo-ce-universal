@@ -67,7 +67,9 @@ jobs:
         run: python tools/ci_build.py linux release
 
       - name: Test
-        run: python -m pytest -q tools/test_linux_port.py
+        run: |
+          python -m pytest -q tools/test_linux_port.py
+          python -m unittest tools.test_custom_maps tools.test_virtual_keyboard_input
 
       - name: Compile cache
         run: ccache --show-stats

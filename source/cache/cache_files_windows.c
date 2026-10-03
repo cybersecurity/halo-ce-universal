@@ -205,7 +205,11 @@ enum
 
 	SOLO_CACHE_FILE_MAXIMUM_SIZE = 0x11600000,
 	MAIN_MENU_CACHE_FILE_MAXIMUM_SIZE = 0x02300000,
+#ifdef HALO_PORT_MULTIPLAYER_CACHE_SIZE
+	MULTIPLAYER_CACHE_FILE_MAXIMUM_SIZE = HALO_PORT_MULTIPLAYER_CACHE_SIZE,
+#else
 	MULTIPLAYER_CACHE_FILE_MAXIMUM_SIZE = 0x02F00000,
+#endif
 };
 
 /* ---------- macros */
@@ -1235,7 +1239,13 @@ static short cached_map_files_find_free_map(
 		{
 			struct cached_map_file *map_file = cached_map_file_get(map_file_index);
 
-			if (cached_map_file_get_size(map_file_index) > file_length)
+			if (cached_map_file_get_size(map_file_index) > file_length
+#ifdef HALO_PORT_MULTIPLAYER_CACHE_SIZE
+				/* A native multiplayer cache may exactly fill its disk slot. */
+				|| (scenario_type == _scenario_type_multiplayer &&
+					cached_map_file_get_size(map_file_index) == file_length)
+#endif
+				)
 			{
 				if (best_map_file_index == NONE ||
 					cached_map_file_get_size(map_file_index) < cached_map_file_get_size(best_map_file_index) ||

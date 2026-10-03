@@ -347,6 +347,16 @@ static rectangle2d keyboard_rect[NUMBER_OF_VIRTUAL_KEYS] =
 
 static struct virtual_keyboard_globals virtual_keyboard_globals= {0};
 
+/* Keep the computer keyboard's input mode in sync with every open/close
+   path. The UI stops processing the virtual keyboard once it is inactive. */
+static void virtual_keyboard_set_active(boolean active)
+{
+	extern void platform_text_typing(int typing);
+
+	virtual_keyboard_globals.active = active;
+	platform_text_typing(active);
+}
+
 /* ---------- public code */
 
 boolean virtual_keyboard_initialize(
@@ -354,7 +364,7 @@ boolean virtual_keyboard_initialize(
 {
 	long keyboard_index;
 
-	virtual_keyboard_globals.active = FALSE;
+	virtual_keyboard_set_active(FALSE);
 	virtual_keyboard_globals.shift_active = FALSE;
 	virtual_keyboard_globals.caps_active = FALSE;
 	virtual_keyboard_globals.symbols_active = FALSE;
@@ -399,7 +409,7 @@ boolean virtual_keyboard_initialize(
 void virtual_keyboard_dispose(
 	void)
 {
-	virtual_keyboard_globals.active = FALSE;
+	virtual_keyboard_set_active(FALSE);
 	virtual_keyboard_globals.shift_active = FALSE;
 	virtual_keyboard_globals.caps_active = FALSE;
 	virtual_keyboard_globals.symbols_active = FALSE;
@@ -440,7 +450,7 @@ boolean virtual_keyboard_launch(
 		event_manager_flush();
 		virtual_keyboard_globals.row = 0;
 		virtual_keyboard_globals.column = 0;
-		virtual_keyboard_globals.active = TRUE;
+		virtual_keyboard_set_active(TRUE);
 		virtual_keyboard_globals.text_buffer = text_buffer;
 		virtual_keyboard_globals.cursor = text_buffer + ustrlen(text_buffer);
 		virtual_keyboard_globals.buffer_size = buffer_size;
@@ -553,7 +563,7 @@ static boolean virtual_keyboard_tab_down(
 static boolean virtual_keyboard_cancel(
 	void)
 {
-	virtual_keyboard_globals.active = FALSE;
+	virtual_keyboard_set_active(FALSE);
 	if (virtual_keyboard_globals.text_buffer)
 	{
 		ustrncpy(
@@ -957,13 +967,6 @@ void virtual_keyboard_render(
 void virtual_keyboard_process(
 	void)
 {
-	/* port: while it is up the computer's keyboard types into it
-	(port/linux/src/xinput_sdl.c) */
-	{
-		extern void platform_text_typing(int typing);
-
-		platform_text_typing(virtual_keyboard_globals.active);
-	}
 	if (virtual_keyboard_globals.active)
 		virtual_keyboard_process_internal();
 
@@ -1013,7 +1016,7 @@ static boolean virtual_keyboard_select(
 			virtual_keyboard_globals.last_exit_saved_text = TRUE;
 		}
 		ui_play_audio_feedback_sound(_ui_audio_feedback_back);
-		virtual_keyboard_globals.active = FALSE;
+		virtual_keyboard_set_active(FALSE);
 		event_manager_flush();
 		break;
 

@@ -629,6 +629,9 @@ struct widget_instance;
 
 #include "cseries.h"
 #include "errors.h"
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+#include "halo_custom_maps.h"
+#endif
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmaps.h"
 #include "bink/bink_playback.h"
@@ -5085,7 +5088,11 @@ static void widget_instance_render_text_box(
 	rectangle2d bounds;
 	rectangle2d clip;
 
-	if (definition->text_label_string_list.index != NONE)
+	if (definition->text_label_string_list.index != NONE
+#ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+		&& widget->parameters.text_box.string_list_index != HALO_CUSTOM_MAP_TEXT
+#endif
+		)
 	{
 		short string_list_index;
 		wchar_t *string;
