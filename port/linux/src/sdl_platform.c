@@ -1177,10 +1177,15 @@ void platform_ui_pointer_set_active(BOOL active)
 
 		SDL_GetWindowSize(platform_window, &width, &height);
 		SDL_WarpMouseInWindow(platform_window, width * 0.5f, height * 0.5f);
+		SDL_ShowCursor();
 		pthread_mutex_lock(&input_lock);
 		ui_pointer.x = width * 0.5f;
 		ui_pointer.y = height * 0.5f;
 		pthread_mutex_unlock(&input_lock);
+	}
+	else
+	{
+		SDL_HideCursor();
 	}
 }
 
