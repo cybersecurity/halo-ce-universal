@@ -16,7 +16,10 @@ also need the tick after the pair it spans: two ticks behind.)
 Rotations are blended as quaternions (normalised lerp, taking the shorter
 way round), positions and scales linearly. Anything that moves further than
 a tick of motion plausibly allows (teleports, respawns, camera cuts) snaps
-instead of sweeping across the world.
+instead of sweeping across the world, and so does a pose whose nodes moved
+too far for one tick: two snapshots of different poses (a model swapped,
+another weapon's skeleton, a pose left from seconds before) blended node by
+node stretch vertices across the screen.
 
 Particles, contrails and other effects already move every frame
 (game_frame), so they need nothing here.
@@ -56,6 +59,17 @@ unsigned long config_changes(void);
 /* world units (10 feet each) a node may move in one tick before it snaps:
 well beyond any vehicle, short of any teleport */
 #define OBJECT_SNAP_DISTANCE 10.0f
+/* ... a node may move in the object's root node's frame in one tick before
+the pose is taken for a new one, not blended to: further than any limb or
+part of a model moves in 33 ms (37 m/s), short of the game changing a pose
+at once (an actor waking from dormancy, a model swapped), which blended
+sweeps the vertices through poses it never had. (In the root's frame, so
+that the whole object turning moves nothing: measured in the world, a fast
+turn swung the head and weapon far enough to snap, and characters moved
+like robots.) */
+#define NODE_SNAP_DISTANCE 0.4f
+/* ... a first-person node may move relative to the camera */
+#define FIRST_PERSON_SNAP_DISTANCE 0.25f
 /* a correction's difference left drawn after each tick (of 1) */
 #define CORRECTION_DECAY 0.6f
 /* ... and small enough to be none */
@@ -311,16 +325,6 @@ static void matrix_blend_rotations(
 	result->up.k = lerp(a->up.k, b->up.k, t);
 }
 
-/* a matrix a fraction t of the way from a to b */
-static void matrix_blend(real_matrix4x3 const *a, real_matrix4x3 const *b, real t, real_matrix4x3 *result)
-{
-	struct interpolation_rotation rotation_a, rotation_b;
-
-	rotation_from_matrix(a, &rotation_a);
-	rotation_from_matrix(b, &rotation_b);
-	matrix_blend_rotations(a, b, &rotation_a, &rotation_b, t, result);
-}
-
 /* the vector's parts' sum, large enough to be a correction (so written that
 one not a number is none) */
 static boolean correction_significant(real_vector3d const *correction)
@@ -530,14 +534,22 @@ real_matrix4x3 *render_interpolation_object_node_matrices(long object_index)
 		real_matrix4x3 const *latest = record->nodes + record->latest * record->node_capacity;
 		real_matrix4x3 *blended = record->nodes + 2 * record->node_capacity;
 		short node_index;
-
 		/* (so written that a position not a number snaps) */
-		if (!(distance_squared(&previous[0].position, &latest[0].position) <=
-			OBJECT_SNAP_DISTANCE * OBJECT_SNAP_DISTANCE))
+		boolean snap = !(distance_squared(&previous[0].position, &latest[0].position) <=
+			OBJECT_SNAP_DISTANCE * OBJECT_SNAP_DISTANCE);
+
+		/* a node moved further in the root's frame than a tick allows: the
+		two snapshots are different poses, not one moving (so written that
+		a position not a number snaps) */
+		for (node_index = 1; !snap && node_index < record->node_count; node_index++)
 		{
-			memcpy(blended, latest, record->node_count * sizeof(real_matrix4x3));
+			real_point3d previous_local, latest_local;
+
+			matrix4x3_inverse_transform_point(&previous[0], &previous[node_index].position, &previous_local);
+			matrix4x3_inverse_transform_point(&latest[0], &latest[node_index].position, &latest_local);
+			snap = !(distance_squared(&previous_local, &latest_local) <= NODE_SNAP_DISTANCE * NODE_SNAP_DISTANCE);
 		}
-		else
+		if (!snap)
 		{
 			struct interpolation_rotation *previous_rotations =
 				record->rotations + (record->latest ^ 1) * record->node_capacity;
@@ -566,6 +578,8 @@ real_matrix4x3 *render_interpolation_object_node_matrices(long object_index)
 					&latest_rotations[node_index], interpolation_fraction, &blended[node_index]);
 			}
 		}
+		if (snap)
+			memcpy(blended, latest, record->node_count * sizeof(real_matrix4x3));
 		if (correction_significant(&record->correction) || correction_significant(&record->correction_pending))
 		{
 			real_vector3d drawn;
@@ -804,6 +818,8 @@ void render_interpolation_first_person(
 	struct interpolated_first_person *first_person;
 	real_matrix4x3 camera_matrix;
 	real_matrix4x3 inverse_camera;
+	struct interpolation_rotation previous_rotations[MAXIMUM_INTERPOLATED_NODES];
+	struct interpolation_rotation latest_rotations[MAXIMUM_INTERPOLATED_NODES];
 	short node_index;
 
 	if (!interpolation_rendering ||
@@ -817,8 +833,11 @@ void render_interpolation_first_person(
 	matrix4x3_inverse(&camera_matrix, &inverse_camera);
 	if (first_person->tick != interpolation_tick)
 	{
-		/* the pose drawn last, at the end of the previous tick */
-		first_person->has_previous = first_person->node_count == node_count;
+		/* the pose drawn last, if that was at the end of the tick just
+		before: not one left from before the view was last away from first
+		person (zoomed, in a vehicle, dead, in a cinematic), seconds old */
+		first_person->has_previous = first_person->tick == interpolation_tick - 1 &&
+			first_person->node_count == node_count;
 		memcpy(first_person->previous, first_person->latest, sizeof(first_person->previous));
 		first_person->tick = interpolation_tick;
 	}
@@ -827,13 +846,31 @@ void render_interpolation_first_person(
 	first_person->node_count = node_count;
 	if (!first_person->has_previous)
 		return;
+	/* a node that jumped further in the camera's frame than a tick allows:
+	the last pose was another weapon's skeleton (of as many nodes), not this
+	one moving (so written that a position not a number snaps) */
+	for (node_index = 0; node_index < node_count; node_index++)
+	{
+		real_matrix4x3 const *previous = &first_person->previous[node_index];
+		real_matrix4x3 const *latest = &first_person->latest[node_index];
+
+		if (!(distance_squared(&previous->position, &latest->position) <=
+			FIRST_PERSON_SNAP_DISTANCE * FIRST_PERSON_SNAP_DISTANCE))
+		{
+			return;
+		}
+		rotation_from_matrix(previous, &previous_rotations[node_index]);
+		rotation_from_matrix(latest, &latest_rotations[node_index]);
+	}
 	for (node_index = 0; node_index < node_count; node_index++)
 	{
 		real_matrix4x3 blended;
 
-		matrix_blend(
+		matrix_blend_rotations(
 			&first_person->previous[node_index],
 			&first_person->latest[node_index],
+			&previous_rotations[node_index],
+			&latest_rotations[node_index],
 			interpolation_fraction,
 			&blended);
 		matrix4x3_multiply(&camera_matrix, &blended, &node_matrices[node_index]);
