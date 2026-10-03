@@ -20,6 +20,10 @@ header included in hcex build.
 
 /* ---------- prototypes/NETWORK_SERVER_MANAGER.C */
 
+/* port: whether the host's game is being played (not its lobby) */
+boolean network_game_server_playing(
+	struct network_game_server *server);
+
 struct network_game_server;
 struct game_variant;
 
@@ -49,6 +53,12 @@ enum
 {
 	NETWORK_GAME_SERVER_NAME_TEXT_SIZE = 16,
 };
+/* port: the PC menus' server settings: the game's name (empty: the
+machine's) and the most players (0: every player the build holds), for
+every game the server sets up */
+void network_game_server_port_set_settings(
+	wchar_t const *name,
+	long maximum_players);
 boolean network_game_server_ban_player(
 	char const *text);
 short network_game_server_matching_player_names(

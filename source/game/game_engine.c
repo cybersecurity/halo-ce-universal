@@ -548,6 +548,7 @@ symbols in this file:
 #include "bitmaps/bitmap_group_lookup.h"
 #include "effects/player_effects.h"
 #include "game_allegiance.h"
+#include "game.h"
 #include "game_globals.h"
 #include "interface/interface.h"
 #include "interface/hud.h"
@@ -566,6 +567,9 @@ symbols in this file:
 #include "math/integer_math.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
+#include "networking/network_game_manager.h"
+/* (network_server_manager_internal.h's: the host's game record) */
+struct network_game *network_game_server_get_game(struct network_game_server *server);
 #include "objects.h"
 #include "objects/damage_effect_definitions.h"
 #include "physics/collision_features.h"
@@ -621,11 +625,6 @@ enum
 
 enum
 {
-	_game_variant_generic_starting_equipment_bit = 5,
-};
-
-enum
-{
 	_game_engine_all = 12,
 	_game_engine_all_non_team,
 	_game_engine_all_normal,
@@ -675,6 +674,10 @@ enum game_engine_weapons
 	_game_engine_weapons_short_range,
 	_game_engine_weapons_human,
 	_game_engine_weapons_no_grenades,
+	/* port: the PC version's */
+	_game_engine_weapons_covenant,
+	_game_engine_weapons_classic,
+	_game_engine_weapons_heavy,
 	NUMBER_OF_GAME_ENGINE_WEAPON_SETS,
 };
 
@@ -1077,6 +1080,7 @@ static void game_engine_generate_title_string(
 {
 	wchar_t *secondary_string;
 	wchar_t life_string[128];
+	wchar_t time_left_string[160];
 	wchar_t score_string[256];
 	long string_list_index;
 	wchar_t *format_string;
@@ -1142,6 +1146,24 @@ static void game_engine_generate_title_string(
 			secondary_string = life_string;
 			break;
 		}
+	}
+
+	/* port: the gametype's time limit's time left (game_variant_options) */
+	if (game_variant_options_get()->time_limit > 0 &&
+		game_engine_globals.postgame_state == game_engine_mode_active)
+	{
+		long left = game_variant_options_get()->time_limit * 60L * TICKS_PER_SECOND - game_time_get();
+		wchar_t time_string[32];
+
+		ticks_to_unicode_time_string(MAX(left, 0), NUMBEROF(time_string), time_string);
+		if (secondary_string[0] && secondary_string != time_left_string)
+		{
+			usnprintf(time_left_string, NUMBEROF(time_left_string), L"%s, %s left", secondary_string, time_string);
+		}
+		else
+			usnprintf(time_left_string, NUMBEROF(time_left_string), L"%s left", time_string);
+		time_left_string[NUMBEROF(time_left_string) - 1] = 0;
+		secondary_string = time_left_string;
 	}
 
 	if (game_engine_globals.postgame_state == game_engine_mode_postgame_delay)
@@ -1637,6 +1659,430 @@ static long select_players_to_display(
 	return MIN(maximum_count, player_count);
 }
 
+/* port: the scoreboard of a full-screen view (game_engine_rasterize_in_game_score;
+a split-screen view's keeps the Xbox's six rows): SCOREBOARD_SCALE times the
+HUD's text, centred, on a panel (display.scoreboard_background). A team game's
+players in a column for each team (display.scoreboard_team_layout), else in
+order of score in one column, or two when one has too few rows; each with
+the player's ping in a network game (the host's measure:
+network_distributed.c). More players than a page are scrolled to with the
+mouse wheel and Page Up/Down (platform_scoreboard_scroll), a footer telling
+which are shown; opened, it shows the viewer's own player's page. */
+enum
+{
+	/* the rows' widths (in the scoreboard's text, before it is scaled):
+	place, name, score, ping (the last as wide as "Ping" or three digits,
+	so that the columns centred are their text centred) */
+	SCOREBOARD_PLACE_WIDTH = 55,
+	SCOREBOARD_NAME_WIDTH = 150,
+	SCOREBOARD_SCORE_WIDTH = 95,
+	SCOREBOARD_PING_WIDTH = 40,
+	SCOREBOARD_COLUMN_WIDTH = SCOREBOARD_PLACE_WIDTH + SCOREBOARD_NAME_WIDTH + SCOREBOARD_SCORE_WIDTH + SCOREBOARD_PING_WIDTH,
+	SCOREBOARD_COLUMN_GAP = 40,
+	/* the rows a column has: as many as fit between 6 rows of the screen
+	from its top and 2 from its bottom (the motion sensor); the scoreboard
+	is centred on the screen, but never nearer its top than 4 rows (the
+	HUD's shields and health; its messages, such as "hold BACK for score",
+	are hidden while the scoreboard shows) */
+	SCOREBOARD_LAYOUT_TOP_ROWS = 6,
+	SCOREBOARD_BOTTOM_ROWS = 2,
+	SCOREBOARD_MINIMUM_TOP_ROWS = 4,
+	/* the entries (or a team column's rows) a notch of the wheel scrolls */
+	SCOREBOARD_WHEEL_STEP = 3,
+};
+
+#define SCOREBOARD_SCALE 0.75f
+
+/* network_distributed.c's */
+long distributed_player_ping(short player_index);
+/* port_config.c's */
+int config_boolean(const char *name);
+const char *config_string(const char *name);
+unsigned long config_changes(void);
+/* cinematics.c's */
+void draw_quad(rectangle2d *rectangle, pixel32 color);
+
+/* display.scoreboard_background(_color): the panel behind the scoreboard's
+text, its colour "red, green, blue, alpha" (0 to 255 each), or 0 for none */
+static pixel32 scoreboard_background_color(
+	void)
+{
+	static unsigned long read_at = (unsigned long)-1;
+	static pixel32 color = 0;
+
+	/* (read again when Settings changes it) */
+	if (read_at != config_changes())
+	{
+		char const *text = config_string("display.scoreboard_background_color");
+		long parts[4] = { 16, 16, 16, 150 };
+		short part;
+
+		read_at = config_changes();
+		color = 0;
+		if (!config_boolean("display.scoreboard_background"))
+			return color;
+		for (part = 0; part < 4 && text && *text; part++)
+		{
+			long value = 0;
+			boolean digits = FALSE;
+
+			while (*text == ' ' || *text == ',')
+				text++;
+			while (*text >= '0' && *text <= '9')
+			{
+				value = value * 10 + (*text++ - '0');
+				digits = TRUE;
+			}
+			if (digits)
+				parts[part] = PIN(value, 0, 255);
+			while (*text && *text != ',')
+				text++;
+		}
+		color = ((pixel32)parts[3] << 24) | ((pixel32)parts[0] << 16) | ((pixel32)parts[1] << 8) | (pixel32)parts[2];
+	}
+
+	return color;
+}
+
+/* a row of the scoreboard: its text (tab separated) from the column's left
+(tabs: the column's stops), on the row below the title's (at top) */
+static void scoreboard_draw_row(
+	wchar_t const *string,
+	boolean brighten,
+	real_argb_color const *row_color,
+	long row_index,
+	short top,
+	short left,
+	boolean tabs)
+{
+	rectangle2d bounds = render.camera.window_bounds;
+	long font_index = hud_get_font_index();
+	/* (brightened as a copy: the team colours serve every row) */
+	real_argb_color color = *row_color;
+	short tab_stops[4];
+	struct font_header *font;
+	long line_height;
+
+	if (font_index == NONE)
+		return;
+	offset_rectangle2d(&bounds, -render.camera.viewport_bounds.x0, -render.camera.viewport_bounds.y0);
+	font = font_definition_get(font_index);
+	line_height = font->leading_height + font->descending_height + font->ascending_height;
+	if (brighten)
+	{
+		color.red = MIN(color.red + 0.4f, 1.0f);
+		color.green = MIN(color.green + 0.4f, 1.0f);
+		color.blue = MIN(color.blue + 0.4f, 1.0f);
+	}
+	tab_stops[0] = left;
+	tab_stops[1] = (short)(left + SCOREBOARD_PLACE_WIDTH);
+	tab_stops[2] = (short)(tab_stops[1] + SCOREBOARD_NAME_WIDTH);
+	tab_stops[3] = (short)(tab_stops[2] + SCOREBOARD_SCORE_WIDTH);
+	draw_string_set_tab_stops(tabs ? tab_stops : NULL, tabs ? 4 : 0);
+	/* (the row as wide as the screen once scaled) */
+	bounds.x1 = (short)(bounds.x0 + (bounds.x1 - bounds.x0) / SCOREBOARD_SCALE);
+	if (!tabs)
+		bounds.x0 = left;
+	bounds.y0 = (short)(top + row_index * line_height);
+	bounds.y1 = (short)(bounds.y0 + line_height);
+	draw_string_set_draw_mode(font_index, NONE, 0, 0, &color);
+	rasterizer_draw_unicode_string(&bounds, NULL, NULL, 0, string);
+	draw_string_set_tab_stops(NULL, 0);
+
+	return;
+}
+
+/* sdl_platform.c's: the wheel's and Page Up/Down's moves of the open
+scoreboard (notches and pages, down positive) */
+void platform_scoreboard_scroll(int open, long *notches, long *pages);
+
+/* the scoreboard's scroll (entries of one list, or rows of the team
+columns), and whether it showed last frame (opened, it shows the viewer's
+own player) */
+static long scoreboard_scroll = 0;
+static boolean scoreboard_open = FALSE;
+
+/* display.scoreboard_team_layout: a team game's players in a column for each
+team ("teams", the red team's on the left), or all in order of score
+("score") */
+static boolean scoreboard_team_columns(
+	void)
+{
+	static short setting = NONE;
+	static unsigned long read_at = (unsigned long)-1;
+
+	if (read_at != config_changes())
+	{
+		char const *value = config_string("display.scoreboard_team_layout");
+
+		read_at = config_changes();
+		setting = value && !csstrcmp(value, "score") ? FALSE : TRUE;
+	}
+
+	return (boolean)setting;
+}
+
+/* the scoreboard closed: its scroll forgotten, the wheel the weapons' again */
+static void game_engine_scoreboard_closed(
+	void)
+{
+	if (scoreboard_open)
+	{
+		scoreboard_open = FALSE;
+		platform_scoreboard_scroll(FALSE, NULL, NULL);
+	}
+}
+
+static void game_engine_rasterize_scoreboard(
+	long player_index,
+	real alpha)
+{
+	struct statistic_buffer ranked[MULTIPLAYER_MAXIMUM_PLAYERS];
+	/* (the players of each column's list, as indices into ranked: a team
+	game's by team, else all in one list over both columns) */
+	short lists[2][MULTIPLAYER_MAXIMUM_PLAYERS];
+	long list_counts[2] = { 0, 0 };
+	wchar_t row_string[256];
+	wchar_t score_string[256];
+	wchar_t title_string[80];
+	wchar_t ping_string[16];
+	real_argb_color text_color;
+	real_argb_color team_colors[2];
+	real_argb_color color;
+	rectangle2d bounds = render.camera.window_bounds;
+	boolean has_teams = game_engine_has_teams();
+	boolean network = game_connection() == _game_connection_network_client ||
+		game_connection() == _game_connection_network_server;
+	boolean team_columns;
+	long font_index = hud_get_font_index();
+	long string_list_index;
+	long line_height;
+	long rows;
+	long columns;
+	long ranked_count;
+	long total;
+	long page;
+	long shown_rows;
+	long index;
+	short width;
+	short left;
+	short top;
+	wchar_t *column_name;
+	wchar_t *score_name;
+
+	if (font_index == NONE)
+		return;
+	offset_rectangle2d(&bounds, -render.camera.viewport_bounds.x0, -render.camera.viewport_bounds.y0);
+	{
+		struct font_header *font = font_definition_get(font_index);
+
+		line_height = font->leading_height + font->descending_height + font->ascending_height;
+	}
+	if (line_height <= 0)
+		return;
+	/* (laid out at full size, then drawn scaled about the title's top left:
+	the screen holds 1/SCOREBOARD_SCALE as much) */
+	width = (short)((bounds.x1 - bounds.x0) / SCOREBOARD_SCALE);
+	rows = (long)((bounds.y1 - SCOREBOARD_LAYOUT_TOP_ROWS * line_height) / SCOREBOARD_SCALE / line_height) - 2 -
+		SCOREBOARD_BOTTOM_ROWS;
+	rows = MAX(rows, 1);
+	ranked_count = populate_statistic_buffer(ranked, _postgame_statistic_ranking, FALSE);
+	team_columns = has_teams && scoreboard_team_columns() && width >= 2 * SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP;
+	for (index = 0; index < ranked_count; index++)
+	{
+		struct player_datum *player = player_try_and_get(ranked[index].player_index);
+		short list = team_columns && player ? (short)PIN(player->team_index, 0, 1) : 0;
+
+		lists[list][list_counts[list]++] = (short)index;
+	}
+	/* (a page: the rows of both team columns, or both columns of one list;
+	the scroll in rows of the team columns, or entries of the list) */
+	if (team_columns)
+	{
+		columns = 2;
+		total = MAX(list_counts[0], list_counts[1]);
+		page = rows;
+	}
+	else
+	{
+		columns = list_counts[0] > rows && width >= 2 * SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP ? 2 : 1;
+		total = list_counts[0];
+		page = rows * columns;
+	}
+	/* (opened, at the viewer's own player's page; then where the wheel and
+	Page Up/Down take it) */
+	{
+		long notches = 0;
+		long pages = 0;
+
+		platform_scoreboard_scroll(TRUE, &notches, &pages);
+		if (!scoreboard_open)
+		{
+			scoreboard_open = TRUE;
+			scoreboard_scroll = 0;
+			for (index = 0; index < 2; index++)
+			{
+				long position;
+
+				for (position = 0; position < list_counts[index]; position++)
+				{
+					if (ranked[lists[index][position]].player_index == player_index)
+						scoreboard_scroll = position / page * page;
+				}
+			}
+		}
+		scoreboard_scroll += notches * SCOREBOARD_WHEEL_STEP + pages * page;
+		scoreboard_scroll = PIN(scoreboard_scroll, 0, MAX(total - page, 0));
+	}
+	left = (short)(bounds.x0 + (width - (columns * SCOREBOARD_COLUMN_WIDTH + (columns - 1) * SCOREBOARD_COLUMN_GAP)) / 2);
+	/* (centred on the rows shown: the title's, the heading's, the longest
+	column's, and the footer telling where the scroll is) */
+	shown_rows = MIN(rows, total);
+	if (total > page)
+		shown_rows++;
+	{
+		real height = (2 + shown_rows) * line_height * SCOREBOARD_SCALE;
+
+		top = (short)(bounds.y0 + ((bounds.y1 - bounds.y0) - height) / 2);
+		top = MAX(top, (short)(SCOREBOARD_MINIMUM_TOP_ROWS * line_height));
+		/* (the panel behind it, half a row beyond its text, fading with it) */
+		{
+			pixel32 background = scoreboard_background_color();
+			real padding = 0.5f * line_height * SCOREBOARD_SCALE;
+			real block_width = (columns * SCOREBOARD_COLUMN_WIDTH + (columns - 1) * SCOREBOARD_COLUMN_GAP) * SCOREBOARD_SCALE;
+			real block_left = bounds.x0 + (left - bounds.x0) * SCOREBOARD_SCALE;
+
+			if (background >> 24)
+			{
+				rectangle2d panel;
+				long panel_alpha = (long)((background >> 24) * PIN(alpha, 0.0f, 1.0f) + 0.5f);
+
+				panel.x0 = (short)(block_left - padding);
+				/* (the ping, nearly as wide as its column, given room) */
+				panel.x1 = (short)(block_left + block_width + padding + 8.0f * SCOREBOARD_SCALE);
+				panel.y0 = (short)(top - padding);
+				panel.y1 = (short)(top + height + padding);
+				draw_quad(&panel, ((pixel32)panel_alpha << 24) | (background & 0x00FFFFFF));
+			}
+		}
+	}
+	rasterizer_text_set_scale(SCOREBOARD_SCALE, (real)bounds.x0, (real)top);
+
+	team_colors[0].alpha = alpha;
+	team_colors[0].red = 0.6f;
+	team_colors[0].green = 0.3f;
+	team_colors[0].blue = 0.3f;
+	team_colors[1].alpha = alpha;
+	team_colors[1].red = 0.3f;
+	team_colors[1].green = 0.3f;
+	team_colors[1].blue = 0.6f;
+
+	game_engine_generate_title_string(title_string, player_index);
+	color.alpha = alpha;
+	color.red = color.green = color.blue = 0.7f;
+	scoreboard_draw_row(title_string, FALSE, &color, 0, top, left, FALSE);
+
+	string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+	column_name = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 0x43) : L"";
+	score_name = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 0x44) : L"";
+	game_engine->format_score_name(score_string);
+	usprintf(row_string, L"\t%s\t%s\t%s\t%s", column_name, score_name, score_string, network ? L"Ping" : L"");
+	{
+		long column;
+
+		for (column = 0; column < columns; column++)
+		{
+			/* (a team column's heading in its team's colour, brightened) */
+			if (team_columns)
+			{
+				color = team_colors[column];
+				color.red = MIN(color.red + 0.25f, 1.0f);
+				color.green = MIN(color.green + 0.25f, 1.0f);
+				color.blue = MIN(color.blue + 0.25f, 1.0f);
+			}
+			else
+			{
+				color.alpha = alpha;
+				color.red = color.green = color.blue = 0.5f;
+			}
+			scoreboard_draw_row(row_string, FALSE, &color, 1, top,
+				(short)(left + column * (SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP)), TRUE);
+		}
+	}
+
+	/* each slot of the page: a team column's row, or a place in the list */
+	for (index = 0; index < rows * columns; index++)
+	{
+		long column = team_columns ? index % 2 : index / rows;
+		long row = team_columns ? index / 2 : index % rows;
+		long list = team_columns ? column : 0;
+		long position = scoreboard_scroll + (team_columns ? row : index);
+		struct statistic_buffer *entry;
+		struct player_datum *player;
+		wchar_t *status_string;
+		real_argb_color *row_color;
+
+		if (row >= rows || position >= list_counts[list])
+			continue;
+		entry = &ranked[lists[list][position]];
+		player = player_try_and_get(entry->player_index);
+		if (!player)
+			continue;
+		color = *hud_get_text_color(&text_color);
+		color.alpha = alpha;
+		game_engine->format_player_score(entry->player_index, score_string);
+		if (game_engine_player_is_out_of_lives(entry->player_index))
+			status_string = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 0x8A) : L"";
+		else if (player->quit_out_of_game)
+			status_string = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 0x8B) : L"";
+		else
+			status_string = score_string;
+		ping_string[0] = 0;
+		if (network)
+		{
+			long ping = distributed_player_ping((short)DATUM_INDEX_TO_ABSOLUTE_INDEX(entry->player_index));
+
+			/* (three digits at most: its column's width) */
+			if (ping == NONE)
+				usprintf(ping_string, L"-");
+			else if (ping > 999)
+				usprintf(ping_string, L"999+");
+			else
+				usprintf(ping_string, L"%ld", ping);
+		}
+		usprintf(
+			row_string,
+			L"\t%s\t%s\t%s\t%s",
+			get_place_string(entry),
+			player->name,
+			status_string,
+			ping_string);
+		row_color = has_teams ? &team_colors[PIN(player->team_index, 0, 1)] : &color;
+		scoreboard_draw_row(
+			row_string,
+			player_index == entry->player_index,
+			row_color,
+			2 + row,
+			top,
+			(short)(left + column * (SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP)),
+			TRUE);
+	}
+	/* (where the scroll is, and how to move it) */
+	if (total > page)
+	{
+		long first = scoreboard_scroll + 1;
+		long last = MIN(scoreboard_scroll + page, total);
+
+		color.alpha = alpha;
+		color.red = color.green = color.blue = 0.6f;
+		usprintf(row_string, L"%ld-%ld of %ld   (Page Up / Page Down, mouse wheel)", first, last, total);
+		scoreboard_draw_row(row_string, FALSE, &color, 2 + rows, top, left, FALSE);
+	}
+	rasterizer_text_set_scale(1.0f, 0.0f, 0.0f);
+
+	return;
+}
+
 static void game_engine_rasterize_in_game_score(
 	long player_index,
 	real alpha)
@@ -1656,6 +2102,12 @@ static void game_engine_rasterize_in_game_score(
 	wchar_t *column_name;
 	wchar_t *score_name;
 
+	/* port: a full-screen view's its own (game_engine_rasterize_scoreboard) */
+	if (local_player_count() <= 1)
+	{
+		game_engine_rasterize_scoreboard(player_index, alpha);
+		return;
+	}
 	game_engine_generate_title_string(title_string, player_index);
 	entry_count = select_players_to_display(
 		_postgame_statistic_ranking,
@@ -2203,12 +2655,11 @@ long game_engine_remap_equipment(
 			break;
 		}
 
-		if (!TEST_FLAG(game_engine_globals.flags, _game_engine_5_or_more_players_bit))
+		/* (port: whatever the number of players, as
+		game_engine_infinite_grenades_internal) */
+		if (game_engine_infinite_grenades_internal())
 		{
-			if (game_engine_infinite_grenades_internal())
-			{
-				weapon_list_index = NONE;
-			}
+			weapon_list_index = NONE;
 		}
 
 		if (TEST_FLAG(game_engine_globals.flags, _game_engine_9_or_more_players_bit))
@@ -2730,12 +3181,9 @@ boolean match_game_type(
 static boolean game_engine_infinite_grenades_internal(
 	void)
 {
-	boolean infinite_grenades = FALSE;
-
-	if (!TEST_FLAG(game_engine_globals.flags, _game_engine_5_or_more_players_bit))
-		infinite_grenades = TEST_FLAG(global_variant.universal_variant.flags, _game_variant_infinite_grenades_bit);
-
-	return infinite_grenades;
+	/* port: whatever the number of players (the Xbox game's had none with
+	five or more) */
+	return TEST_FLAG(global_variant.universal_variant.flags, _game_variant_infinite_grenades_bit);
 }
 
 static boolean find_closest_player_callback(
@@ -3060,6 +3508,11 @@ static void game_engine_post_rasterize_in_game(
 
 		game_engine_rasterize_in_game_score(player_index, alpha);
 	}
+	else if (local_player_count() <= 1)
+	{
+		/* (port: the full-screen scoreboard's scroll forgotten) */
+		game_engine_scoreboard_closed();
+	}
 
 	game_engine_globals.hud_message_timers[local_player_index] = fade;
 
@@ -3169,6 +3622,24 @@ boolean game_engine_showing_postgame(
 	void)
 {
 	return game_engine != NULL && game_engine_globals.postgame_state == game_engine_mode_postgame_rasterize;
+}
+
+void game_variant_options_default(
+	struct game_variant const *variant,
+	struct game_variant_options *options)
+{
+	csmemset(options, 0, sizeof(*options));
+	options->friendly_fire = _friendly_fire_on;
+	options->loadout = _loadout_category;
+	options->primary_weapon = _loadout_weapon_assault_rifle;
+	options->secondary_weapon = _loadout_weapon_pistol;
+	options->radar_players = variant &&
+		!TEST_FLAG(variant->universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit) ?
+		_radar_players_none : _radar_players_all;
+	options->vehicle_set[0] = options->vehicle_set[1] =
+		variant ? (byte)variant->universal_variant.vehicle_set : 0;
+
+	return;
 }
 
 boolean game_engine_force_single_screen(
@@ -3644,6 +4115,99 @@ static void game_engine_update_teleporter(
 	return;
 }
 
+/* port: the gametype's vehicle respawn time (game_variant_options): the
+host puts a vehicle destroyed, or left empty away from where the map put
+it, back there after the time (the clients get the host's: the distributed
+netcode). Vehicles otherwise stay where they are left (the Xbox game's). */
+enum
+{
+	MAXIMUM_VEHICLE_HOMES = 64
+};
+
+static struct
+{
+	long object_index;
+	long definition_index;
+	real_point3d position;
+	real_vector3d forward;
+	real_vector3d up;
+	long idle_since;
+} game_engine_vehicle_homes[MAXIMUM_VEHICLE_HOMES];
+static short game_engine_vehicle_home_count = NONE;
+
+static void game_engine_update_vehicle_respawn(
+	void)
+{
+	long respawn_ticks = game_variant_options_get()->vehicle_respawn_time * TICKS_PER_SECOND;
+	long now = game_time_get();
+	short index;
+
+	if (respawn_ticks <= 0 || network_game_distributed_client() || now % TICKS_PER_SECOND)
+		return;
+	/* (where the map put them: the vehicles there at the first look) */
+	if (game_engine_vehicle_home_count == NONE)
+	{
+		struct object_iterator iterator;
+
+		game_engine_vehicle_home_count = 0;
+		object_iterator_new(&iterator, _object_mask_vehicle, 0);
+		while (object_iterator_next(&iterator) && game_engine_vehicle_home_count < MAXIMUM_VEHICLE_HOMES)
+		{
+			struct object_datum *object = object_get(iterator.index);
+			short home = game_engine_vehicle_home_count++;
+
+			game_engine_vehicle_homes[home].object_index = iterator.index;
+			game_engine_vehicle_homes[home].definition_index = object->definition_index;
+			game_engine_vehicle_homes[home].position = object->object.position;
+			object_get_orientation(iterator.index, &game_engine_vehicle_homes[home].forward,
+				&game_engine_vehicle_homes[home].up);
+			game_engine_vehicle_homes[home].idle_since = NONE;
+		}
+	}
+	for (index = 0; index < game_engine_vehicle_home_count; index++)
+	{
+		struct unit_datum *vehicle = unit_try_and_get(game_engine_vehicle_homes[index].object_index);
+		boolean waiting = TRUE;
+
+		if (vehicle && !TEST_FLAG(vehicle->object.damage_flags, _object_dead_bit))
+		{
+			real dx = vehicle->object.position.x - game_engine_vehicle_homes[index].position.x;
+			real dy = vehicle->object.position.y - game_engine_vehicle_homes[index].position.y;
+			real dz = vehicle->object.position.z - game_engine_vehicle_homes[index].position.z;
+
+			long child_index;
+
+			/* (empty: no rider among its children, which hold its own
+			weapons too) */
+			waiting = vehicle->unit.driver_object_index == NONE && vehicle->unit.gunner_object_index == NONE &&
+				dx * dx + dy * dy + dz * dz > 4.0f;
+			for (child_index = vehicle->object.first_child_object_index; waiting && child_index != NONE;
+				child_index = object_get(child_index)->object.next_object_index)
+			{
+				if (object_get(child_index)->object.type == _object_type_biped)
+					waiting = FALSE;
+			}
+		}
+		if (!waiting)
+			game_engine_vehicle_homes[index].idle_since = NONE;
+		else if (game_engine_vehicle_homes[index].idle_since == NONE)
+			game_engine_vehicle_homes[index].idle_since = now;
+		else if (now - game_engine_vehicle_homes[index].idle_since >= respawn_ticks)
+		{
+			struct object_placement_data placement_data;
+
+			if (vehicle)
+				object_delete(game_engine_vehicle_homes[index].object_index);
+			object_placement_data_new(&placement_data, game_engine_vehicle_homes[index].definition_index, NONE);
+			placement_data.position = game_engine_vehicle_homes[index].position;
+			placement_data.forward = game_engine_vehicle_homes[index].forward;
+			placement_data.up = game_engine_vehicle_homes[index].up;
+			game_engine_vehicle_homes[index].object_index = object_new(&placement_data);
+			game_engine_vehicle_homes[index].idle_since = NONE;
+		}
+	}
+}
+
 void game_engine_update(
 	void)
 {
@@ -3653,6 +4217,7 @@ void game_engine_update(
 		game_engine_update_purge();
 		game_engine_update_weapons();
 		game_engine_update_item_spawn();
+		game_engine_update_vehicle_respawn();
 
 		{
 			struct data_iterator player_iterator;
@@ -3803,6 +4368,10 @@ enum
 	_equipment_created_at_rest_bit = 0,
 };
 
+/* port: each player's friendly fire penalty (game_variant_options), added to
+his next respawn: by the player's absolute index */
+static short game_engine_betrayal_penalty[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+
 void game_engine_player_killed(
 	long killing_player_index,
 	long killing_object_index,
@@ -3827,6 +4396,9 @@ void game_engine_player_killed(
 	killer (port/linux/game/network_distributed.c) */
 	network_distributed_player_killed(&killing_player_index, &killing_object_index, dead_player_index,
 		&friendly_fire);
+	/* port: a killer who has left the game since is no one's kill */
+	if (killing_player_index != NONE && !player_try_and_get(killing_player_index))
+		killing_player_index = NONE;
 	/* the host's kill of a player who quit, ahead of this client's clock
 	(game_update_quit_players has not come to its time yet) */
 	if (network_game_distributed_client() && dead_player->quit_out_of_game_time != NONE &&
@@ -3872,6 +4444,56 @@ void game_engine_player_killed(
 
 	if (!player_kill)
 		dead_player->respawn_timer += global_variant.universal_variant.suicide_penalty;
+
+	/* port: the gametype's auto team balance (game_variant_options): the host
+	moves the dead to the other team when his is two or more bigger (his
+	next unit is the other team's, which the clients take it from:
+	network_player_attach_unit) */
+	if (global_variant.universal_variant.teams && game_variant_options_get()->auto_team_balance &&
+		!network_game_distributed_client() && VALID_INDEX(dead_player->team_index, 2) && !dead_player->quit_out_of_game)
+	{
+		struct data_iterator iterator;
+		struct player_datum *player;
+		short count[2] = { 0, 0 };
+
+		data_iterator_new(&iterator, player_data);
+		while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		{
+			if (!player->quit_out_of_game && VALID_INDEX(player->team_index, 2))
+				count[player->team_index]++;
+		}
+		if (count[dead_player->team_index] >= count[1 - dead_player->team_index] + 2)
+		{
+			struct network_game_server *server = global_network_game_server_get();
+			struct network_game *game = server ? network_game_server_get_game(server) : NULL;
+			long list_index = dead_player->network_player_data.player_list_index;
+
+			dead_player->team_index = 1 - dead_player->team_index;
+			dead_player->network_player_data.team_index = (char)dead_player->team_index;
+			/* (and the host's game record, which late joins count and the
+			lobby shows) */
+			if (game && VALID_INDEX(list_index, HALO_PORT_MAXIMUM_NETWORK_PLAYERS))
+				game->players[list_index].team_index = (char)dead_player->team_index;
+		}
+	}
+
+	/* port: the gametype's friendly fire penalty: the team killer's next
+	respawn later (the dead's own, if he has one waiting) */
+	{
+		long dead_absolute = DATUM_INDEX_TO_ABSOLUTE_INDEX(dead_player_index);
+
+		if (dead_absolute < HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+		{
+			dead_player->respawn_timer += game_engine_betrayal_penalty[dead_absolute];
+			game_engine_betrayal_penalty[dead_absolute] = 0;
+		}
+		if (friendly_fire && valid_players && !same_player && global_variant.universal_variant.teams &&
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(killing_player_index) < HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+		{
+			game_engine_betrayal_penalty[DATUM_INDEX_TO_ABSOLUTE_INDEX(killing_player_index)] =
+				(short)(game_variant_options_get()->friendly_fire_penalty * TICKS_PER_SECOND);
+		}
+	}
 
 	dead_player->respawn_timer = MAX(dead_player->respawn_timer, 90);
 	dead_player = player_get(dead_player_index);
@@ -4061,6 +4683,16 @@ boolean game_engine_has_shield(
 	return has_shield;
 }
 
+/* port: the local player whose motion sensor is drawn (motion_sensor.c),
+for the gametype's FRIENDS radar (game_variant_options) */
+static short game_engine_motion_sensor_local_player = NONE;
+
+void game_engine_motion_sensor_viewer(
+	short local_player_index)
+{
+	game_engine_motion_sensor_local_player = local_player_index;
+}
+
 boolean game_engine_draw_object_in_motion_sensor(
 	long unit_index)
 {
@@ -4068,6 +4700,16 @@ boolean game_engine_draw_object_in_motion_sensor(
 
 	if (game_engine)
 		draw_object = TEST_FLAG(global_variant.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit);
+	/* port: friends only: the viewer's team's */
+	if (draw_object && game_engine && global_variant.universal_variant.teams &&
+		game_variant_options_get()->radar_players == _radar_players_friends &&
+		game_engine_motion_sensor_local_player != NONE)
+	{
+		long player_index = local_player_get_player_index(game_engine_motion_sensor_local_player);
+		struct player_datum *viewer = player_index != NONE ? player_try_and_get(player_index) : NULL;
+
+		draw_object = viewer && object_get(unit_index)->object.owner_team_index == viewer->team_index;
+	}
 
 	return draw_object;
 }
@@ -4328,6 +4970,12 @@ boolean game_engine_should_end_game(
 
 	if (game_engine && !multiple_teams_alive())
 		should_end_game = TRUE;
+	/* port: the gametype's time limit (game_variant_options) */
+	if (game_engine && game_variant_options_get()->time_limit > 0 &&
+		game_time_get() >= game_variant_options_get()->time_limit * 60L * TICKS_PER_SECOND)
+	{
+		should_end_game = TRUE;
+	}
 
 	return should_end_game;
 }
@@ -6136,6 +6784,8 @@ void game_engine_initialize_for_new_map(
 		game_engine_intialize_queued_sounds();
 		csmemset(global_goal, 0, sizeof(global_goal));
 		game_engine_globals.next_team_index = 0;
+		csmemset(game_engine_betrayal_penalty, 0, sizeof(game_engine_betrayal_penalty));
+		game_engine_vehicle_home_count = NONE;
 		timeout_for_endgame_sound = 0;
 		game_engine_network_state_read = FALSE;
 
@@ -6165,6 +6815,9 @@ void game_engine_player_added(
 	long player_index)
 {
 	initialize_player_multiplayer_data(player_index);
+	/* port: not the friendly fire penalty of the slot's last player */
+	if (DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index) < HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+		game_engine_betrayal_penalty[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)] = 0;
 
 	if (game_engine)
 	{
@@ -6282,6 +6935,146 @@ real game_engine_get_starting_location_rating(
 	return default_starting_location_rate_function(player_index, starting_location);
 }
 
+/* port: the gametype's vehicles of each team (game_variant_options) */
+static byte game_engine_vehicles_placed[2][NUMBER_OF_VARIANT_VEHICLES];
+
+void game_engine_vehicle_placement_begin(
+	void)
+{
+	csmemset(game_engine_vehicles_placed, 0, sizeof(game_engine_vehicles_placed));
+}
+
+/* a vehicle definition's type: the globals' multiplayer vehicles (warthog,
+ghost, scorpion), else by its tag's name; NONE for none of them */
+static short game_engine_variant_vehicle_type(
+	long definition_index)
+{
+	struct game_globals *game_globals = scenario_get_game_globals();
+	struct game_globals_multiplayer_information *information;
+	char const *name;
+	short index;
+
+	if (definition_index == NONE)
+		return NONE;
+	if (game_globals->multiplayer_information.count > 0)
+	{
+		information = TAG_BLOCK_GET_ELEMENT(&game_globals->multiplayer_information, 0,
+			struct game_globals_multiplayer_information);
+		for (index = 0; index < 3 && index < information->vehicles.count; index++)
+		{
+			if (TAG_BLOCK_GET_ELEMENT(&information->vehicles, index, struct game_globals_vehicle)->vehicle.index ==
+				definition_index)
+			{
+				return index == 0 ? _variant_vehicle_warthog : index == 1 ? _variant_vehicle_ghost :
+					_variant_vehicle_scorpion;
+			}
+		}
+	}
+	name = tag_get_name(definition_index);
+	if (!name)
+		return NONE;
+	if (strstr(name, "rwarthog") || strstr(name, "rocket"))
+		return _variant_vehicle_rocket_warthog;
+	if (strstr(name, "banshee"))
+		return _variant_vehicle_banshee;
+	if (strstr(name, "turret"))
+		return _variant_vehicle_gun_turret;
+	if (strstr(name, "warthog"))
+		return _variant_vehicle_warthog;
+	if (strstr(name, "ghost"))
+		return _variant_vehicle_ghost;
+	if (strstr(name, "scorpion"))
+		return _variant_vehicle_scorpion;
+	return NONE;
+}
+
+/* the team whose spawn points are nearest the point (red's if none) */
+static short game_engine_nearest_team(
+	real_point3d const *point)
+{
+	struct scenario *scenario = global_scenario_get();
+	real best = -1.0f;
+	short team = 0;
+	long index;
+
+	for (index = 0; index < scenario->players.count; index++)
+	{
+		struct player_starting_location *location =
+			TAG_BLOCK_GET_ELEMENT(&scenario->players, index, struct player_starting_location);
+		real dx = location->position.x - point->x;
+		real dy = location->position.y - point->y;
+		real dz = location->position.z - point->z;
+		real distance = dx * dx + dy * dy + dz * dz;
+
+		if (VALID_INDEX(location->team_index, 2) && (best < 0.0f || distance < best))
+		{
+			best = distance;
+			team = location->team_index;
+		}
+	}
+	return team;
+}
+
+boolean game_engine_vehicle_placement_allowed(
+	struct scenario_object_datum const *placement,
+	struct tag_block *palette)
+{
+	struct game_variant_options const *options = game_variant_options_get();
+	short side, type;
+	byte set;
+
+	if (!game_engine || placement->palette_entry_index == NONE)
+		return TRUE;
+	side = global_variant.universal_variant.teams ? game_engine_nearest_team(&placement->position) : 0;
+	set = options->vehicle_set[side];
+	type = game_engine_variant_vehicle_type(TAG_BLOCK_GET_ELEMENT(palette, placement->palette_entry_index,
+		struct scenario_object_palette_entry)->reference.index);
+	/* (the map's own: the multiplayer ones of the globals, as the Xbox
+	game's remap allows) */
+	if (set == _game_engine_vehicles_default)
+		return type == NONE || type <= _variant_vehicle_scorpion;
+	if (type == NONE)
+		return set != _game_engine_vehicles_none;
+	if (set == VARIANT_VEHICLE_SET_CUSTOM)
+	{
+		if (game_engine_vehicles_placed[side][type] >= options->vehicle_counts[side][type])
+			return FALSE;
+		game_engine_vehicles_placed[side][type]++;
+		return TRUE;
+	}
+	/* (the sets: none, then each type alone, in the options' order) */
+	return set != _game_engine_vehicles_none && set - _game_engine_vehicles_warthog == type;
+}
+
+/* port: the gametype's friendly fire (game_variant_options) on a teammate's
+hit of the object (its damage marked friendly: object_cause_damage): all of
+it, none, its shields only, or explosives' only. A player's own hit of
+himself, or of what is not a player's teammate's, is the game's own. */
+short game_engine_friendly_damage(
+	long attacker_player_index,
+	long object_index,
+	boolean explosive)
+{
+	struct game_variant_options const *options = game_variant_options_get();
+	struct player_datum *attacker;
+
+	if (!game_engine || !global_variant.universal_variant.teams || attacker_player_index == NONE ||
+		options->friendly_fire == _friendly_fire_on)
+	{
+		return _friendly_damage_all;
+	}
+	attacker = (struct player_datum *)datum_try_and_get(player_data, attacker_player_index);
+	if (!attacker || attacker->unit_index == object_index)
+		return _friendly_damage_all;
+	switch (options->friendly_fire)
+	{
+	case _friendly_fire_off: return _friendly_damage_none;
+	case _friendly_fire_shields_only: return _friendly_damage_shields;
+	case _friendly_fire_explosives_only: return explosive ? _friendly_damage_all : _friendly_damage_none;
+	}
+	return _friendly_damage_all;
+}
+
 real game_engine_get_damage_multiplier(
 	long damaging_player_index,
 	long damaged_player_index)
@@ -6336,14 +7129,22 @@ long game_engine_remap_vehicle(
 		vehicle1 = TAG_BLOCK_GET_ELEMENT(vehicles, 1, struct game_globals_vehicle);
 		vehicle2 = TAG_BLOCK_GET_ELEMENT(vehicles, 2, struct game_globals_vehicle);
 
+		/* (port: and the other types a gametype's sets name, which a map may
+		have: game_engine_variant_vehicle_type) */
 		if (result != vehicle0->vehicle.index &&
 			result != vehicle1->vehicle.index &&
-			result != vehicle2->vehicle.index)
+			result != vehicle2->vehicle.index &&
+			((game_variant_options_get()->vehicle_set[0] == _game_engine_vehicles_default &&
+				game_variant_options_get()->vehicle_set[1] == _game_engine_vehicles_default) ||
+				game_engine_variant_vehicle_type(result) == NONE))
 		{
 			result = NONE;
 		}
 
-		switch (global_variant.universal_variant.vehicle_set)
+		/* port: the per-team sets decide at placement
+		(game_engine_vehicle_placement_allowed) */
+		switch (game_variant_options_get()->vehicle_set[0] == game_variant_options_get()->vehicle_set[1] ?
+			global_variant.universal_variant.vehicle_set : _game_engine_vehicles_default)
 		{
 		case _game_engine_vehicles_none:
 			result = NONE;
@@ -6394,8 +7195,14 @@ long game_engine_remap_weapon(
 		return weapon_definition_index;
 	}
 
-	if (weapon_list_index == _weapon_list_flamethrower)
+	/* (port: and the gravity rifle, a cut weapon, as the flamethrower,
+	which the Xbox's maps have unfinished: neither is a multiplayer weapon) */
+	if (weapon_list_index == _weapon_list_flamethrower || weapon_list_index == _weapon_list_gravity_rifle)
 		weapon_list_index = _weapon_list_rocket_launcher;
+
+	/* port: a custom loadout (game_variant_options) has no weapon set */
+	if (game_variant_options_get()->loadout == _loadout_custom)
+		return list_index_to_weapon_definition_index(weapon_list_index);
 
 	switch (global_variant.universal_variant.weapon_set)
 	{
@@ -6490,6 +7297,40 @@ long game_engine_remap_weapon(
 			weapon_list_index = _weapon_list_pistol;
 			break;
 		}
+		break;
+
+	/* port: the PC version's sets. Covenant: the Covenant's weapons (the
+	needler for the rocket launcher: the Xbox's maps have no fuel rod) */
+	case _game_engine_weapons_covenant:
+		switch (weapon_list_index)
+		{
+		case _weapon_list_assault_rifle:
+			weapon_list_index = _weapon_list_plasma_rifle;
+			break;
+
+		case _weapon_list_pistol:
+			weapon_list_index = _weapon_list_plasma_pistol;
+			break;
+
+		case _weapon_list_shotgun:
+		case _weapon_list_sniper_rifle:
+			weapon_list_index = _weapon_list_needler;
+			break;
+
+		case _weapon_list_rocket_launcher:
+			weapon_list_index = _weapon_list_needler;
+			break;
+		}
+		break;
+
+	/* classic: the Xbox game's weapons (the flamethrower and the gravity
+	rifle are already rocket launchers) */
+	case _game_engine_weapons_classic:
+		break;
+
+	/* heavy weapons: rocket launchers */
+	case _game_engine_weapons_heavy:
+		weapon_list_index = _weapon_list_rocket_launcher;
 		break;
 	}
 
@@ -7443,6 +8284,12 @@ static void game_engine_update_item_spawn(
 				struct object_placement_data placement_data;
 				long object_index;
 
+				/* port: the gametype's no weapons on the map */
+				if (definition_index != NONE && game_variant_options_get()->no_map_weapons &&
+					object_definition_get(definition_index)->object.type == _object_type_weapon)
+				{
+					continue;
+				}
 				object_placement_data_new(
 					&placement_data,
 					definition_index,
@@ -7556,6 +8403,70 @@ static void handle_custom_starting_equipment(
 	return;
 }
 
+/* port: a custom loadout's weapon's place in the globals' weapon list
+(game_engine_h's _loadout_weapon_*, from the assault rifle); random: one
+of those the map has */
+static long game_engine_loadout_weapon_definition(
+	byte weapon)
+{
+	static short const list_indices[] =
+	{
+		_weapon_list_assault_rifle, _weapon_list_pistol, _weapon_list_shotgun, _weapon_list_sniper_rifle,
+		_weapon_list_rocket_launcher, _weapon_list_plasma_pistol, _weapon_list_plasma_rifle, _weapon_list_needler
+	};
+	short index;
+
+	if (weapon == _loadout_weapon_random)
+	{
+		long available[NUMBEROF(list_indices)];
+		short count = 0;
+
+		for (index = 0; index < NUMBEROF(list_indices); index++)
+		{
+			long definition_index = list_index_to_weapon_definition_index(list_indices[index]);
+
+			if (definition_index != NONE)
+				available[count++] = definition_index;
+		}
+		return count ? available[local_random_range(0, count)] : NONE;
+	}
+	index = (short)(weapon - _loadout_weapon_assault_rifle);
+	return index >= 0 && index < NUMBEROF(list_indices) ? list_index_to_weapon_definition_index(list_indices[index]) :
+		NONE;
+}
+
+/* port: the unit's weapons the loadout's (its others gone): the primary,
+then the secondary */
+static void game_engine_give_loadout(
+	long unit_index)
+{
+	struct game_variant_options const *options = game_variant_options_get();
+	byte const weapons[2] = { options->primary_weapon, options->secondary_weapon };
+	boolean first = TRUE;
+	short index;
+
+	unit_delete_all_weapons(unit_index);
+	for (index = 0; index < 2; index++)
+	{
+		long definition_index = game_engine_loadout_weapon_definition(weapons[index]);
+		struct object_placement_data placement_data;
+		long weapon_index;
+
+		if (definition_index == NONE)
+			continue;
+		object_placement_data_new(&placement_data, definition_index, NONE);
+		weapon_index = object_new(&placement_data);
+		if (weapon_index == NONE)
+			continue;
+		if (!first && unit_has_weapon_definition_index(unit_index, definition_index))
+			object_delete(weapon_index);
+		else if (unit_add_weapon_to_inventory(unit_index, weapon_index, first ? 2 : 0))
+			first = FALSE;
+		else
+			object_delete(weapon_index);
+	}
+}
+
 void game_engine_postspawn_player_update(
 	long player_index)
 {
@@ -7604,7 +8515,12 @@ void game_engine_postspawn_player_update(
 			fragmentation_grenade_count;
 		long starting_plasma_grenade_count = 0;
 
-		if (!TEST_FLAG(global_variant.universal_variant.flags, _game_variant_generic_starting_equipment_bit))
+		/* port: a custom loadout's weapons (game_variant_options) */
+		if (game_variant_options_get()->loadout == _loadout_custom)
+		{
+			game_engine_give_loadout(unit_index);
+		}
+		else if (!TEST_FLAG(global_variant.universal_variant.flags, _game_variant_generic_starting_equipment_bit))
 		{
 			handle_custom_starting_equipment(
 				unit_index,

@@ -367,6 +367,9 @@ struct gl_device
 	had caught up */
 	GLuint visibility_results_buffer;
 	volatile GLuint *visibility_results;
+	/* a pipeline flush every flush_every draws (draw_flush), 0 never */
+	unsigned long flush_every;
+	unsigned long flush_draws;
 #endif
 
 	unsigned long frame;
@@ -958,6 +961,18 @@ static void gl_initialize(void)
 		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
 	if (!device.visibility_results)
 		platform_log("cannot map the visibility test results; tests wait for the GPU");
+	{
+		long every = config_integer("debug.gpu_flush_draws");
+		const char *renderer = (const char *)glGetString(GL_RENDERER);
+
+		if (every < 0)
+			every = renderer && strstr(renderer, "Mesa Intel") ? 3 : 0;
+		if (every > 0)
+		{
+			device.flush_every = (unsigned long)every;
+			platform_log("GPU: a pipeline flush every %ld draws", every);
+		}
+	}
 #endif
 #ifdef HALO_ANDROID
 	if (xgpu_capabilities.atomic_counters)
@@ -1139,8 +1154,8 @@ HRESULT WINAPI Direct3D_CreateDevice(UINT adapter, D3DDEVTYPE device_type, void 
 #ifdef HALO_ANDROID
 int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
 {
-	(void)menus_active;
 	(void)pointer;
+	platform_menus_set_active(menus_active != 0);
 	return 0;
 }
 #else
@@ -1179,6 +1194,7 @@ int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
 {
 	struct platform_ui_pointer state;
 
+	platform_menus_set_active(menus_active != 0);
 	platform_ui_pointer_set_active(menus_active != 0);
 	if (!menus_active || !device.gl_ready || !platform_ui_pointer_read(&state))
 		return 0;
@@ -2476,6 +2492,25 @@ static void uniform_float(GLint location, float *shadow, float value)
 	glUniform1f(location, value);
 }
 
+/* Intel's graphics with Mesa's driver can hang the GPU in a long run of
+draws with no pipeline flush between them, which the game's effects make
+(hundreds of small draws in a row): the command streamer stops at a draw,
+and the reset that follows takes the desktop's other programs with it.
+Intel's workaround for a hang of this kind on their DG2 graphics
+(Wa_16014538804) is a flush at least every 3 draws, which Mesa does not
+apply to the others. A memory barrier is one (and only that: nothing
+here writes images). */
+static void draw_flush(void)
+{
+#ifndef HALO_ANDROID
+	if (device.flush_every && ++device.flush_draws >= device.flush_every)
+	{
+		device.flush_draws = 0;
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+	}
+#endif
+}
+
 static struct program_entry *prepare_draw(BOOL immediate)
 {
 	struct vertex_shader_object *program = current_program();
@@ -2545,6 +2580,7 @@ static struct program_entry *prepare_draw(BOOL immediate)
 		stats.immediate_draws++;
 	else
 		stats.draws++;
+	draw_flush();
 	state_program(entry->program);
 #ifdef HALO_ANDROID
 	if (key.count_samples)

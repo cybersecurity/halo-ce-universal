@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu\settings_select\player_setup\player_profile_edit\name_edit (tools/ce_menus.py) -->
+<menus>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/name_edit/header_profile_name" controller="1" left="35" top="11" width="346" height="59" bitmap="main_menu/settings_select/player_setup/player_profile_edit/name_edit/header_profile_name">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/name_edit/profile_name_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" auto_close="1" bitmap="bitmaps/gradient">
+		<on event="created" run="NULL"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/name_edit/header_profile_name"/>
+	</widget>
+</menus>

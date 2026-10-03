@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="64" viewBox="0 0 512 64">
+  <defs>
+    <filter id="soft" filterUnits="userSpaceOnUse" x="-60" y="-60" width="632" height="184">
+      <feGaussianBlur stdDeviation="14.23 13.06"/>
+    </filter>
+    <mask id="cut" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="64">
+      <rect width="512" height="59" fill="#fff"/>
+    </mask>
+  </defs>
+  <g mask="url(#cut)">
+    <rect x="29.08" y="28.05" width="234.01" height="40.95" fill="#021931" fill-opacity="0.893" filter="url(#soft)"/>
+  </g>
+</svg>

@@ -720,6 +720,15 @@ ULONG WINAPI IDirectSound_Release(LPDIRECTSOUND sound)
 
 VOID WINAPI DirectSoundDoWork(void)
 {
+	static unsigned long volume_read_at = (unsigned long)-1;
+
+	/* (audio.volume read again when Settings changes it: on the game's
+	thread, not the mixer's, whose lock the config's file I/O would hold) */
+	if (volume_read_at != config_changes())
+	{
+		volume_read_at = config_changes();
+		master_volume = (float)config_real("audio.volume");
+	}
 	streams_complete_finished();
 }
 

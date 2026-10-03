@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit (tools/ce_menus.py) -->
+<menus>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/edit_playlist_select_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_list_extended_desc">
+		<data input="playlist settings menu update desc"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_name_list_item"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_game_type_item"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_player_opts_item"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_items_list_item"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_vehicles_list_item"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_indicators_item"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_team_item"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_edit_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="created" run="close if not editing profile"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/header_edit_multiplayer_gametype"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/edit_playlist_select_list"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_label" x="294" y="360"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_label" type="text" controller="1" width="235" height="22" font="ui\large_ui" color="#FFFFFFFF">
+		<data input="get edit game settings name"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/header_edit_multiplayer_gametype" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/multiplayer_setup/playlist_edit/header_edit_multiplayer_gametype">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/header_set_options" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/header_rules">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_button_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mp profile save changes" open="error/warning_saving_file_screen"/>
+		<on event="start" run="mp profile save changes" open="error/warning_saving_file_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_ext_desc_pic" controller="1" left="290" top="80" width="284" height="208" bitmap="main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_ext_desc_text" type="text" controller="1" left="294" top="276" width="321" height="124" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_list_extended_dsc_text" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_game_type_item" type="text" left="51" top="111" width="232" height="32" bitmap="bitmaps/list_item_bkd" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_options" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_screen"/>
+		<on event="start" open="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_indicators_item" type="text" left="51" top="243" width="232" height="32" bitmap="bitmaps/list_item_bkd" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_options" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_screen"/>
+		<on event="start" open="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_items_list_item" type="text" left="51" top="177" width="232" height="32" bitmap="bitmaps/list_item_bkd" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_options" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_screen"/>
+		<on event="start" open="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_list_extended_desc" controller="1" left="275" top="78" width="320" height="322" bitmap="bitmaps/list_field" text_x="20" text_y="240">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_ext_desc_text"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_ext_desc_pic"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_name_list_item" type="text" left="51" top="78" width="232" height="32" bitmap="bitmaps/list_item_bkd_top" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_options" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" run="mp profile change name" open="main_menu/settings_select/multiplayer_setup/name_edit/gametype_name_screen"/>
+		<on event="start" run="mp profile change name" open="main_menu/settings_select/multiplayer_setup/name_edit/gametype_name_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_player_opts_item" type="text" left="51" top="144" width="232" height="32" bitmap="bitmaps/list_item_bkd" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_options" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/settings_select/multiplayer_setup/player_options_edit/player_options_screen"/>
+		<on event="start" open="main_menu/settings_select/multiplayer_setup/player_options_edit/player_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_team_item" type="text" left="51" top="276" width="232" height="32" bitmap="bitmaps/list_item_bkd" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_options" string_index="7" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_screen"/>
+		<on event="start" open="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_vehicles_list_item" type="text" left="51" top="210" width="232" height="32" bitmap="bitmaps/list_item_bkd" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_options" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/vehicle_options_screen"/>
+		<on event="start" open="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/vehicle_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+</menus>

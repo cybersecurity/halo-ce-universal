@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu\player_profiles_select (tools/ce_menus.py) -->
+<menus>
+	<widget name="main_menu/player_profiles_select/current_level" type="text" controller="1" width="150" height="50" string_list="main_menu/map_list" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/player_profiles_select/current_level_label" type="text" controller="1" width="150" height="25" string_list="main_menu/player_profiles_select/profile_description_labels" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/player_profiles_select/empty_profile_slot_text" type="text" controller="1" width="150" height="200" string_list="main_menu/player_profiles_select/profile_description_labels" string_index="4" font="ui\small_ui" color="#FF2896FF" align="center">
+	</widget>
+	<widget name="main_menu/player_profiles_select/header_select_profile" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/player_profiles_select/header_select_profile">
+	</widget>
+	<widget name="main_menu/player_profiles_select/joystick_controls" type="text" controller="1" width="150" height="25" string_list="main_menu/player_profiles_select/joystick_set_defaults_descriptions" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/player_profiles_select/joystick_controls_label" type="text" controller="1" width="150" height="25" string_list="main_menu/player_profiles_select/profile_description_labels" string_index="2" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/player_profiles_select/player_profile_right_data" controller="1" width="150" height="155">
+		<child widget="main_menu/player_profiles_select/empty_profile_slot_text"/>
+		<child widget="main_menu/player_profiles_select/current_level_label" y="89"/>
+		<child widget="main_menu/player_profiles_select/current_level" x="6" y="111"/>
+		<child widget="main_menu/player_profiles_select/skill_level_label" y="44"/>
+		<child widget="main_menu/player_profiles_select/skill_level" x="6" y="65"/>
+		<child widget="main_menu/player_profiles_select/joystick_controls_label"/>
+		<child widget="main_menu/player_profiles_select/joystick_controls" x="6" y="21"/>
+	</widget>
+	<widget name="main_menu/player_profiles_select/player_profile_right_item" controller="1" left="406" top="75" width="162" height="326" bitmap="bitmaps/spinner_list_3_wide_item_background">
+		<child widget="main_menu/player_profiles_select/player_profile_right_name" x="415" y="83"/>
+		<child widget="main_menu/multiplayer_type_select/connected/4way_profile_select/qtr_screen_profile_color_pic" x="438" y="82"/>
+		<child widget="main_menu/player_profiles_select/player_profile_right_data" x="416" y="242"/>
+	</widget>
+	<widget name="main_menu/player_profiles_select/player_profile_right_name" type="text" controller="1" width="147" height="22" font="ui\large_ui" color="#FF2896FF" align="center">
+	</widget>
+	<widget name="main_menu/player_profiles_select/skill_level" type="text" controller="1" width="150" height="25" string_list="main_menu/player_profiles_select/difficulty_names" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/player_profiles_select/skill_level_label" type="text" controller="1" width="150" height="25" string_list="main_menu/player_profiles_select/profile_description_labels" string_index="1" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+</menus>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's multiplayer screens, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/op_map_weapons" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/map_weapons_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/map_weapons_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/map_weapons_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels" string_index="8" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/map_weapons_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/item_options_edit/var_map_weapons" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/op_loadout" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/loadout_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/loadout_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/loadout_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/loadout_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/item_options_edit/var_loadout" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/op_primary_weapon" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/primary_weapon_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/primary_weapon_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/primary_weapon_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/primary_weapon_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/item_options_edit/var_loadout_weapon" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/op_secondary_weapon" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/secondary_weapon_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/secondary_weapon_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/secondary_weapon_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels" string_index="7" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/secondary_weapon_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/item_options_edit/var_loadout_weapon" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/var_map_weapons">
+		<string text="YES"/>
+		<string text="NO"/>
+	</strings>
+	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/var_loadout">
+		<string text="CATEGORY"/>
+		<string text="CUSTOM"/>
+	</strings>
+	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/var_loadout_weapon">
+		<string text="NONE"/>
+		<string text="RANDOM"/>
+		<string text="ASSAULT RIFLE"/>
+		<string text="PISTOL"/>
+		<string text="SHOTGUN"/>
+		<string text="SNIPER RIFLE"/>
+		<string text="ROCKET LAUNCHER"/>
+		<string text="PLASMA PISTOL"/>
+		<string text="PLASMA RIFLE"/>
+		<string text="NEEDLER"/>
+	</strings>
+</menus>

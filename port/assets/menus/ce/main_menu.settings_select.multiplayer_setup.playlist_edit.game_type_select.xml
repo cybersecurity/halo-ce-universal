@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\game_type_select (tools/ce_menus.py) -->
+<menus>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="common_button_back" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_ctf_item" type="text" left="51" top="78" width="232" height="32" bitmap="bitmaps/list_item_bkd_top" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_options" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" run="mp profile set game engine" open="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_options_screen"/>
+		<on event="start" run="mp profile set game engine" open="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_koth_item" type="text" left="51" top="111" width="232" height="32" bitmap="bitmaps/list_item_bkd" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_options" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" run="mp profile set game engine" open="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_options_screen"/>
+		<on event="start" run="mp profile set game engine" open="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items" description="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_ext_desc">
+		<data input="gametype select menu update desc"/>
+		<on event="created" run="mp profile init game engine"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_ctf_item"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_koth_item"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_slayer_item"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_oddball_item"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_race_item"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_ext_desc" controller="1" left="275" top="78" width="320" height="322" bitmap="bitmaps/list_field">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/rules_list_ext_desc_text" y="-22"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/rules_list_ext_desc_pic" x="20"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_oddball_item" type="text" left="51" top="177" width="232" height="32" bitmap="bitmaps/list_item_bkd" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_options" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" run="mp profile set game engine" open="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/oddball_options_screen"/>
+		<on event="start" run="mp profile set game engine" open="main_menu/settings_select/multiplayer_setup/playlist_edit/oddball_edit/oddball_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_race_item" type="text" left="51" top="210" width="232" height="32" bitmap="bitmaps/list_item_bkd" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_options" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" run="mp profile set game engine" open="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/race_options_screen"/>
+		<on event="start" run="mp profile set game engine" open="main_menu/settings_select/multiplayer_setup/playlist_edit/race_edit/race_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="created" run="mp type menu initialize"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/header_set_options"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/rules_label" x="296" y="362"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_slayer_item" type="text" left="51" top="144" width="232" height="32" bitmap="bitmaps/list_item_bkd" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_options" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" run="mp profile set game engine" open="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_options_screen"/>
+		<on event="start" run="mp profile set game engine" open="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/header_rules" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/multiplayer_setup/playlist_edit/header_set_options">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/rules_label" type="text" controller="1" width="275" height="22" string_list="multiplayer_game_text" font="ui\large_ui" color="#FFFFFFFF">
+		<data input="mp edit profile set rule text"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/rules_list_ext_desc_pic" controller="1" left="285" top="95" width="256" height="250" bitmap="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/rules_options">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/rules_list_ext_desc_text" type="text" controller="1" left="295" top="298" width="300" height="102" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_list_extended_dsc_text" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+</menus>

@@ -421,6 +421,15 @@ void players_debug_render(
 void debug_player_teleport(
 	short player_index,
 	short location_index);
+/* port: player names the host's ban command can always name */
+char player_name_character_ascii(
+	wchar_t character);
+boolean player_name_clean(
+	wchar_t *name,
+	long count);
+boolean player_name_valid(
+	wchar_t const *name,
+	long count);
 
 /* ---------- globals */
 

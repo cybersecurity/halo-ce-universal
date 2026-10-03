@@ -37,6 +37,16 @@ long playlist_profile_new(
 void playlist_profile_save(
 	long playlist_profile_index,
 	struct game_variant *variant);
+/* port: a gametype's PC options (game_engine.h), and a gametype saved with
+them */
+struct game_variant_options;
+boolean playlist_profile_get_options(
+	long playlist_profile_index,
+	struct game_variant_options *options);
+void playlist_profile_save_with_options(
+	long playlist_profile_index,
+	struct game_variant *variant,
+	struct game_variant_options const *options);
 void playlist_profile_delete(
 	long playlist_profile_index);
 boolean playlist_profile_get_from_path(

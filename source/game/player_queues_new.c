@@ -137,7 +137,9 @@ enum
 		FLAG(_unit_control_integrated_light_bit) |
 		FLAG(_unit_control_action_bit) |
 		FLAG(_unit_control_use_equipment_bit) |
-		FLAG(_unit_control_weapon_reload_bit),
+		FLAG(_unit_control_weapon_reload_bit) |
+		/* port: latched with the action it goes with (units.h) */
+		FLAG(UNIT_CONTROL_PORT_ACTION_ONLY_BIT),
 };
 
 /* ---------- macros */
@@ -354,11 +356,36 @@ void update_server_start(
 	return;
 }
 
+/* port: a player's queue is at its player's index, and the slot of a player
+who left the game is reused (network_game_spawn_player): that player's queue
+goes first, which datum_new_at_index would find in the way. The same player
+added again keeps its queue. TRUE when the slot is the player's already */
+static boolean update_queue_make_room(
+	struct data_array *queues,
+	long player_index)
+{
+	short absolute_index = (short)player_index;
+	struct datum_header *header;
+
+	if (absolute_index < 0 || absolute_index >= queues->maximum_count)
+		return FALSE;
+	header = (struct datum_header *)((byte *)queues->data + queues->size * absolute_index);
+	if (!header->identifier)
+		return FALSE;
+	if (header->identifier == (short)(player_index >> 16))
+		return TRUE;
+	datum_delete(queues, (long)header->identifier << 16 | (unsigned short)absolute_index);
+
+	return FALSE;
+}
+
 void update_server_add_player(
 	long player_index)
 {
 	long queue_index;
 
+	if (update_queue_make_room(update_server_globals.queues, player_index))
+		return;
 	queue_index = datum_new_at_index(update_server_globals.queues, player_index);
 	match_assert(
 		"c:\\halo\\SOURCE\\game\\player_queues_new.c",
@@ -556,6 +583,8 @@ void update_client_add_player(
 {
 	long queue_index;
 
+	if (update_queue_make_room(update_client_globals.queues, player_index))
+		return;
 	queue_index = datum_new_at_index(update_client_globals.queues, player_index);
 	match_assert(
 		"c:\\halo\\SOURCE\\game\\player_queues_new.c",

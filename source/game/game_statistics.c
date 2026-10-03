@@ -94,6 +94,11 @@ void game_statistics_record_kill(
 		long dead_player_index = player_index_from_unit_index(dead_unit_index);
 		long statistic_index;
 
+		/* port: a unit keeps its attackers' player indices, and a player who
+		has left the game since has no player (a NULL from player_get) */
+		if (killing_player_index != NONE && !player_try_and_get(killing_player_index))
+			killing_player_index = NONE;
+
 		/* only player victims are tallied (NONE otherwise); the later HCEA build
 		   still indexes kills[] and assists[] through this NONE-or-zero value */
 		if (dead_player_index == NONE)
@@ -161,7 +166,9 @@ void game_statistics_record_kill(
 			if (best_attacker_index == NONE)
 				best_attacker_index = killer_attacker_index;
 
-			if (best_attacker_index != NONE)
+			if (best_attacker_index != NONE &&
+				(dead_unit->unit.attackers[best_attacker_index].player_index == NONE ||
+				player_try_and_get(dead_unit->unit.attackers[best_attacker_index].player_index)))
 			{
 				credited_player_index =
 					dead_unit->unit.attackers[best_attacker_index].player_index;
@@ -206,9 +213,9 @@ void game_statistics_record_kill(
 						attacker->player_index != NONE &&
 						attacker->player_index != credited_player_index)
 					{
-						struct player_datum *assisting_player = player_get(attacker->player_index);
+						struct player_datum *assisting_player = player_try_and_get(attacker->player_index);
 
-						if (game_team_is_enemy(dead_team_index, (short)assisting_player->team_index))
+						if (assisting_player && game_team_is_enemy(dead_team_index, (short)assisting_player->team_index))
 							assisting_player->statistics.assists[statistic_index]++;
 					}
 				}

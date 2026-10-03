@@ -16,6 +16,7 @@ memory_watch.c detects that by write-protecting the pages.
 
 #include "xgpu.h"
 #include "hud_hires.h"
+#include "menu_files.h"
 #include "text_hires.h"
 #include "port_config.h"
 
@@ -712,6 +713,18 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 		{
 			description->levels = 1;
 			return atlas;
+		}
+	}
+	/* (a menu's bitmap: menu_files.h) */
+	{
+		unsigned long levels;
+		GLuint art = menu_art_texture(entry->data, &levels);
+
+		if (art)
+		{
+			description->levels = levels;
+			description->hires = TRUE;
+			return art;
 		}
 	}
 	if (entry->override >= 0)

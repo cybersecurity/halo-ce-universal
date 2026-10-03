@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="32" viewBox="0 0 256 32">
+  <!-- rounded panel with 2px blue outline -->
+  <path d="M10,0 H246 A10,10 0 0 1 256,10 V18 A10,10 0 0 1 246,28 H10 A10,10 0 0 1 0,18 V10 A10,10 0 0 1 10,0 Z" fill="#002244"/>
+  <rect x="1" y="1" width="254" height="26" rx="9" fill="none" stroke="#2299ff" stroke-width="2"/>
+</svg>

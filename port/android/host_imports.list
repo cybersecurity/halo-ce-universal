@@ -39,6 +39,8 @@ host_sdl_gamepad_axis
 host_sdl_gamepad_button
 host_sdl_gamepad_type
 host_sdl_rumble_gamepad
+host_sdl_scancode_name
+host_sdl_scancode_from_name
 host_sdl_open_audio_stream
 host_sdl_put_audio_stream_data
 host_sdl_resume_audio_stream_device

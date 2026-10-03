@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's multiplayer screens, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/multiplayer_type_select/join_game/header_server_browser" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/multiplayer_type_select/join_game/header_server_browser">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/join_game/header_direct_link" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/multiplayer_type_select/join_game/header_direct_link">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/join_game/button_clipboard" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="PASTE LINK" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="direct ip connect go"/>
+		<on event="start" run="direct ip connect go"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+</menus>

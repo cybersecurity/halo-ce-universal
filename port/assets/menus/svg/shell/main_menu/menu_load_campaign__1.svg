@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="256" height="64" viewBox="0 0 256 64">
+  <defs>
+    <path id="gA" d="M8.77,0L14.11,0L22.88,21.5L18.21,21.5L16.04,16.18L6.84,16.18L4.66,21.5L0,21.5ZM8.36,12.44L14.52,12.44L11.44,4.9Z"/>
+    <path id="gC" d="M0,8.47C0,3.79 3.79,0 8.47,0L17.81,0L17.81,3.85L9.66,3.85C7.12,3.85 5.07,5.9 5.07,8.43L5.07,13.07C5.07,15.6 7.12,17.66 9.66,17.66L17.81,17.66L17.81,21.5L8.47,21.5C3.79,21.5 0,17.71 0,13.03Z"/>
+    <path id="gG" d="M0,8.45C0,3.78 3.78,0 8.45,0L20.01,0L20.01,3.85L10.12,3.85C7.16,3.85 4.77,6.24 4.77,9.2L4.77,12.3C4.77,15.26 7.16,17.65 10.12,17.65L15.25,17.65L15.25,12.54L9.09,12.54L9.09,8.83L20.01,8.83L20.01,21.27C20.01,21.4 19.91,21.5 19.79,21.5L8.45,21.5C3.78,21.5 0,17.72 0,13.05Z"/>
+    <path id="gI" d="M0,0L4.7,0L4.7,21.5L0,21.5Z"/>
+    <path id="gM" d="M0,0L6.86,0L12.21,16.25L17.56,0L24.43,0L24.43,21.5L19.96,21.5L19.96,5.76L14.69,21.5L9.73,21.5L4.46,5.76L4.46,21.5L0,21.5Z"/>
+    <path id="gN" d="M0,0L5.55,0L14.61,15L14.61,0L19.19,0L19.19,21.5L13.64,21.5L4.57,5.65L4.57,21.5L0,21.5Z"/>
+    <path id="gP" d="M0,0L13.22,0C16.59,0 19.32,2.73 19.32,6.09L19.32,7.84C19.32,11.22 16.57,13.97 13.18,13.97L4.7,13.97L4.7,21.5L0,21.5ZM4.7,10.14L10.97,10.14C12.98,10.14 14.62,8.5 14.62,6.49L14.62,7.48C14.62,5.47 12.98,3.83 10.97,3.83L4.7,3.83Z"/>
+    <filter id="glow" filterUnits="userSpaceOnUse" x="0" y="0" width="256" height="64">
+      <feGaussianBlur stdDeviation="2.19"/>
+    </filter>
+  </defs>
+  <!-- "CAMPAIGN" (highlighted: white with blue glow) -->
+  <g fill="#2895ff" stroke="#2895ff" stroke-width="6.3" stroke-linejoin="round" opacity="0.650" filter="url(#glow)">
+    <use href="#gC" transform="translate(55.75,6.57) scale(0.9037)"/>
+    <use href="#gA" transform="translate(71.77,6.57) scale(0.9037)"/>
+    <use href="#gM" transform="translate(93.77,6.57) scale(0.9037)"/>
+    <use href="#gP" transform="translate(119.84,6.57) scale(0.9037)"/>
+    <use href="#gA" transform="translate(135.27,6.57) scale(0.9037)"/>
+    <use href="#gI" transform="translate(157.37,6.57) scale(0.9037)"/>
+    <use href="#gG" transform="translate(164.75,6.57) scale(0.9037)"/>
+    <use href="#gN" transform="translate(185.9,6.57) scale(0.9037)"/>
+  </g>
+  <g id="text" fill="#fff">
+    <use href="#gC" transform="translate(55.75,6.57) scale(0.9037)"/>
+    <use href="#gA" transform="translate(71.77,6.57) scale(0.9037)"/>
+    <use href="#gM" transform="translate(93.77,6.57) scale(0.9037)"/>
+    <use href="#gP" transform="translate(119.84,6.57) scale(0.9037)"/>
+    <use href="#gA" transform="translate(135.27,6.57) scale(0.9037)"/>
+    <use href="#gI" transform="translate(157.37,6.57) scale(0.9037)"/>
+    <use href="#gG" transform="translate(164.75,6.57) scale(0.9037)"/>
+    <use href="#gN" transform="translate(185.9,6.57) scale(0.9037)"/>
+  </g>
+</svg>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu (tools/ce_menus.py) -->
+<menus root="main_menu/main_menu">
+	<widget name="main_menu/blueline" controller="1" width="192" height="2" bitmap="bitmaps/blue">
+	</widget>
+	<widget name="main_menu/build_number" type="text" controller="1" width="150" height="20" font="ui\small_ui" color="#FFFF8000">
+		<data input="build number textbox only"/>
+	</widget>
+	<widget name="main_menu/current_profile_name" type="text" controller="1" left="10" top="446" width="340" height="34" font="ui\large_ui" color="#FFCCCCCC">
+	</widget>
+	<widget name="main_menu/halo_logo" controller="1" width="640" height="256" bitmap="ui\shell\main_menu\halo_logo">
+	</widget>
+	<widget name="main_menu/main_menu" width="640" height="480" flags="pass_unhandled_to_focused_child">
+		<on event="created" run="main menu intialize" label="ring_loop"/>
+		<on event="back" open="main_menu/quit_select/quit_screen"/>
+		<on event="b" open="main_menu/quit_select/quit_screen"/>
+		<child widget="main_menu/halo_logo" y="28"/>
+		<child widget="main_menu/main_menu_select_list"/>
+		<child widget="main_menu/build_number" x="450" y="400"/>
+	</widget>
+	<widget name="main_menu/main_menu_item_load_camp" type="text" width="256" height="33" bitmap="main_menu/menu_load_campaign" string_list="main_menu/main_menu_options" string_index="1" font="ui\small_ui" color="#000080FF">
+		<on event="a" run="new game if no plyr profiles" label="load_campaign" open="main_menu/campaign_select/campaign_menu" branch="true"/>
+		<on event="start" run="new game if no plyr profiles" label="load_campaign" open="main_menu/campaign_select/campaign_menu" branch="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<conditional widget="main_menu/new_campaign_creating_profile" if_failed="true"/>
+	</widget>
+	<widget name="main_menu/main_menu_item_multiplayer" type="text" width="256" height="33" bitmap="main_menu/menu_multiplayer" string_list="main_menu/main_menu_options" string_index="2" font="ui\small_ui" color="#000080FF">
+		<on event="a" run="new game if no plyr profiles" open="main_menu/multiplayer_type_select/multiplayer_type_select_screen" branch="true"/>
+		<on event="start" run="new game if no plyr profiles" open="main_menu/multiplayer_type_select/multiplayer_type_select_screen" branch="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<conditional widget="main_menu/profile_manager/multiplayer_creating_profile" if_failed="true"/>
+	</widget>
+	<widget name="main_menu/main_menu_item_profile" type="text" width="256" height="33" bitmap="main_menu/menu_profile" string_list="main_menu/main_menu_options" string_index="2" font="ui\small_ui" color="#000080FF">
+		<on event="a" run="new game if no plyr profiles" open="main_menu/profile_manager/player_profile_manager" branch="true"/>
+		<on event="start" run="new game if no plyr profiles" open="main_menu/multiplayer_type_select/multiplayer_type_select_screen" branch="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<conditional widget="main_menu/profile_manager/pm_entry_creating_profile" if_failed="true"/>
+	</widget>
+	<widget name="main_menu/main_menu_item_quit_game" type="text" width="256" height="33" bitmap="main_menu/menu_quit">
+		<on event="start" open="main_menu/quit_select/quit_screen"/>
+		<on event="a" open="main_menu/quit_select/quit_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/main_menu_item_settings" type="text" width="256" height="33" bitmap="main_menu/menu_settings" string_list="main_menu/main_menu_options" string_index="3" font="ui\small_ui" color="#000080FF">
+		<on event="a" run="profile set edit begin" label="settings" open="main_menu/settings_select/player_setup/player_profile_edit/player_profile_edit_screen" branch="true"/>
+		<on event="start" run="profile set edit begin" label="settings" open="main_menu/settings_select/player_setup/player_profile_edit/player_profile_edit_screen" branch="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<conditional widget="main_menu/profile_manager/settings_creating_profile" if_failed="true"/>
+	</widget>
+	<widget name="main_menu/main_menu_list_ext_desc" controller="1" left="-1" top="-1" width="1" height="1" bitmap="bitmaps/white" color="#FF0080FF">
+	</widget>
+	<widget name="main_menu/main_menu_select_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items" description="main_menu/main_menu_list_ext_desc">
+		<data input="main menu fake animate"/>
+		<on event="down"/>
+		<child widget="main_menu/main_menu_item_load_camp" x="194" y="247"/>
+		<child widget="main_menu/main_menu_item_multiplayer" x="192" y="283"/>
+		<child widget="main_menu/main_menu_item_profile" x="192" y="319"/>
+		<child widget="main_menu/main_menu_item_settings" x="192" y="355"/>
+		<child widget="main_menu/main_menu_item_quit_game" x="192" y="391"/>
+	</widget>
+	<widget name="main_menu/new_campaign_creating_profile" width="640" height="480" flags="pass_unhandled_to_focused_child no_history" auto_close="1">
+		<on event="deleted" run="new campaign decision" open="main_menu/new_campaign_saving_profile"/>
+	</widget>
+	<widget name="main_menu/new_campaign_saving_profile" width="640" height="480" flags="pass_unhandled_to_focused_child no_history" auto_close="3000" auto_close_fade="1000">
+		<on event="b" run="NULL"/>
+		<on event="back" run="NULL"/>
+		<on event="deleted" run="NULL" open="main_menu/difficulty_select/difficulty_select_list_screen"/>
+		<child widget="error/warning_creating_player_profile_screen"/>
+	</widget>
+</menus>

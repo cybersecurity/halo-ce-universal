@@ -39,6 +39,19 @@ const char *SDL_GetError(void)
 	return buffer;
 }
 
+const char *SDL_GetScancodeName(SDL_Scancode scancode)
+{
+	static __thread char buffer[64];
+
+	host_sdl_scancode_name((int)scancode, buffer, sizeof(buffer));
+	return buffer;
+}
+
+SDL_Scancode SDL_GetScancodeFromName(const char *name)
+{
+	return (SDL_Scancode)host_sdl_scancode_from_name(name);
+}
+
 Uint64 SDL_GetTicks(void)
 {
 	return (Uint64)host_sdl_ticks();

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="32" viewBox="0 0 64 32">
+  <!-- server list column header: 2px top/bottom, 1px side border -->
+  <rect x="0" y="0" width="64" height="18" fill="#eff7ff"/>
+  <rect x="1" y="2" width="62" height="14" fill="#004a84"/>
+</svg>

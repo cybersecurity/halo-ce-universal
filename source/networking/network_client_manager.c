@@ -3012,6 +3012,18 @@ boolean network_game_client_advertised_game_compatible(
 	return FALSE;
 }
 
+/* port: whether the advertised game is under way (HALO_PORT_ADVERTISED_IN_PROGRESS_FLAG),
+not in its lobby */
+boolean network_game_client_advertised_game_in_progress(
+	struct network_game_client *client,
+	struct network_advertised_game const *game)
+{
+	long game_index = client ? game - client->available_games : NONE;
+
+	return game_index >= 0 && game_index < MAXIMUM_NETWORK_ADVERTISED_GAMES &&
+		(network_game_client_advertised_versions[game_index].flags & HALO_PORT_ADVERTISED_IN_PROGRESS_FLAG) != 0;
+}
+
 boolean network_game_client_join_first_available_game(
 	void)
 {

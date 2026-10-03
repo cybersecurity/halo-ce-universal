@@ -33,12 +33,46 @@ static struct platform_input_state input_state;
 /* keys pressed since the last read, so a press and release between two
 reads still counts as a press (input injected on Android, or a slow frame) */
 static unsigned char keys_pressed[SDL_SCANCODE_COUNT];
+/* likewise the mouse buttons pressed since the last read, so that a click
+quicker than a frame still counts */
+static unsigned char mouse_buttons_pressed[PLATFORM_MOUSE_BUTTON_COUNT];
 #ifndef HALO_ANDROID
 /* the menus' pointer (platform_ui_pointer_set_active), under input_lock */
 static struct platform_ui_pointer ui_pointer;
 static float ui_pointer_wheel;
 #endif
 static pthread_mutex_t input_lock = PTHREAD_MUTEX_INITIALIZER;
+/* rebinding (platform_binding_capture_begin), under input_lock: waiting for
+an input, and the one taken; then the keyboard and mouse settle (their keys
+and buttons held then are let go) before they drive anything again */
+enum
+{
+	_binding_capture_idle,
+	_binding_capture_waiting,
+	_binding_capture_taken,
+};
+static int binding_capture;
+static int binding_capture_result;
+static int binding_captured_input;
+static BOOL binding_settling;
+static Uint64 binding_taken_ms;
+/* when the menus last asked (a capture they stop asking about, their screen
+gone, ends: else the keyboard stays held from the game) */
+static Uint64 binding_polled_ms;
+#define BINDING_ABANDONED_MS 500
+static unsigned mouse_buttons_down;
+/* (an input taken that nothing asks for is let go after this) */
+#define BINDING_UNCLAIMED_MS 2000
+/* the multiplayer scoreboard is open (platform_scoreboard_scroll): the wheel
+and Page Up/Down scroll it, and the wheel switches no weapon; how far they
+have moved it since the game last asked (notches down, pages down). Open
+until the game stops saying so for SCOREBOARD_OPEN_MS (a game that ends with
+it open never says it closed). */
+#define SCOREBOARD_OPEN_MS 250
+static Uint64 scoreboard_open_until_ms;
+static float scoreboard_wheel;
+static long scoreboard_notches;
+static long scoreboard_pages;
 
 /* debug keyboard queue */
 #define KEYSTROKE_QUEUE_SIZE 64
@@ -303,19 +337,63 @@ BOOL platform_offer_game_data(const char *destination)
 
 int halo_interpolation_enabled(void)
 {
-	static int enabled = -1;
+	static int enabled;
+	static unsigned long read_at = (unsigned long)-1;
 
-	if (enabled < 0)
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
 		enabled = config_boolean("display.interpolation");
+	}
 	return enabled;
 }
 
 #ifndef HALO_ANDROID
-/* whether the window opens fullscreen (display.fullscreen), never when it
-is hidden */
+/* the display mode (display.mode, else display.fullscreen's: borderless or
+the window) */
+enum
+{
+	_display_mode_windowed = 0,
+	_display_mode_borderless,
+	_display_mode_fullscreen
+};
+
+static int platform_display_mode(void)
+{
+	const char *mode = config_string("display.mode");
+
+	if (!strcmp(mode, "fullscreen"))
+		return _display_mode_fullscreen;
+	if (!strcmp(mode, "borderless"))
+		return _display_mode_borderless;
+	if (!strcmp(mode, "windowed"))
+		return _display_mode_windowed;
+	return config_boolean("display.fullscreen") ? _display_mode_borderless : _display_mode_windowed;
+}
+
+/* whether the window opens fullscreen (either kind), never when it is
+hidden */
 static BOOL platform_fullscreen_setting(void)
 {
-	return !config_boolean("debug.hidden_window") && config_boolean("display.fullscreen");
+	return !config_boolean("debug.hidden_window") && platform_display_mode() != _display_mode_windowed;
+}
+
+/* the window's fullscreen kind (display.mode): borderless, a window over
+the whole desktop (SDL's fullscreen without a mode), or fullscreen, the
+display taken at its desktop resolution. Either draws at the display's
+resolution (platform_screen_mode); F11 switches to the kind set. */
+static void platform_fullscreen_kind_apply(void)
+{
+	static int applied = -1;
+	int exclusive = platform_display_mode() == _display_mode_fullscreen ? 1 : 0;
+	SDL_DisplayID display;
+
+	if (!platform_window || exclusive == applied)
+		return;
+	applied = exclusive;
+	display = SDL_GetDisplayForWindow(platform_window);
+	SDL_SetWindowFullscreenMode(platform_window,
+		exclusive && display ? SDL_GetDesktopDisplayMode(display) : NULL);
 }
 
 /* whether the game is, or is to be, fullscreen, and if so the size in
@@ -340,6 +418,10 @@ BOOL platform_screen_mode(long *width, long *height)
 }
 
 #endif
+/* the window's scale (display.window_scale, as the window was made or last
+resized: platform_display_apply) */
+static long platform_window_scale = -1;
+
 BOOL platform_video_initialize(unsigned long width, unsigned long height)
 {
 	int scale = (int)config_integer("display.window_scale");
@@ -351,6 +433,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		return FALSE;
 	if (scale < 1)
 		scale = 1;
+	platform_window_scale = scale;
 
 #ifdef HALO_ANDROID
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
@@ -392,6 +475,9 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		platform_log("SDL_CreateWindow failed: %s", SDL_GetError());
 		return FALSE;
 	}
+#ifndef HALO_ANDROID
+	platform_fullscreen_kind_apply();
+#endif
 	platform_gl_context = SDL_GL_CreateContext(platform_window);
 #ifdef HALO_ANDROID
 	/* ES 3.2 where the driver has it, otherwise the renderer makes do with
@@ -420,14 +506,89 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	return TRUE;
 }
 
+/* display.fullscreen, display.window_scale (when it changes: the window can
+be resized) and display.vsync, as Settings has written them */
+void platform_display_apply(void)
+{
+#ifndef HALO_ANDROID
+	BOOL fullscreen = platform_fullscreen_setting();
+	long scale = config_integer("display.window_scale");
+
+	if (!platform_window)
+		return;
+	platform_fullscreen_kind_apply();
+	if (((SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) != 0) != (fullscreen != FALSE))
+		SDL_SetWindowFullscreen(platform_window, fullscreen ? true : false);
+	if (scale != platform_window_scale && scale >= 1)
+	{
+		platform_window_scale = scale;
+		SDL_SetWindowSize(platform_window, (int)(640 * scale), (int)(480 * scale));
+	}
+#else
+	if (!platform_window)
+		return;
+#endif
+	SDL_GL_SetSwapInterval(config_boolean("display.vsync") ? 1 : 0);
+}
+
 void platform_video_drawable_size(int *width, int *height)
 {
 	SDL_GetWindowSizeInPixels(platform_window, width, height);
 }
 
+#ifndef HALO_ANDROID
+/* with vsync off, the time between frames display.max_fps asks for (0:
+twice the display's refresh rate), or 0 for no limit. A GPU never left idle
+can hang (Intel's Raptor Lake graphics, whose reset then takes the desktop
+with it); the limit gives it a rest every frame. */
+static Uint64 frame_interval_ns(void)
+{
+	static int vsync;
+	static long maximum;
+	static unsigned long read_at = (unsigned long)-1;
+	float rate;
+
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
+		vsync = config_boolean("display.vsync");
+		maximum = config_integer("display.max_fps");
+	}
+	if (vsync || maximum < 0)
+		return 0;
+	rate = (float)maximum;
+	if (!maximum)
+	{
+		SDL_DisplayID display = SDL_GetDisplayForWindow(platform_window);
+		const SDL_DisplayMode *mode = display ? SDL_GetCurrentDisplayMode(display) : NULL;
+
+		rate = 2.0f * (mode && mode->refresh_rate > 0.0f ? mode->refresh_rate : 60.0f);
+	}
+	return (Uint64)(1e9f / rate);
+}
+
+#endif
 void platform_video_swap(void)
 {
+#ifndef HALO_ANDROID
+	static Uint64 next_frame;
+	Uint64 interval, now;
+
+#endif
 	SDL_GL_SwapWindow(platform_window);
+#ifndef HALO_ANDROID
+	interval = frame_interval_ns();
+	if (!interval)
+		return;
+	now = SDL_GetTicksNS();
+	if (next_frame > now)
+	{
+		SDL_DelayPrecise(next_frame - now);
+		now = next_frame;
+	}
+	/* (a frame more than an interval late starts the count again) */
+	next_frame = now - next_frame > interval ? now + interval : next_frame + interval;
+#endif
 }
 
 void platform_mouse_capture(BOOL capture)
@@ -608,6 +769,23 @@ static BOOL platform_text_has_invite_link(const char *text)
 	return FALSE;
 }
 
+/* the clipboard's text (the menus' text fields' Ctrl+V), and text put on it
+(the server settings' invite link); 0 if there is none. The main thread's */
+int platform_clipboard_get(char *text, int size)
+{
+	char *clipboard = SDL_GetClipboardText();
+	int got = clipboard && *clipboard;
+
+	snprintf(text, (size_t)size, "%s", got ? clipboard : "");
+	SDL_free(clipboard);
+	return got;
+}
+
+void platform_clipboard_set(const char *text)
+{
+	SDL_SetClipboardText(text);
+}
+
 /* puts a new invite on the clipboard, and joins one found there when the
 game comes to the front */
 static void platform_invite_clipboard(BOOL look)
@@ -701,6 +879,41 @@ static void platform_show_pending_message(void)
 
 /* ---------- events */
 
+/* quits as closing the window does, when the events are next read (the
+menus' Quit: port/linux/game/menu_functions.c); Android's menus have none,
+as the system closes its apps */
+void platform_request_quit(void)
+{
+#ifndef HALO_ANDROID
+	SDL_Event event;
+
+	memset(&event, 0, sizeof(event));
+	event.type = SDL_EVENT_QUIT;
+	SDL_PushEvent(&event);
+#endif
+}
+
+void platform_scoreboard_scroll(int open, long *notches, long *pages)
+{
+	Uint64 now = SDL_GetTicks();
+
+	pthread_mutex_lock(&input_lock);
+	if (!open || now >= scoreboard_open_until_ms)
+	{
+		scoreboard_wheel = 0.0f;
+		scoreboard_notches = 0;
+		scoreboard_pages = 0;
+	}
+	scoreboard_open_until_ms = open ? now + SCOREBOARD_OPEN_MS : 0;
+	if (notches)
+		*notches = scoreboard_notches;
+	if (pages)
+		*pages = scoreboard_pages;
+	scoreboard_notches = 0;
+	scoreboard_pages = 0;
+	pthread_mutex_unlock(&input_lock);
+}
+
 void platform_pump_events(void)
 {
 	/* debug.exit_after (seconds) ends the game that long after the window
@@ -744,7 +957,22 @@ void platform_pump_events(void)
 				if (event.key.down)
 					keys_pressed[event.key.scancode] = 1;
 			}
+			if (binding_capture == _binding_capture_waiting && event.key.down && !event.key.repeat &&
+				event.key.scancode != SDL_SCANCODE_F11 && event.key.scancode != SDL_SCANCODE_F12)
+			{
+				binding_capture = _binding_capture_taken;
+				binding_taken_ms = SDL_GetTicks();
+				binding_capture_result = event.key.scancode == SDL_SCANCODE_ESCAPE ? 3 :
+					event.key.scancode == SDL_SCANCODE_DELETE ? 2 : 1;
+				binding_captured_input = event.key.scancode;
+				break;
+			}
 			queue_keystroke(&event.key);
+			if (SDL_GetTicks() < scoreboard_open_until_ms && event.key.down &&
+				(event.key.scancode == SDL_SCANCODE_PAGEUP || event.key.scancode == SDL_SCANCODE_PAGEDOWN))
+			{
+				scoreboard_pages += event.key.scancode == SDL_SCANCODE_PAGEDOWN ? 1 : -1;
+			}
 			/* F12 releases or recaptures the mouse */
 			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F12)
 			{
@@ -777,6 +1005,22 @@ void platform_pump_events(void)
 			break;
 		case SDL_EVENT_MOUSE_BUTTON_DOWN:
 		case SDL_EVENT_MOUSE_BUTTON_UP:
+			if (event.button.button < 32)
+			{
+				if (event.button.down)
+					mouse_buttons_down |= 1u << event.button.button;
+				else
+					mouse_buttons_down &= ~(1u << event.button.button);
+			}
+			if (binding_capture == _binding_capture_waiting && event.button.down &&
+				event.button.button < PLATFORM_MOUSE_BUTTON_COUNT)
+			{
+				binding_capture = _binding_capture_taken;
+				binding_taken_ms = SDL_GetTicks();
+				binding_capture_result = 1;
+				binding_captured_input = INPUT_MOUSE + event.button.button;
+				break;
+			}
 #ifndef HALO_ANDROID
 			/* clicks in the menus go to the pointer; a button held down
 			when the menu closes stays up until pressed again, so the click
@@ -797,9 +1041,37 @@ void platform_pump_events(void)
 			}
 #endif
 			if (event.button.button < PLATFORM_MOUSE_BUTTON_COUNT)
+			{
 				input_state.mouse_buttons[event.button.button] = event.button.down;
+				if (event.button.down)
+					mouse_buttons_pressed[event.button.button] = 1;
+			}
 			break;
 		case SDL_EVENT_MOUSE_WHEEL:
+			if (binding_capture == _binding_capture_waiting && event.wheel.y != 0.0f)
+			{
+				binding_capture = _binding_capture_taken;
+				binding_taken_ms = SDL_GetTicks();
+				binding_capture_result = 1;
+				binding_captured_input = event.wheel.y > 0.0f ? INPUT_WHEEL_UP : INPUT_WHEEL_DOWN;
+				break;
+			}
+			if (SDL_GetTicks() < scoreboard_open_until_ms)
+			{
+				/* whole notches, up (away) scrolling up */
+				scoreboard_wheel -= event.wheel.y;
+				while (scoreboard_wheel >= 1.0f)
+				{
+					scoreboard_notches++;
+					scoreboard_wheel -= 1.0f;
+				}
+				while (scoreboard_wheel <= -1.0f)
+				{
+					scoreboard_notches--;
+					scoreboard_wheel += 1.0f;
+				}
+				break;
+			}
 #ifndef HALO_ANDROID
 			if (input_state.ui_pointer)
 			{
@@ -823,6 +1095,7 @@ void platform_pump_events(void)
 		case SDL_EVENT_WINDOW_FOCUS_LOST:
 			memset(input_state.keys, 0, sizeof(input_state.keys));
 			memset(input_state.mouse_buttons, 0, sizeof(input_state.mouse_buttons));
+			memset(mouse_buttons_pressed, 0, sizeof(mouse_buttons_pressed));
 			input_state.focused = FALSE;
 			break;
 		case SDL_EVENT_WINDOW_FOCUS_GAINED:
@@ -845,6 +1118,38 @@ void platform_pump_events(void)
 	platform_invite_clipboard(look_at_clipboard);
 }
 
+void platform_menus_set_active(BOOL active)
+{
+	pthread_mutex_lock(&input_lock);
+	input_state.menus = active;
+	pthread_mutex_unlock(&input_lock);
+}
+
+void platform_binding_capture_begin(void)
+{
+	pthread_mutex_lock(&input_lock);
+	binding_capture = _binding_capture_waiting;
+	binding_settling = TRUE;
+	binding_polled_ms = SDL_GetTicks();
+	pthread_mutex_unlock(&input_lock);
+}
+
+int platform_binding_capture_poll(int *input)
+{
+	int result = 0;
+
+	pthread_mutex_lock(&input_lock);
+	binding_polled_ms = SDL_GetTicks();
+	if (binding_capture == _binding_capture_taken)
+	{
+		result = binding_capture_result;
+		*input = binding_captured_input;
+		binding_capture = _binding_capture_idle;
+	}
+	pthread_mutex_unlock(&input_lock);
+	return result;
+}
+
 #ifndef HALO_ANDROID
 /* ---------- the menus' pointer */
 
@@ -863,6 +1168,7 @@ void platform_ui_pointer_set_active(BOOL active)
 	input_state.mouse_dy = 0.0f;
 	input_state.mouse_wheel = 0.0f;
 	memset(input_state.mouse_buttons, 0, sizeof(input_state.mouse_buttons));
+	memset(mouse_buttons_pressed, 0, sizeof(mouse_buttons_pressed));
 	pthread_mutex_unlock(&input_lock);
 	platform_mouse_capture(!active && !input_state.mouse_released);
 	if (active)
@@ -904,6 +1210,37 @@ void platform_input_read(struct platform_input_state *state, BOOL consume_motion
 {
 	pthread_mutex_lock(&input_lock);
 	*state = input_state;
+	/* (rebinding: nothing reaches the controller until the input is taken
+	and every key and button is up again) */
+	if (binding_capture != _binding_capture_idle || binding_settling)
+	{
+		int scancode;
+		BOOL held = mouse_buttons_down != 0;
+
+		for (scancode = 0; scancode < SDL_SCANCODE_COUNT && !held; scancode++)
+			held = input_state.keys[scancode] != 0;
+		if (binding_capture == _binding_capture_taken && SDL_GetTicks() - binding_taken_ms > BINDING_UNCLAIMED_MS)
+			binding_capture = _binding_capture_idle;
+		if (binding_capture == _binding_capture_waiting && SDL_GetTicks() - binding_polled_ms > BINDING_ABANDONED_MS)
+			binding_capture = _binding_capture_idle;
+		if (binding_capture == _binding_capture_idle && !held)
+			binding_settling = FALSE;
+		memset(state->keys, 0, sizeof(state->keys));
+		memset(state->mouse_buttons, 0, sizeof(state->mouse_buttons));
+		memset(keys_pressed, 0, sizeof(keys_pressed));
+		memset(mouse_buttons_pressed, 0, sizeof(mouse_buttons_pressed));
+		state->mouse_wheel = 0.0f;
+		/* (and the motion of the while, which would otherwise pile up for
+		the aim) */
+		state->mouse_dx = state->mouse_dy = 0.0f;
+		if (consume_motion)
+		{
+			input_state.mouse_dx = input_state.mouse_dy = 0.0f;
+			input_state.mouse_wheel = 0.0f;
+		}
+		pthread_mutex_unlock(&input_lock);
+		return;
+	}
 	if (consume_motion)
 	{
 		int scancode;
@@ -912,6 +1249,11 @@ void platform_input_read(struct platform_input_state *state, BOOL consume_motion
 		{
 			state->keys[scancode] |= keys_pressed[scancode];
 			keys_pressed[scancode] = 0;
+		}
+		for (scancode = 0; scancode < PLATFORM_MOUSE_BUTTON_COUNT; scancode++)
+		{
+			state->mouse_buttons[scancode] |= mouse_buttons_pressed[scancode];
+			mouse_buttons_pressed[scancode] = 0;
 		}
 	}
 	if (consume_motion)

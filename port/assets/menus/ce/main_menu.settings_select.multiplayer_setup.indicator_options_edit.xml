@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu\settings_select\multiplayer_setup\indicator_options_edit (tools/ce_menus.py) -->
+<menus>
+	<widget name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/header_indicator_options" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/multiplayer_setup/indicator_options_edit/header_indicator_options">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_button_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mp profile set indicator opts" back="true"/>
+		<on event="start" run="mp profile set indicator opts" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_friends_on_screen_label" type="text" controller="1" width="320" height="22" string_list="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_friends_on_screen_spinner" type="spinner" left="2" top="2" width="46" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/indicator_options_edit/var_friends_on_screen" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 48 19 54">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_help" type="text" controller="1" left="68" top="321" width="482" height="79" string_list="main_menu/settings_select/multiplayer_setup/indicator_options_edit/cap_indicator_options" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_help">
+		<data input="game settings lists text update"/>
+		<on event="created" run="mp profile init indicator opts"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/indicator_options_edit/op_radar display" x="54" y="73"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/indicator_options_edit/op_players_on_radar" x="54" y="103"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/indicator_options_edit/op_friends_on_screen" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_players_on_radar_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_players_on_radar_spinner" type="spinner" left="2" top="2" width="106" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/indicator_options_edit/var_others_on_radar" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 108 19 114">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_radar display_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_labels" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_radar display_spinner" type="spinner" left="3" top="2" width="183" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/indicator_options_edit/var_radar display" font="ui\large_ui" color="#FF2896FF" align="center" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 186 19 192">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<child widget="main_menu/settings_select/multiplayer_setup/indicator_options_edit/header_indicator_options"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_menu"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/op_friends_on_screen" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_friends_on_screen_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_friends_on_screen_spinner" x="366" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/op_players_on_radar" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_players_on_radar_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_players_on_radar_spinner" x="336" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/op_radar display" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_radar display_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/indicator_options_edit/indicator_options_radar display_spinner" x="297" y="1"/>
+	</widget>
+</menus>

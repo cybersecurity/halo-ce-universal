@@ -70,6 +70,9 @@ int host_sdl_gl_swap_window(unsigned int window);
 int host_sdl_poll_event(void *event);
 int host_sdl_set_clipboard_text(const char *text);
 void host_sdl_get_clipboard_text(char *buffer, unsigned int size);
+/* the keyboard's keys by name (the controls' bindings, xinput_sdl.c) */
+void host_sdl_scancode_name(int scancode, char *buffer, unsigned int size);
+int host_sdl_scancode_from_name(const char *name);
 int host_sdl_show_toast(const char *message, int duration, int gravity, int x, int y);
 int host_sdl_show_simple_message_box(unsigned int flags, const char *title, const char *message);
 int host_sdl_get_gamepads(unsigned int *ids, int capacity);

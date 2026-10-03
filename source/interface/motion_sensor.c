@@ -374,6 +374,9 @@ static void motion_sensor_update(
 			local_player_index = local_player_get_next(local_player_index);
 		}
 
+		/* (port: the scan shared by the local players: friends and enemies
+		alike, each player's own pass keeps his friends: update_motion_sensor) */
+		game_engine_motion_sensor_viewer(NONE);
 		object_iterator_new(&iter, _object_mask_unit, TRUE);
 		while (object_iterator_next(&iter) && !done)
 		{
@@ -506,6 +509,8 @@ static void update_motion_sensor(
 
 	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
 	player = get_motion_sensor_data(local_player_index);
+	/* (port: the FRIENDS radar's viewer: this player) */
+	game_engine_motion_sensor_viewer(local_player_index);
 	game_time_get();
 	if (motion_sensor_globals->update)
 	{
@@ -988,6 +993,7 @@ static void blip_begin(
 		reference);
 
 	blip_player_index = local_player_index;
+	game_engine_motion_sensor_viewer(local_player_index);
 	scale[0] = in_multiplayer ? 0.75f : 1.0f;
 	center_point = *reference;
 	rasterizer_hud_motion_sensor_blip_begin();

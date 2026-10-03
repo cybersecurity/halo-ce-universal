@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu\settings_select\multiplayer_setup (tools/ce_menus.py) -->
+<menus>
+	<widget name="main_menu/settings_select/multiplayer_setup/create_and_edit_new_gametype_screen" width="640" height="480" flags="pass_unhandled_to_focused_child">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_edit_screen"/>
+	</widget>
+</menus>

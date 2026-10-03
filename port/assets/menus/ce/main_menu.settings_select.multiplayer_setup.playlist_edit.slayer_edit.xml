@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\slayer_edit (tools/ce_menus.py) -->
+<menus>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/death_bonus_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_labels" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/death_bonus_spinner" type="spinner" left="2" top="2" width="148" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/var_death_bonus" font="ui\large_ui" color="#FF2896FF" align="center" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/kill_in_order_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/kill_in_order_spinner" type="spinner" left="2" top="2" width="148" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/var_kill_in_order" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/kill_penalty_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/kill_penalty_spinner" type="spinner" left="2" top="2" width="148" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/indicator_options_edit/var_objectives_on_screen" font="ui\large_ui" color="#FF2896FF" align="center" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/kills_to_win_label" type="text" controller="1" width="320" height="22" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/kills_to_win_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/var_kills_to_win" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/op_death_bonus" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/death_bonus_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/death_bonus_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/op_kill_in_order" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/kill_in_order_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/kill_in_order_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/op_kill_penalty" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/kill_penalty_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/kill_penalty_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/op_kills_to_win" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/kills_to_win_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/kills_to_win_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/op_team_play" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/team_play_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/team_play_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_button_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mp profile set slayer rules" back="true"/>
+		<on event="start" run="mp profile set slayer rules" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_options_help" type="text" controller="1" left="68" top="321" width="482" height="79" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/cap_slayer" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_options_help">
+		<data input="game settings lists text update"/>
+		<on event="created" run="mp profile init slayer rules"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/op_death_bonus" x="54" y="73"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/op_kill_penalty" x="54" y="103"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/op_kill_in_order" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/op_kills_to_win" x="54" y="163"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/op_team_play" x="54" y="193"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/op_time_limit" x="54" y="223"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="created" run="NULL"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/header_rules"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_options_menu"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/team_play_label" type="text" controller="1" width="320" height="22" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/slayer_labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/team_play_spinner" type="spinner" left="2" top="2" width="148" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/var_team_play" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+</menus>

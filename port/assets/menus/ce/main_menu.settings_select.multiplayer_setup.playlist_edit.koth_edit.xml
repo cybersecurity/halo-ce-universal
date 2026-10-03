@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\koth_edit (tools/ce_menus.py) -->
+<menus>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_button_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mp profile set koth rules" back="true"/>
+		<on event="start" run="mp profile set koth rules" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_help" type="text" controller="1" left="68" top="321" width="482" height="79" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/cap_koth" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_moving_hill_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_labels" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_moving_hill_spinner" type="spinner" left="2" top="2" width="148" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/var_moving_hill" font="ui\large_ui" color="#FF2896FF" align="center" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_help">
+		<data input="game settings lists text update"/>
+		<on event="created" run="mp profile init koth rules"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/op_moving_hill" x="54" y="73"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/op_score_to_win" x="54" y="103"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/op_team_play" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/op_time_limit" x="54" y="163"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="created" run="NULL"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/header_rules"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_options_menu"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_score_to_win_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_score_to_win_spinner" type="spinner" left="4" top="2" width="146" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/var_score_to_win" font="ui\large_ui" color="#FF2896FF" align="center" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_team_play_spinner" type="spinner" left="2" top="2" width="148" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/var_team_play" font="ui\large_ui" color="#FF2896FF" align="center" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_teams_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/op_moving_hill" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_moving_hill_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_moving_hill_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/op_score_to_win" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_score_to_win_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_score_to_win_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/op_team_play" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_teams_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/koth_team_play_spinner" x="320" y="1"/>
+	</widget>
+</menus>

@@ -309,9 +309,11 @@ static struct
 	int stun_started;
 	int reported_symmetric;
 
-	/* hosting: while the game listens on hosting_socket */
+	/* hosting: while the game listens on hosting_socket, and its game may be
+	joined from the internet (p2p_set_hosting_allowed) */
 	int hosting_socket;
 	int hosting;
+	int hosting_lan_only;
 	int has_token;
 	unsigned char token[P2P_TOKEN_SIZE];
 	char invite[P2P_LINK_SIZE];
@@ -2359,7 +2361,7 @@ static int connected_player_count(void)
 
 static void update_hosting(void)
 {
-	int want = p2p.hosting_socket >= 0;
+	int want = p2p.hosting_socket >= 0 && !p2p.hosting_lan_only;
 
 	if (want && !p2p.hosting)
 	{
@@ -2412,6 +2414,24 @@ static void update_hosting(void)
 			p2p_discord_set_hosting(p2p.invite + strlen("halo://join/"), count, maximum);
 		}
 	}
+}
+
+void p2p_set_hosting_allowed(int allowed)
+{
+	pthread_mutex_lock(&p2p_lock);
+	p2p.hosting_lan_only = !allowed;
+	pthread_mutex_unlock(&p2p_lock);
+}
+
+int p2p_invite_link(char *link, int size)
+{
+	int hosting;
+
+	pthread_mutex_lock(&p2p_lock);
+	hosting = p2p.hosting && p2p.has_token;
+	snprintf(link, (size_t)size, "%s", hosting ? p2p.invite : "");
+	pthread_mutex_unlock(&p2p_lock);
+	return hosting;
 }
 
 void p2p_set_game_player_counts(int count, int maximum)

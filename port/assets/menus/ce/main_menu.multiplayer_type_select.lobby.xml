@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's multiplayer screens, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="created" run="net server accept conx"/>
+		<on event="created" run="net server allow start"/>
+		<on event="b" run="net game unjoin player" back="true"/>
+		<on event="back" run="net game unjoin player" back="true"/>
+		<child widget="main_menu/new_select/sel_list_desc_bkd"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/lobby_list"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/header_lobby"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/header_lobby" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/multiplayer_type_select/lobby/header_lobby">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/multiplayer_type_select/lobby/lobby_desc">
+		<data input="net splitscreen prejoin players"/>
+		<data input="port lobby update"/>
+		<on event="left right" run="swap player team"/>
+		<child widget="main_menu/new_select/list_item_0" x="20" y="73"/>
+		<child widget="main_menu/new_select/list_item_1" x="20" y="103"/>
+		<child widget="main_menu/new_select/list_item_2" x="20" y="133"/>
+		<child widget="main_menu/new_select/list_item_3" x="20" y="163"/>
+		<child widget="main_menu/new_select/list_item_4" x="20" y="193"/>
+		<child widget="main_menu/new_select/list_item_5" x="20" y="223"/>
+		<child widget="main_menu/new_select/list_item_6" x="20" y="253"/>
+		<child widget="main_menu/new_select/list_item_7" x="20" y="283"/>
+		<child widget="main_menu/new_select/list_item_8" x="20" y="313"/>
+		<child widget="main_menu/new_select/list_item_9" x="20" y="343"/>
+		<child widget="main_menu/new_select/list_item_10" x="20" y="373"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/lobby_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_desc" width="640" height="480">
+		<child widget="main_menu/current_profile_name"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/lobby_right_item" x="22" y="2"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_right_item" controller="1" left="406" top="75" width="162" height="326" bitmap="bitmaps/spinner_list_3_wide_item_background">
+		<child widget="main_menu/multiplayer_type_select/lobby/lobby_map_pic"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/lobby_map_name"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/lobby_game_data"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_map_pic" controller="1" left="419" top="87" width="140" height="114" bitmap="ui\shell\bitmaps\mp_map_grafix">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_map_name" type="text" controller="1" left="417" top="204" width="146" height="43" string_list="main_menu/mp_map_list" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_game_data" type="text" controller="1" left="417" top="250" width="146" height="144" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="main_menu/multiplayer_type_select/lobby/lobby_button_team" x="250" y="1"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/lobby_button_start" x="380" y="1"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/lobby_button_leave" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_button_team" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="SWITCH TEAM" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="swap player team"/>
+		<on event="start" run="swap player team"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_button_start" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="START NOW" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="net game speed start"/>
+		<on event="start" run="net game speed start"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_button_leave" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="LEAVE" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mouse emit back event"/>
+		<on event="start" run="mouse emit back event"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/preview_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/new_select/sel_list_desc_bkd"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/preview_list"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/header_lobby"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/preview_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child left_right_tabs_items" description="main_menu/multiplayer_type_select/lobby/lobby_desc">
+		<data input="port lobby preview update"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/preview_status" x="30" y="75"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/preview_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/preview_status" type="text" controller="1" width="360" height="300" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/preview_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="main_menu/multiplayer_type_select/lobby/preview_button_join" x="380" y="1"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/preview_button_back" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/preview_button_join" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="JOIN GAME" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port lobby preview join"/>
+		<on event="start" run="port lobby preview join"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/preview_button_back" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="BACK" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mouse emit back event"/>
+		<on event="start" run="mouse emit back event"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+</menus>

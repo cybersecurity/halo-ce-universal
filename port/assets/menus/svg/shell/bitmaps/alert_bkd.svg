@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="256" height="256" viewBox="0 0 256 256">
+<defs>
+<linearGradient id="p0" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="28">
+  <stop offset="0.00000" stop-color="#000000" stop-opacity="0.749"/>
+  <stop offset="0.86538" stop-color="#000000" stop-opacity="0.749"/>
+  <stop offset="1.00000" stop-color="#010306" stop-opacity="0.749"/>
+</linearGradient>
+<linearGradient id="p1" gradientUnits="userSpaceOnUse" x1="0" y1="29" x2="0" y2="130">
+  <stop offset="0.00000" stop-color="#0a2446" stop-opacity="0.749"/>
+  <stop offset="0.07426" stop-color="#08203d" stop-opacity="0.749"/>
+  <stop offset="0.31188" stop-color="#071a32" stop-opacity="0.749"/>
+  <stop offset="1.00000" stop-color="#050d1c" stop-opacity="0.749"/>
+</linearGradient>
+<mask id="pm" maskUnits="userSpaceOnUse" x="0" y="0" width="256" height="256"><path d="M10.5,2H228.5A8.5,8.5 0 0 1 237,10.5V148.5A8.5,8.5 0 0 1 228.5,157H10.5A8.5,8.5 0 0 1 2,148.5V10.5A8.5,8.5 0 0 1 10.5,2Z" fill="#fff"/></mask>
+</defs>
+<g mask="url(#pm)">
+  <rect x="2" y="2" width="235" height="26" fill="url(#p0)"/>
+  <rect x="2" y="28" width="235" height="1" fill="#2896ff" fill-opacity="0.749"/>
+  <rect x="2" y="29" width="235" height="101" fill="url(#p1)"/>
+  <rect x="2" y="130" width="235" height="1" fill="#2896ff" fill-opacity="0.749"/>
+  <rect x="2" y="131" width="235" height="26" fill="#000000" fill-opacity="0.749"/>
+</g>
+<path d="M9.5,0H229.5A9.5,9.5 0 0 1 239,9.5V149.5A9.5,9.5 0 0 1 229.5,159H9.5A9.5,9.5 0 0 1 0,149.5V9.5A9.5,9.5 0 0 1 9.5,0Z M10.5,2H228.5A8.5,8.5 0 0 1 237,10.5V148.5A8.5,8.5 0 0 1 228.5,157H10.5A8.5,8.5 0 0 1 2,148.5V10.5A8.5,8.5 0 0 1 10.5,2Z" fill="#2896ff" fill-rule="evenodd"/>
+</svg>

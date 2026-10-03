@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\error (tools/ce_menus.py) -->
+<menus>
+	<widget name="error/confirm_delete_gametype" controller="1" width="640" height="480" bitmap="bitmaps/semi_transparent_grey">
+		<child widget="error/confirm_delete_gametype_text_box" x="192" y="176"/>
+		<child widget="error/header_warning" x="201" y="180"/>
+	</widget>
+	<widget name="error/confirm_delete_gametype_button_bar" type="column_list" width="256" height="20" flags="pass_unhandled_to_focused_child up_down_tabs_items left_right_tabs_items">
+		<child widget="error/confirm_delete_gametype_button_cancel" x="128"/>
+		<child widget="error/confirm_delete_gametype_button_ok"/>
+	</widget>
+	<widget name="error/confirm_delete_gametype_button_cancel" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="2" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="left_mouse" run="mouse emit back event"/>
+		<on event="a" run="mouse emit back event"/>
+		<on event="start" run="mouse emit back event"/>
+	</widget>
+	<widget name="error/confirm_delete_gametype_button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="final del playlist profile" close="current" sound="sound\sfx\ui\forward"/>
+		<on event="start" run="final del playlist profile" close="current" sound="sound\sfx\ui\forward"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="error/confirm_delete_gametype_modal_fullscreen" width="640" height="480" flags="pass_unhandled_to_focused_child">
+		<on event="b" run="cancel profile delete" close="current" sound="sound\sfx\ui\back"/>
+		<on event="back" run="cancel profile delete" close="current" sound="sound\sfx\ui\back"/>
+		<child widget="error/confirm_delete_gametype"/>
+		<child widget="error/confirm_delete_gametype_button_bar" x="194" y="309"/>
+	</widget>
+	<widget name="error/confirm_delete_gametype_text_box" type="text" controller="1" width="280" height="159" bitmap="bitmaps/alert_bkd" string_list="strings/displayed_error_messages" string_index="25" font="ui\large_ui" color="#FF2896FF" text_x="9" text_y="36">
+	</widget>
+	<widget name="error/confirm_delete_profile" width="640" height="480" bitmap="bitmaps/semi_transparent_grey">
+		<child widget="error/confirm_delete_profile_text_box" x="192" y="176"/>
+		<child widget="error/header_warning" x="201" y="180"/>
+	</widget>
+	<widget name="error/confirm_delete_profile_button_bar" type="column_list" width="256" height="20" flags="pass_unhandled_to_focused_child up_down_tabs_items left_right_tabs_items">
+		<child widget="error/confirm_delete_profile_button_cancel" x="128"/>
+		<child widget="error/confirm_delete_profile_button_ok"/>
+	</widget>
+	<widget name="error/confirm_delete_profile_button_cancel" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="2" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="left_mouse" run="mouse emit back event"/>
+		<on event="a" run="mouse emit back event"/>
+		<on event="start" run="mouse emit back event"/>
+	</widget>
+	<widget name="error/confirm_delete_profile_button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="final del player profile" close="current" sound="sound\sfx\ui\forward"/>
+		<on event="start" run="final del player profile" close="current" sound="sound\sfx\ui\forward"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="error/confirm_delete_profile_modal_fullscreen" width="640" height="480" flags="pass_unhandled_to_focused_child">
+		<on event="b" run="cancel profile delete" close="current" sound="sound\sfx\ui\back"/>
+		<on event="back" run="cancel profile delete" close="current" sound="sound\sfx\ui\back"/>
+		<child widget="error/confirm_delete_profile"/>
+		<child widget="error/confirm_delete_profile_button_bar" x="194" y="309"/>
+	</widget>
+	<widget name="error/confirm_delete_profile_text_box" type="text" controller="1" width="280" height="159" bitmap="bitmaps/alert_bkd" string_list="strings/displayed_error_messages" string_index="24" font="ui\large_ui" color="#FF2896FF" text_x="9" text_y="36">
+	</widget>
+	<widget name="error/confirm_delete_savegame" width="640" height="480" bitmap="bitmaps/semi_transparent_grey">
+		<child widget="error/confirm_delete_savegame_text_box" x="192" y="176"/>
+		<child widget="error/header_warning" x="201" y="180"/>
+	</widget>
+	<widget name="error/confirm_delete_savegame_button_bar" type="column_list" width="256" height="20" flags="pass_unhandled_to_focused_child up_down_tabs_items left_right_tabs_items">
+		<child widget="error/confirm_delete_profile_button_cancel" x="128"/>
+		<child widget="error/confirm_delete_savegame_button_ok"/>
+	</widget>
+	<widget name="error/confirm_delete_savegame_button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="load game menu delete finish" close="current" sound="sound\sfx\ui\forward"/>
+		<on event="start" run="load game menu delete finish" close="current" sound="sound\sfx\ui\forward"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="error/confirm_delete_savegame_modal_fullscreen" width="640" height="480" flags="pass_unhandled_to_focused_child">
+		<on event="b" run="cancel profile delete" close="current" sound="sound\sfx\ui\back"/>
+		<on event="back" run="cancel profile delete" close="current" sound="sound\sfx\ui\back"/>
+		<child widget="error/confirm_delete_savegame"/>
+		<child widget="error/confirm_delete_savegame_button_bar" x="194" y="309"/>
+	</widget>
+	<widget name="error/confirm_delete_savegame_text_box" type="text" controller="1" width="280" height="159" bitmap="bitmaps/alert_bkd" string_list="strings/displayed_error_messages" string_index="59" font="ui\large_ui" color="#FF2896FF" text_x="9" text_y="36">
+	</widget>
+	<widget name="error/confirm_empty_player_text_box" type="text" controller="1" width="280" height="159" bitmap="bitmaps/alert_bkd" string_list="main_menu/player_profiles_select/empty_profile_selected" font="ui\large_ui" color="#FF2896FF" text_x="9" text_y="36">
+	</widget>
+	<widget name="error/confirm_empty_profile" controller="1" width="640" height="480" bitmap="bitmaps/semi_transparent_grey">
+		<child widget="error/confirm_empty_player_text_box" x="192" y="176"/>
+		<child widget="error/header_attention" x="201" y="180"/>
+	</widget>
+	<widget name="error/error_modal" width="640" height="480" flags="pass_unhandled_to_focused_child">
+		<child widget="error/error_text_box" x="192" y="176"/>
+		<child widget="error/header_error" x="202" y="180"/>
+	</widget>
+	<widget name="error/error_modal_button_bar" type="column_list" width="256" height="20" flags="pass_unhandled_to_focused_child up_down_tabs_items left_right_tabs_items">
+		<child widget="error/error_modal_button_ok" x="64"/>
+	</widget>
+	<widget name="error/error_modal_button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="error/error_text_box" type="text" controller="1" width="280" height="159" bitmap="bitmaps/alert_bkd" string_list="strings/displayed_error_messages" font="ui\large_ui" color="#FF2896FF" text_x="9" text_y="35">
+		<replace search="%controller" function="controller"/>
+	</widget>
+	<widget name="error/header_are_you_sure" type="text" controller="1" width="170" height="20" string_list="error/error_headers" string_index="2" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="error/header_attention" type="text" controller="1" width="150" height="20" string_list="error/error_headers" string_index="4" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="error/header_error" type="text" controller="1" width="150" height="20" string_list="error/error_headers" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="error/header_saving" type="text" controller="1" width="150" height="20" string_list="error/error_headers" string_index="3" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="error/header_warning" type="text" controller="1" width="150" height="20" string_list="error/error_headers" string_index="1" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="error/warning_creating_player_profile_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" auto_close="1000" auto_close_fade="500" bitmap="bitmaps/semi_transparent_grey">
+		<on event="b" run="NULL"/>
+		<on event="back" run="NULL"/>
+		<child widget="error/warning_creating_player_profile_text" x="192" y="176"/>
+		<child widget="error/header_saving" x="201" y="180"/>
+	</widget>
+	<widget name="error/warning_creating_player_profile_text" type="text" controller="1" width="256" height="160" bitmap="bitmaps/alert_bkd" string_list="strings/displayed_error_messages" string_index="16" font="ui\large_ui" color="#FF2896FF" text_x="9" text_y="36">
+	</widget>
+	<widget name="error/warning_pre_testing_video_screen" width="640" height="480" bitmap="bitmaps/semi_transparent_grey">
+		<child widget="error/warning_pre_testing_video_text" x="192" y="176"/>
+		<child widget="error/header_warning" x="201" y="180"/>
+	</widget>
+	<widget name="error/warning_pre_testing_video_text" type="text" controller="1" width="280" height="160" bitmap="bitmaps/alert_bkd" string_list="strings/displayed_error_messages" string_index="51" font="ui\large_ui" color="#FF2896FF" text_x="9" text_y="36">
+	</widget>
+	<widget name="error/warning_saving_file_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" auto_close="1000" auto_close_fade="500" bitmap="bitmaps/semi_transparent_grey">
+		<on event="b" run="NULL"/>
+		<on event="back" run="NULL"/>
+		<child widget="error/warning_saving_file_text" x="192" y="176"/>
+		<child widget="error/header_saving" x="201" y="180"/>
+	</widget>
+	<widget name="error/warning_saving_file_text" type="text" controller="1" width="256" height="160" bitmap="bitmaps/alert_bkd" string_list="strings/displayed_error_messages" string_index="15" font="ui\large_ui" color="#FF2896FF" text_x="9" text_y="36">
+	</widget>
+	<widget name="error/warning_testing_video_screen" width="640" height="480" bitmap="bitmaps/semi_transparent_grey">
+		<child widget="error/warning_testing_video_text" x="192" y="176"/>
+		<child widget="error/header_are_you_sure" x="201" y="180"/>
+	</widget>
+	<widget name="error/warning_testing_video_text" type="text" controller="1" width="280" height="160" bitmap="bitmaps/alert_bkd" string_list="strings/displayed_error_messages" string_index="41" font="ui\large_ui" color="#FF2896FF" text_x="9" text_y="36">
+	</widget>
+</menus>

@@ -94,6 +94,13 @@ symbols in this file:
 enum
 {
 	PLAYLIST_PROFILE_CHECKSUM_DATA_SIZE = 104,
+	/* port: the PC options (struct game_variant_options) after the
+	signature: a header (magic, version, size), the options, their own
+	signature. Builds before them write zeros (or the stack's bytes) here,
+	which do not pass. */
+	PLAYLIST_PROFILE_OPTIONS_OFFSET = 0x100,
+	PLAYLIST_PROFILE_OPTIONS_MAGIC = 0x4F565047, /* 'GPVO' little-endian */
+	PLAYLIST_PROFILE_OPTIONS_VERSION = 1,
 	MAXIMUM_GAME_VARIANT_NAME_LENGTH = 12,
 	NUMBER_OF_DEFAULT_PLAYLIST_PROFILES = 26,
 };
@@ -170,8 +177,21 @@ static unsigned long __stdcall playlist_profile_write_thread_proc(
 static void playlist_profile_write(
 	long playlist_profile_index,
 	struct game_variant *variant);
+static boolean playlist_profile_read_block(
+	long playlist_profile_index,
+	byte *block);
+static boolean playlist_profile_options_from_block(
+	byte const *block,
+	struct game_variant_options *options);
+static void playlist_profile_options_to_block(
+	byte *block,
+	struct game_variant_options const *options);
 
 /* ---------- globals */
+
+/* port: the options the asynchronous write writes (playlist_profile_write),
+the file's own when the saver gave none */
+static struct game_variant_options playlist_profile_write_options;
 
 static struct playlist_profile_runtime_globals_prefix playlist_profile_globals = { 0 };
 static struct playlist_profile_data playlist_profile_default_data =
@@ -453,6 +473,44 @@ void playlist_profile_save(
 	long playlist_profile_index,
 	struct game_variant *variant)
 {
+	struct game_variant_options options;
+
+	/* port: the file's PC options kept */
+	if (playlist_profile_index != NONE)
+	{
+		playlist_profile_get_options(playlist_profile_index, &options);
+		playlist_profile_save_with_options(playlist_profile_index, variant, &options);
+	}
+
+	return;
+}
+
+/* port: a gametype's PC options: the file's, else the defaults of its
+variant (game_variant_options_default) */
+boolean playlist_profile_get_options(
+	long playlist_profile_index,
+	struct game_variant_options *options)
+{
+	byte block[SAVED_GAME_FILE_BLOCK_SIZE];
+
+	if (playlist_profile_index != NONE &&
+		TEST_FLAG(playlist_profile_index, _saved_game_file_index_valid_bit) &&
+		playlist_profile_read_block(playlist_profile_index, block))
+	{
+		if (!playlist_profile_options_from_block(block, options))
+			game_variant_options_default((struct game_variant *)block, options);
+		return TRUE;
+	}
+	game_variant_options_default(NULL, options);
+	return FALSE;
+}
+
+/* port: a gametype saved with its PC options */
+void playlist_profile_save_with_options(
+	long playlist_profile_index,
+	struct game_variant *variant,
+	struct game_variant_options const *options)
+{
 	match_assert(
 		"c:\\halo\\SOURCE\\saved games\\playlist_profile.c",
 		305,
@@ -461,6 +519,17 @@ void playlist_profile_save(
 	if (playlist_profile_index != NONE)
 	{
 		game_engine_variant_cleanup(variant);
+		/* (a write still running reads the options it was given: it ends
+		first) */
+		if (playlist_profile_globals.thread)
+		{
+			while (!thread_has_exited(playlist_profile_globals.thread))
+			{
+			}
+			dispose_thread(playlist_profile_globals.thread);
+			playlist_profile_globals.thread = NULL;
+		}
+		playlist_profile_write_options = *options;
 		playlist_profile_write(playlist_profile_index, variant);
 	}
 
@@ -696,6 +765,9 @@ static unsigned long __stdcall playlist_profile_write_thread_proc(
 
 		if (saved_game_file_open(&file, playlist_profile_index))
 		{
+			/* port: the block cleared (the Xbox game wrote its stack's bytes
+			after the signature), and the PC options after it */
+			csmemset(block, 0, sizeof(block));
 			csmemcpy(
 				block,
 				variant,
@@ -704,6 +776,7 @@ static unsigned long __stdcall playlist_profile_write_thread_proc(
 				block,
 				sizeof(struct game_variant),
 				(struct _XCALCSIG_SIGNATURE *)(block + sizeof(struct game_variant)));
+			playlist_profile_options_to_block(block, &playlist_profile_write_options);
 
 			if (!file_set_position(&file, 0) ||
 				!file_write(&file, sizeof(block), block))
@@ -788,3 +861,90 @@ static void playlist_profile_write(
 
 	return;
 }
+
+/* port: a gametype file's block, read whole */
+static boolean playlist_profile_read_block(
+	long playlist_profile_index,
+	byte *block)
+{
+	struct file_reference file;
+	boolean success = FALSE;
+
+	if (playlist_profile_globals.thread)
+	{
+		while (!thread_has_exited(playlist_profile_globals.thread))
+		{
+		}
+		dispose_thread(playlist_profile_globals.thread);
+		playlist_profile_globals.thread = NULL;
+	}
+	if (saved_game_files_take_mutex())
+	{
+		if (saved_game_file_open(&file, playlist_profile_index))
+		{
+			success = file_read(&file, SAVED_GAME_FILE_BLOCK_SIZE, block);
+			saved_game_file_close(&file, playlist_profile_index);
+		}
+		saved_game_files_release_mutex();
+	}
+	return success;
+}
+
+struct playlist_profile_options_header
+{
+	unsigned long magic;
+	word version;
+	word size;
+};
+
+static boolean playlist_profile_options_from_block(
+	byte const *block,
+	struct game_variant_options *options)
+{
+	struct playlist_profile_options_header header;
+	byte const *data = block + PLAYLIST_PROFILE_OPTIONS_OFFSET;
+	unsigned long size = sizeof(header) + sizeof(*options);
+	XCALCSIG_SIGNATURE checksum;
+
+	csmemcpy(&header, data, sizeof(header));
+	if (header.magic != PLAYLIST_PROFILE_OPTIONS_MAGIC || header.version != PLAYLIST_PROFILE_OPTIONS_VERSION ||
+		header.size != sizeof(*options))
+	{
+		return FALSE;
+	}
+	saved_game_file_generate_checksum((byte *)data, size, &checksum);
+	if (csmemcmp(&checksum, data + size, sizeof(checksum)))
+		return FALSE;
+	csmemcpy(options, data + sizeof(header), sizeof(*options));
+	options->friendly_fire = (short)PIN(options->friendly_fire, 0, NUMBER_OF_FRIENDLY_FIRE_MODES - 1);
+	options->radar_players = (byte)PIN(options->radar_players, 0, NUMBER_OF_RADAR_PLAYERS - 1);
+	options->loadout = (byte)PIN(options->loadout, 0, NUMBER_OF_LOADOUTS - 1);
+	options->no_map_weapons = options->no_map_weapons != FALSE;
+	/* (the gravity rifle, a cut weapon, and the flamethrower, once loadout
+	weapons: rocket launchers, as the game makes them) */
+	if (options->primary_weapon >= NUMBER_OF_LOADOUT_WEAPONS)
+		options->primary_weapon = _loadout_weapon_rocket_launcher;
+	if (options->secondary_weapon >= NUMBER_OF_LOADOUT_WEAPONS)
+		options->secondary_weapon = _loadout_weapon_rocket_launcher;
+	return TRUE;
+}
+
+static void playlist_profile_options_to_block(
+	byte *block,
+	struct game_variant_options const *options)
+{
+	struct playlist_profile_options_header header;
+	byte *data = block + PLAYLIST_PROFILE_OPTIONS_OFFSET;
+	unsigned long size = sizeof(header) + sizeof(*options);
+
+	header.magic = PLAYLIST_PROFILE_OPTIONS_MAGIC;
+	header.version = PLAYLIST_PROFILE_OPTIONS_VERSION;
+	header.size = sizeof(*options);
+	csmemcpy(data, &header, sizeof(header));
+	csmemcpy(data + sizeof(header), options, sizeof(*options));
+	saved_game_file_generate_checksum(data, size, (XCALCSIG_SIGNATURE *)(data + size));
+}
+
+typedef char verify_playlist_profile_options_fit[
+	PLAYLIST_PROFILE_OPTIONS_OFFSET + sizeof(struct playlist_profile_options_header) +
+		sizeof(struct game_variant_options) + sizeof(XCALCSIG_SIGNATURE) <= SAVED_GAME_FILE_BLOCK_SIZE ? 1 : -1];

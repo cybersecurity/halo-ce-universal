@@ -1387,6 +1387,20 @@ static void get_local_player_input_blob(
 					input->unit_control_flags,
 					_unit_control_action_bit,
 					effective_buttons[_button_action_reload]);
+				/* port: the keyboard's reload key (port/linux/include/
+				halo_keyboard.h), which the controller's X shares with the
+				action */
+				if (!TEST_FLAG(control->inhibited_button_bit_vector, _button_action_reload) &&
+					input_abstraction_port_reload(gamepad_index))
+				{
+					SET_FLAG(input->unit_control_flags, _unit_control_weapon_reload_bit, TRUE);
+				}
+				/* port: and its action key acts only, never reloading */
+				if (TEST_FLAG(input->unit_control_flags, _unit_control_action_bit) &&
+					input_abstraction_port_action_only(gamepad_index))
+				{
+					SET_FLAG(input->unit_control_flags, UNIT_CONTROL_PORT_ACTION_ONLY_BIT, TRUE);
+				}
 				SET_FLAG(
 					input->unit_control_flags,
 					_unit_control_swap_weapons_bit,
@@ -1424,6 +1438,9 @@ static void get_local_player_input_blob(
 					_button_action_reload))
 				{
 					input->accept = gamepad->buttons[_gamepad_analog_button_a];
+					/* port: and the keyboard's jump key */
+					if (!input->accept)
+						input->accept = input_abstraction_port_accept(gamepad_index);
 				}
 			}
 		}

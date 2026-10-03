@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu\gametype_select (tools/ce_menus.py) -->
+<menus>
+	<widget name="main_menu/gametype_select/gametype_extended_desc" width="640" height="480">
+		<child widget="main_menu/current_profile_name"/>
+		<child widget="main_menu/gametype_select/gametype_right_item" x="22" y="2"/>
+	</widget>
+	<widget name="main_menu/gametype_select/gametype_right_data" type="text" controller="1" left="417" top="258" width="156" height="136" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/gametype_select/gametype_right_item" controller="1" left="406" top="75" width="162" height="326" bitmap="bitmaps/spinner_list_3_wide_item_background">
+		<child widget="main_menu/gametype_select/gametype_right_name"/>
+		<child widget="main_menu/gametype_select/gametype_right_pic"/>
+		<child widget="main_menu/gametype_select/gametype_right_data"/>
+		<child widget="main_menu/gametype_select/locked_gametype_icon" x="423" y="182"/>
+	</widget>
+	<widget name="main_menu/gametype_select/gametype_right_name" type="text" controller="1" left="417" top="204" width="146" height="43" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/gametype_select/gametype_right_pic" controller="1" left="419" top="87" width="140" height="114" bitmap="bitmaps/game_type_grafix">
+	</widget>
+	<widget name="main_menu/gametype_select/gametype_select_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/gametype_select/gametype_select_button_ok" x="380" y="1"/>
+		<child widget="common_button_back" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/gametype_select/gametype_select_button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="emit custom activation event"/>
+		<on event="start" run="emit custom activation event"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/gametype_select/gametype_select_list_2" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/gametype_select/gametype_extended_desc">
+		<data input="gt select list update"/>
+		<on event="created" run="mp profiles list initialize"/>
+		<on event="deleted" run="mp profiles list dispose"/>
+		<on event="custom_activation" run="mp profile set for game" open="main_menu/multiplayer_type_select/server_settings/server_settings_screen"/>
+		<child widget="main_menu/gametype_select/list_item_0_chooser" x="82" y="73"/>
+		<child widget="main_menu/new_select/list_item_1" x="20" y="103"/>
+		<child widget="main_menu/new_select/list_item_2" x="20" y="133"/>
+		<child widget="main_menu/new_select/list_item_3" x="20" y="163"/>
+		<child widget="main_menu/new_select/list_item_4" x="20" y="193"/>
+		<child widget="main_menu/new_select/list_item_5" x="20" y="223"/>
+		<child widget="main_menu/new_select/list_item_6" x="20" y="253"/>
+		<child widget="main_menu/new_select/list_item_7" x="20" y="283"/>
+		<child widget="main_menu/new_select/list_item_8" x="20" y="313"/>
+		<child widget="main_menu/new_select/list_item_9" x="20" y="343"/>
+		<child widget="main_menu/new_select/list_item_10" x="15" y="373"/>
+		<child widget="main_menu/gametype_select/gametype_select_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/gametype_select/gametype_select_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="created" run="net server defer start"/>
+		<child widget="main_menu/new_select/sel_list_desc_bkd"/>
+		<child widget="main_menu/gametype_select/gametype_select_list_2"/>
+		<child widget="main_menu/gametype_select/header_select_gametype"/>
+	</widget>
+	<widget name="main_menu/gametype_select/header_select_gametype" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/gametype_select/header_select_gametype">
+	</widget>
+	<widget name="main_menu/gametype_select/list_item_0_chooser" controller="1" width="256" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds_sm" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<child widget="main_menu/gametype_select/list_item_0_chooser_spinner" x="15" y="2"/>
+	</widget>
+	<widget name="main_menu/gametype_select/list_item_0_chooser_spinner" type="spinner" controller="1" width="226" height="22" flags="left_right_tabs_items" string_list="main_menu/gametype_select/var_gametype_banks" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 226 19 232">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/gametype_select/locked_gametype_icon" controller="1" width="16" height="16" bitmap="bitmaps/locked_gametype">
+	</widget>
+</menus>

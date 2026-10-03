@@ -558,44 +558,95 @@ static boolean network_game_server_handle_message_client_switch_to_pregame(
 
 /* port: a name a machine sends (its machine's, or a player's: they come
 from the wire, from anyone joining by any link) kept to what draws as one
-line of text: ended within its field, without control characters (line
-breaks, tabs), Unicode's separators of lines and paragraphs, zero-width
-and right-to-left marks, lone surrogates and non-characters, nor "|" (the
-game's text's own marks), its spaces before and after left out; one with
-nothing left the default given */
+line of text (player_name_clean); one with nothing left that the host's
+ban command can type the default given */
 static void network_game_server_clean_name(
 	wchar_t *name,
 	long count,
 	wchar_t const *default_name)
 {
-	long read;
-	long written = 0;
-
-	name[count - 1] = 0;
-	for (read = 0; read < count && name[read]; read++)
-	{
-		unsigned short character = (unsigned short)name[read];
-
-		if (character < 0x20 || (character >= 0x7F && character <= 0x9F) ||
-			(character >= 0x200B && character <= 0x200F) || (character >= 0x2028 && character <= 0x202E) ||
-			(character >= 0x2060 && character <= 0x206F) || character == 0xFEFF ||
-			(character >= 0xD800 && character <= 0xDFFF) || character >= 0xFFF0 || character == '|' ||
-			(character == ' ' && written == 0))
-		{
-			continue;
-		}
-		name[written++] = name[read];
-	}
-	while (written > 0 && name[written - 1] == ' ')
-		written--;
-	name[written] = 0;
-	if (!written)
+	if (!player_name_clean(name, count))
 	{
 		long index;
 
 		for (index = 0; index < count - 1 && default_name[index]; index++)
 			name[index] = default_name[index];
 		name[index] = 0;
+	}
+}
+
+/* port: a name as the host's ban command reads it: in ASCII
+(player_name_character_ascii), in lower case */
+static char network_game_server_name_character(
+	wchar_t character)
+{
+	char ascii = player_name_character_ascii(character);
+
+	return ascii >= 'A' && ascii <= 'Z' ? (char)(ascii - 'A' + 'a') : ascii;
+}
+
+/* port: whether another player of the game than the one at own_index has a
+name the ban command would read as the same */
+static boolean network_game_server_player_name_taken(
+	struct network_game_server *server,
+	wchar_t const *name,
+	long own_index)
+{
+	struct network_game *game = network_game_server_get_game(server);
+	long index;
+
+	for (index = 0; index < (long)NUMBEROF(game->players); index++)
+	{
+		wchar_t const *other = game->players[index].name;
+		long character;
+
+		if (index == own_index || !network_player_is_valid(&game->players[index]))
+			continue;
+		for (character = 0; character < (long)NUMBEROF(game->players[index].name); character++)
+		{
+			if (!name[character] || !other[character])
+			{
+				if (!name[character] && !other[character])
+					return TRUE;
+				break;
+			}
+			if (network_game_server_name_character(name[character]) != network_game_server_name_character(other[character]))
+				break;
+		}
+	}
+
+	return FALSE;
+}
+
+/* port: a player's name from the wire made one the host's ban command can
+always single out: kept to text that draws, with something it can type
+(else "Player"), and, the same as another player's, numbered ("Player 2") */
+static void network_game_server_clean_player_name(
+	struct network_game_server *server,
+	struct network_player *player,
+	long own_index)
+{
+	wchar_t base[NUMBEROF(player->name)];
+	long number;
+
+	network_game_server_clean_name(player->name, NUMBEROF(player->name), L"Player");
+	csmemcpy(base, player->name, sizeof(base));
+	for (number = 2; number < 100 && network_game_server_player_name_taken(server, player->name, own_index); number++)
+	{
+		wchar_t suffix[4];
+		long suffix_length = number < 10 ? 2 : 3;
+		long length = ustrlen(base);
+
+		suffix[0] = L' ';
+		suffix[1] = number < 10 ? (wchar_t)(L'0' + number) : (wchar_t)(L'0' + number / 10);
+		suffix[2] = (wchar_t)(L'0' + number % 10);
+		suffix[suffix_length] = 0;
+		if (length > (long)NUMBEROF(player->name) - 1 - suffix_length)
+			length = (long)NUMBEROF(player->name) - 1 - suffix_length;
+		csmemcpy(player->name, base, length * sizeof(wchar_t));
+		while (length > 0 && player->name[length - 1] == L' ')
+			length--;
+		csmemcpy(player->name + length, suffix, (suffix_length + 1) * sizeof(wchar_t));
 	}
 }
 
@@ -1539,7 +1590,7 @@ static void network_game_server_queue_client_player(
 		network_event("client machine #%ld tried to add a player of another machine", machine_index);
 		return;
 	}
-	network_game_server_clean_name(player->name, NUMBEROF(player->name), L"Player");
+	network_game_server_clean_player_name(server, player, NONE);
 	network_game_server_queue_player_for_addition(server, player);
 }
 
@@ -1619,6 +1670,11 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] = (byte)(HALO_PORT_NETWORK_VERSION >> 8);
 			advertisement.reserved[HALO_PORT_ADVERTISED_FLAGS_OFFSET] =
 				HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG;
+			if (network_game_server_get_state(server, NULL) != _network_game_server_state_pregame ||
+				network_game_server_game_is_loading(server))
+			{
+				advertisement.reserved[HALO_PORT_ADVERTISED_FLAGS_OFFSET] |= HALO_PORT_ADVERTISED_IN_PROGRESS_FLAG;
+			}
 			/* (open to joins: not while the machines load the game, nor
 			once it is over, nor in progress when no player can join it) */
 			if (network_game_server_get_state(server, NULL) == _network_game_server_state_ingame
@@ -2029,8 +2085,8 @@ static boolean network_game_server_handle_message_client_add_player_request_preg
 			_network_game_packet_class_client_pregame))
 		{
 			/* (port: its name kept to text that draws, as every name from
-			the wire) */
-			network_game_server_clean_name(player.name, NUMBEROF(player.name), L"Player");
+			the wire, and told apart from the other players') */
+			network_game_server_clean_player_name(server, &player, NONE);
 			if (network_game_server_add_player_to_game(server, client_machine, &player))
 			{
 				if (!network_game_server_send_game_data_pregame(server))
@@ -2228,7 +2284,8 @@ static boolean network_game_server_handle_message_client_player_settings_request
 			slot out of the list over the machines), with a name that ends,
 			and on a team of the game's: else the one the host has it on */
 			network_game_server_get_client_machine(server, client_machine, &machine_index);
-			network_game_server_clean_name(player.name, NUMBEROF(player.name), L"Player");
+			network_game_server_clean_player_name(server, &player,
+				VALID_INDEX(player.player_list_index, MAXIMUM_NUMBER_OF_PLAYERS) ? player.player_list_index : NONE);
 			if (VALID_INDEX(player.player_list_index, MAXIMUM_NUMBER_OF_PLAYERS) &&
 				(!game->variant.universal_variant.teams ||
 					!VALID_INDEX(player.team_index, NUMBER_OF_MULTIPLAYER_TEAMS)))

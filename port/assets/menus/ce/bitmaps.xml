@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus' bitmaps, drawn from the redraws, else the PC version's own pictures (NON_HANDDRAWN.md; tools/ce_menus.py) -->
+<menus>
+	<bitmap name="bitmaps/alert_bkd">
+		<frame png="ce/shell/bitmaps/alert_bkd__0.png" width="256" height="256"/>
+	</bitmap>
+	<bitmap name="bitmaps/arrow_sm_down">
+		<frame png="ce/shell/bitmaps/arrow_sm_down__0.png" width="16" height="16"/>
+		<frame png="ce/shell/bitmaps/arrow_sm_down__1.png" width="16" height="16"/>
+	</bitmap>
+	<bitmap name="bitmaps/arrow_sm_left">
+		<frame png="ce/shell/bitmaps/arrow_sm_left__0.png" width="16" height="16"/>
+		<frame png="ce/shell/bitmaps/arrow_sm_left__1.png" width="16" height="16"/>
+		<frame png="ce/shell/bitmaps/arrow_sm_left__2.png" width="16" height="16"/>
+		<frame png="ce/shell/bitmaps/arrow_sm_left__3.png" width="16" height="16"/>
+	</bitmap>
+	<bitmap name="bitmaps/arrow_sm_right">
+		<frame png="ce/shell/bitmaps/arrow_sm_right__0.png" width="16" height="16"/>
+		<frame png="ce/shell/bitmaps/arrow_sm_right__1.png" width="16" height="16"/>
+		<frame png="ce/shell/bitmaps/arrow_sm_right__2.png" width="16" height="16"/>
+		<frame png="ce/shell/bitmaps/arrow_sm_right__3.png" width="16" height="16"/>
+	</bitmap>
+	<bitmap name="bitmaps/arrow_sm_up">
+		<frame png="ce/shell/bitmaps/arrow_sm_up__0.png" width="16" height="16"/>
+		<frame png="ce/shell/bitmaps/arrow_sm_up__1.png" width="16" height="16"/>
+	</bitmap>
+	<bitmap name="bitmaps/black">
+		<frame png="ce/shell/bitmaps/black__0.png" width="4" height="4"/>
+	</bitmap>
+	<bitmap name="bitmaps/blue">
+		<frame png="ce/shell/bitmaps/blue__0.png" width="4" height="4"/>
+	</bitmap>
+	<bitmap name="bitmaps/controller_border">
+		<frame png="ce/shell/bitmaps/controller_border__0.png" width="1024" height="512"/>
+	</bitmap>
+	<bitmap name="bitmaps/device_border">
+		<frame png="ce/shell/bitmaps/device_border__0.png" width="1024" height="512"/>
+	</bitmap>
+	<bitmap name="bitmaps/game_type_grafix">
+		<frame png="ce/shell/bitmaps/game_type_grafix__0.png" width="256" height="128"/>
+		<frame png="ce/shell/bitmaps/game_type_grafix__1.png" width="256" height="128"/>
+		<frame png="ce/shell/bitmaps/game_type_grafix__2.png" width="256" height="128"/>
+		<frame png="ce/shell/bitmaps/game_type_grafix__3.png" width="256" height="128"/>
+		<frame png="ce/shell/bitmaps/game_type_grafix__4.png" width="256" height="128"/>
+		<frame png="ce/shell/bitmaps/game_type_grafix__5.png" width="256" height="128"/>
+	</bitmap>
+	<bitmap name="bitmaps/gradient">
+		<frame png="ce/shell/bitmaps/gradient__0.png" width="4" height="512"/>
+	</bitmap>
+	<bitmap name="bitmaps/gradient_big">
+		<frame png="ce/shell/bitmaps/gradient_big__0.png" width="4" height="512"/>
+	</bitmap>
+	<bitmap name="bitmaps/join_game_border">
+		<frame png="ce/shell/bitmaps/join_game_border__0.png" width="1024" height="512"/>
+	</bitmap>
+	<bitmap name="bitmaps/list_field">
+		<frame png="ce/shell/bitmaps/list_field__0.png" width="512" height="512"/>
+	</bitmap>
+	<bitmap name="bitmaps/list_item_bkd">
+		<frame png="ce/shell/bitmaps/list_item_bkd__0.png" width="256" height="32"/>
+		<frame png="ce/shell/bitmaps/list_item_bkd__1.png" width="256" height="32"/>
+	</bitmap>
+	<bitmap name="bitmaps/list_item_bkd_top">
+		<frame png="ce/shell/bitmaps/list_item_bkd_top__0.png" width="256" height="32"/>
+		<frame png="ce/shell/bitmaps/list_item_bkd_top__1.png" width="256" height="32"/>
+	</bitmap>
+	<bitmap name="bitmaps/locked_gametype">
+		<frame png="ce/shell/bitmaps/locked_gametype__0.png" width="16" height="16"/>
+		<frame png="ce/shell/bitmaps/locked_gametype__1.png" width="16" height="16"/>
+	</bitmap>
+	<bitmap name="bitmaps/option_bkds">
+		<frame png="ce/shell/bitmaps/option_bkds__0.png" width="512" height="32"/>
+		<frame png="ce/shell/bitmaps/option_bkds__1.png" width="512" height="32"/>
+	</bitmap>
+	<bitmap name="bitmaps/option_bkds_sm">
+		<frame png="ce/shell/bitmaps/option_bkds_sm__0.png" width="256" height="32"/>
+		<frame png="ce/shell/bitmaps/option_bkds_sm__1.png" width="256" height="32"/>
+	</bitmap>
+	<bitmap name="bitmaps/option_bkds_sm2">
+		<frame png="ce/shell/bitmaps/option_bkds_sm2__0.png" width="128" height="32"/>
+		<frame png="ce/shell/bitmaps/option_bkds_sm2__1.png" width="128" height="32"/>
+	</bitmap>
+	<bitmap name="bitmaps/sel_list_desc_bkd">
+		<frame png="ce/shell/bitmaps/sel_list_desc_bkd__0.png" width="256" height="512"/>
+	</bitmap>
+	<bitmap name="bitmaps/sel_list_item_bkd">
+		<frame png="ce/shell/bitmaps/sel_list_item_bkd__0.png" width="256" height="32"/>
+		<frame png="ce/shell/bitmaps/sel_list_item_bkd__1.png" width="512" height="32"/>
+		<frame png="ce/shell/bitmaps/sel_list_item_bkd__2.png" width="512" height="32"/>
+	</bitmap>
+	<bitmap name="bitmaps/sel_list_item_bkd_top">
+		<frame png="ce/shell/bitmaps/sel_list_item_bkd_top__0.png" width="256" height="32"/>
+		<frame png="ce/shell/bitmaps/sel_list_item_bkd_top__1.png" width="512" height="32"/>
+		<frame png="ce/shell/bitmaps/sel_list_item_bkd_top__2.png" width="512" height="32"/>
+	</bitmap>
+	<bitmap name="bitmaps/semi_transparent_grey">
+		<frame png="ce/shell/bitmaps/semi_transparent_grey__0.png" width="4" height="4"/>
+	</bitmap>
+	<bitmap name="bitmaps/server_header_background_0">
+		<frame png="ce/shell/bitmaps/server_header_background_0__0.png" width="16" height="32"/>
+		<frame png="ce/shell/bitmaps/server_header_background_0__1.png" width="16" height="32"/>
+	</bitmap>
+	<bitmap name="bitmaps/server_header_background_1">
+		<frame png="ce/shell/bitmaps/server_header_background_1__0.png" width="32" height="32"/>
+		<frame png="ce/shell/bitmaps/server_header_background_1__1.png" width="32" height="32"/>
+	</bitmap>
+	<bitmap name="bitmaps/server_header_background_2">
+		<frame png="ce/shell/bitmaps/server_header_background_2__0.png" width="64" height="32"/>
+		<frame png="ce/shell/bitmaps/server_header_background_2__1.png" width="64" height="32"/>
+	</bitmap>
+	<bitmap name="bitmaps/server_header_background_3">
+		<frame png="ce/shell/bitmaps/server_header_background_3__0.png" width="128" height="32"/>
+		<frame png="ce/shell/bitmaps/server_header_background_3__1.png" width="128" height="32"/>
+	</bitmap>
+	<bitmap name="bitmaps/server_item_bkds">
+		<frame png="ce/shell/bitmaps/server_item_bkds__0.png" width="512" height="32"/>
+		<frame png="ce/shell/bitmaps/server_item_bkds__1.png" width="512" height="32"/>
+		<frame png="ce/shell/bitmaps/server_item_bkds__2.png" width="512" height="32"/>
+	</bitmap>
+	<bitmap name="bitmaps/spinner_list_3_wide_item_background">
+		<frame png="ce/shell/bitmaps/spinner_list_3_wide_item_background__0.png" width="256" height="512"/>
+		<frame png="ce/shell/bitmaps/spinner_list_3_wide_item_background__1.png" width="256" height="512"/>
+	</bitmap>
+	<bitmap name="bitmaps/text_button_background">
+		<frame png="ce/shell/bitmaps/text_button_background__0.png" width="128" height="32"/>
+		<frame png="ce/shell/bitmaps/text_button_background__1.png" width="128" height="32"/>
+	</bitmap>
+	<bitmap name="bitmaps/white">
+		<frame png="ce/shell/bitmaps/white__0.png" width="4" height="4"/>
+	</bitmap>
+	<bitmap name="main_menu/campaign_select/header_load_game">
+		<frame png="ce/shell/main_menu/campaign_select/header_load_game__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/campaign_select/item_back">
+		<frame png="ce/shell/main_menu/campaign_select/item_back__0.png" width="256" height="64"/>
+		<frame png="ce/shell/main_menu/campaign_select/item_back__1.png" width="256" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/campaign_select/item_continue">
+		<frame png="ce/shell/main_menu/campaign_select/item_continue__0.png" width="256" height="64"/>
+		<frame png="ce/shell/main_menu/campaign_select/item_continue__1.png" width="256" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/campaign_select/item_load_game">
+		<frame png="ce/shell/main_menu/campaign_select/item_load_game__0.png" width="256" height="64"/>
+		<frame png="ce/shell/main_menu/campaign_select/item_load_game__1.png" width="256" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/campaign_select/item_new_campaign">
+		<frame png="ce/shell/main_menu/campaign_select/item_new_campaign__0.png" width="256" height="64"/>
+		<frame png="ce/shell/main_menu/campaign_select/item_new_campaign__1.png" width="256" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/difficulty_select/header_choose_difficulty">
+		<frame png="ce/shell/main_menu/difficulty_select/header_choose_difficulty__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/gametype_select/header_select_gametype">
+		<frame png="ce/shell/main_menu/gametype_select/header_select_gametype__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/menu_load_campaign">
+		<frame png="ce/shell/main_menu/menu_load_campaign__0.png" width="256" height="64"/>
+		<frame png="ce/shell/main_menu/menu_load_campaign__1.png" width="256" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/menu_multiplayer">
+		<frame png="ce/shell/main_menu/menu_multiplayer__0.png" width="256" height="64"/>
+		<frame png="ce/shell/main_menu/menu_multiplayer__1.png" width="256" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/menu_profile">
+		<frame png="ce/shell/main_menu/menu_profile__0.png" width="256" height="64"/>
+		<frame png="ce/shell/main_menu/menu_profile__1.png" width="256" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/menu_quit">
+		<frame png="ce/shell/main_menu/menu_quit__0.png" width="256" height="64"/>
+		<frame png="ce/shell/main_menu/menu_quit__1.png" width="256" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/menu_settings">
+		<frame png="ce/shell/main_menu/menu_settings__0.png" width="256" height="64"/>
+		<frame png="ce/shell/main_menu/menu_settings__1.png" width="256" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/direct_ip/header_direct_ip">
+		<frame png="ce/shell/main_menu/multiplayer_type_select/direct_ip/header_direct_ip__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/header_multiplayer">
+		<frame png="ce/shell/main_menu/multiplayer_type_select/header_multiplayer__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/join_game/classic_icon">
+		<frame png="ce/shell/main_menu/multiplayer_type_select/join_game/classic_icon__0.png" width="16" height="16"/>
+		<frame png="ce/shell/main_menu/multiplayer_type_select/join_game/classic_icon__1.png" width="16" height="16"/>
+		<frame png="ce/shell/main_menu/multiplayer_type_select/join_game/classic_icon__2.png" width="16" height="16"/>
+		<frame png="ce/shell/main_menu/multiplayer_type_select/join_game/classic_icon__3.png" width="16" height="16"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/join_game/dedicated_icon">
+		<frame png="ce/shell/main_menu/multiplayer_type_select/join_game/dedicated_icon__0.png" width="16" height="16"/>
+		<frame png="ce/shell/main_menu/multiplayer_type_select/join_game/dedicated_icon__1.png" width="16" height="16"/>
+		<frame png="ce/shell/main_menu/multiplayer_type_select/join_game/dedicated_icon__2.png" width="16" height="16"/>
+		<frame png="ce/shell/main_menu/multiplayer_type_select/join_game/dedicated_icon__3.png" width="16" height="16"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/join_game/filters/header_filters">
+		<frame png="ce/shell/main_menu/multiplayer_type_select/join_game/filters/header_filters__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/join_game/header_internet">
+		<frame png="ce/shell/main_menu/multiplayer_type_select/join_game/header_internet__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/join_game/header_lan">
+		<frame png="ce/shell/main_menu/multiplayer_type_select/join_game/header_lan__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/join_game/locked_icon">
+		<frame png="ce/shell/main_menu/multiplayer_type_select/join_game/locked_icon__0.png" width="16" height="16"/>
+		<frame png="ce/shell/main_menu/multiplayer_type_select/join_game/locked_icon__1.png" width="16" height="16"/>
+		<frame png="ce/shell/main_menu/multiplayer_type_select/join_game/locked_icon__2.png" width="16" height="16"/>
+		<frame png="ce/shell/main_menu/multiplayer_type_select/join_game/locked_icon__3.png" width="16" height="16"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/mp_map_select/header_select_map">
+		<frame png="ce/shell/main_menu/multiplayer_type_select/mp_map_select/header_select_map__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/mp_options">
+		<frame png="ce/shell/main_menu/multiplayer_type_select/mp_options__0.png" width="512" height="256"/>
+		<frame png="ce/shell/main_menu/multiplayer_type_select/mp_options__1.png" width="512" height="256"/>
+		<frame map="ui\shell\main_menu\multiplayer_type_select\mp_options" index="3"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/server_settings/header_server_settings">
+		<frame png="ce/shell/main_menu/multiplayer_type_select/server_settings/header_server_settings__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/player_profiles_select/header_select_profile">
+		<frame png="ce/shell/main_menu/player_profiles_select/header_select_profile__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/indicator_options_edit/header_indicator_options">
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/indicator_options_edit/header_indicator_options__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/item_options_edit/header_item_options">
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/item_options_edit/header_item_options__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/name_edit/header_gametype_name">
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/name_edit/header_gametype_name__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/player_options_edit/header_player_options">
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/player_options_edit/header_player_options__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/header_rules">
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/header_rules__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/rules_options">
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/rules_options__0.png" width="256" height="256"/>
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/rules_options__1.png" width="256" height="256"/>
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/rules_options__2.png" width="256" height="256"/>
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/rules_options__3.png" width="256" height="256"/>
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/rules_options__4.png" width="256" height="256"/>
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/rules_options__5.png" width="256" height="256"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options">
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__0.png" width="512" height="256"/>
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__1.png" width="512" height="256"/>
+		<frame map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\gametype_options" index="2"/>
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__3.png" width="512" height="256"/>
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__4.png" width="512" height="256"/>
+		<frame map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\gametype_options" index="4"/>
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__6.png" width="512" height="256"/>
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/gametype_options__7.png" width="512" height="256"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/playlist_edit/header_edit_multiplayer_gametype">
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/header_edit_multiplayer_gametype__0.png" width="1024" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/playlist_edit/header_set_options">
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/header_set_options__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/playlist_select/header_select_gametype_to_edit">
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_select/header_select_gametype_to_edit__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/header_teamplay_options">
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/teamplay_options_edit/header_teamplay_options__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/header_vehicle_options">
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/vehicle_options_edit/header_vehicle_options__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/header_profile_audio_settings">
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/audio_settings/header_profile_audio_settings__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/color_edit/header_profile_color">
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/color_edit/header_profile_color__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/controller_edit/header_profile_controller_setting">
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/controller_edit/header_profile_controller_setting__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/header_profile_controls_settings">
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/header_profile_controls_settings__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/header_edit_profile_settings">
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/header_edit_profile_settings__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/header_profile_mouse_settings">
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/header_profile_mouse_settings__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/name_edit/header_profile_name">
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/name_edit/header_profile_name__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/header_profile_network_settings">
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/network_setup/header_profile_network_settings__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/profile_options">
+		<frame map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\profile_options" index="0"/>
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__1.png" width="512" height="256"/>
+		<frame map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\profile_options" index="1"/>
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__3.png" width="512" height="256"/>
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__4.png" width="512" height="256"/>
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__5.png" width="512" height="256"/>
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__6.png" width="512" height="256"/>
+		<frame map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\profile_options" index="3"/>
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__8.png" width="512" height="256"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/header_profile_video_settings">
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/header_profile_video_settings__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/solo_level_select/header_load_level">
+		<frame png="ce/shell/main_menu/solo_level_select/header_load_level__0.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/join_game/header_direct_link">
+		<frame png="ce/port/main_menu/multiplayer_type_select/join_game/header_direct_link.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/join_game/header_server_browser">
+		<frame png="ce/port/main_menu/multiplayer_type_select/join_game/header_server_browser.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/lobby/header_lobby">
+		<frame png="ce/port/main_menu/multiplayer_type_select/lobby/header_lobby.png" width="512" height="64"/>
+	</bitmap>
+</menus>

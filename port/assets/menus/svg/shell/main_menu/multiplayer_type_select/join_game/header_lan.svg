@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="64" viewBox="0 0 512 64">
+  <defs>
+    <path id="gA" d="M8.77,0L14.11,0L22.88,21.5L18.21,21.5L16.04,16.18L6.84,16.18L4.66,21.5L0,21.5ZM8.36,12.44L14.52,12.44L11.44,4.9Z"/>
+    <path id="gB" d="M0,0L13.91,0C16.73,0 19.01,2.28 19.01,5.1L19.01,6.6C19.01,7.47 18.68,8.32 18.07,8.95L16.41,10.68L18.42,12.76C18.82,13.17 19.04,13.72 19.04,14.29L19.04,16.49C19.04,19.26 16.8,21.5 14.03,21.5L0,21.5ZM4.71,8.83L11.64,8.83C13.11,8.83 14.31,7.64 14.31,6.16L14.31,6.5C14.31,5.02 13.11,3.82 11.64,3.82L4.71,3.82ZM4.71,17.68L11.66,17.68C13.14,17.68 14.34,16.48 14.34,15L14.34,15.2C14.34,13.73 13.14,12.53 11.66,12.53L4.71,12.53Z"/>
+    <path id="gL" d="M0,0L4.68,0L4.68,14.22C4.68,16.12 6.23,17.66 8.13,17.66L14.92,17.66L14.92,21.5L7.26,21.5C3.25,21.5 0,18.25 0,14.24Z"/>
+    <path id="gN" d="M0,0L5.55,0L14.61,15L14.61,0L19.19,0L19.19,21.5L13.64,21.5L4.57,5.65L4.57,21.5L0,21.5Z"/>
+    <path id="gO" d="M0,8.58C0,3.62 4.02,-0.4 8.98,-0.4L12.39,-0.4C17.35,-0.4 21.37,3.62 21.37,8.58L21.37,12.92C21.37,17.88 17.35,21.9 12.39,21.9L8.98,21.9C4.02,21.9 0,17.88 0,12.92ZM5.06,12.7C5.06,15.7 7.5,18.13 10.49,18.13L10.88,18.13C13.88,18.13 16.31,15.7 16.31,12.7L16.31,8.8C16.31,5.8 13.88,3.37 10.88,3.37L10.49,3.37C7.5,3.37 5.06,5.8 5.06,8.8Z"/>
+    <path id="gY" d="M0,0L5.55,0L10.69,7.99L15.82,0L21.37,0L13.02,11.9L13.02,21.5L8.35,21.5L8.35,11.9Z"/>
+    <filter id="soft" filterUnits="userSpaceOnUse" x="-60" y="-60" width="632" height="184">
+      <feGaussianBlur stdDeviation="14.23 13.06"/>
+    </filter>
+    <mask id="cut" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="64">
+      <rect width="512" height="59" fill="#fff"/>
+    </mask>
+  </defs>
+  <!-- dark blue backdrop: blurred box, cut off at the bottom edge (y=59) -->
+  <g mask="url(#cut)">
+    <rect width="512" height="64" fill="none"/>
+    <rect x="29.08" y="28.05" width="185.59" height="40.95" fill="#021931" fill-opacity="0.893" filter="url(#soft)"/>
+  </g>
+  <!-- "LAN LOBBY" -->
+  <g id="text" fill="#2995fd">
+    <use href="#gL" transform="translate(30.68,33.5)"/>
+    <use href="#gA" transform="translate(45.27,33.5)"/>
+    <use href="#gN" transform="translate(70.2,33.5)"/>
+    <use href="#gL" transform="translate(104.66,33.5)"/>
+    <use href="#gO" transform="translate(119.3,33.5)"/>
+    <use href="#gB" transform="translate(143.65,33.5)"/>
+    <use href="#gB" transform="translate(166.67,33.5)"/>
+    <use href="#gY" transform="translate(184.54,33.5)"/>
+  </g>
+</svg>

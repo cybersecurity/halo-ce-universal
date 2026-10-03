@@ -333,12 +333,38 @@ void scenario_tags_unload(
 	}
 	sound_cache_close();
 	texture_cache_close();
+	/* port: the menus' tags go, and the map's own table comes back
+	(port/linux/game/menu_tags.c): after the texture cache, which writes to
+	the bitmaps it has loaded as it closes, theirs among them */
+	{
+		extern void menu_tags_unloaded(void);
+
+		menu_tags_unloaded();
+	}
 	cache_file_close();
 	tags_header_deregister_vertex_and_index_buffers(cache_file_globals.tag_header);
 	cache_file_globals.tags_loaded = FALSE;
 	global_tag_instances = NULL;
 
 	return;
+}
+
+/* port: the loaded tags' table, and its tags' count, for the menus' tags
+(port/linux/game/menu_tags.c), which a copy with theirs added replaces */
+void *cache_files_tag_instances(
+	long *count)
+{
+	*count = cache_file_globals.tags_loaded ? cache_file_globals.tag_header->tag_count : 0;
+	return cache_file_globals.tags_loaded ? cache_file_globals.tag_header->tag_instances : NULL;
+}
+
+void cache_files_set_tag_instances(
+	void *instances,
+	long count)
+{
+	cache_file_globals.tag_header->tag_instances = instances;
+	cache_file_globals.tag_header->tag_count = count;
+	global_tag_instances = instances;
 }
 
 void tag_files_open(
@@ -804,6 +830,12 @@ long scenario_tags_load(
 				extern void pal_tags_loaded(char const *build);
 
 				pal_tags_loaded(cache_file_globals.header.build);
+			}
+			/* port: the menus' tags, added to the map's (port/linux/game/menu_tags.c) */
+			{
+				extern void menu_tags_loaded(char const *map_name);
+
+				menu_tags_loaded(cache_file_globals.header.name);
 			}
 			/* port: the bitmaps the high-res HUD stands for (port/linux/game/hud_hires_tags.c) */
 			{

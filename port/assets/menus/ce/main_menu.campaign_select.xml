@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu\campaign_select (tools/ce_menus.py) -->
+<menus>
+	<widget name="main_menu/campaign_select/campaign_menu" width="640" height="480" flags="pass_unhandled_to_focused_child">
+		<child widget="main_menu/halo_logo" y="28"/>
+		<child widget="main_menu/campaign_select/campaign_menu_select_list"/>
+	</widget>
+	<widget name="main_menu/campaign_select/campaign_menu_select_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items">
+		<on event="created" run="campaign menu init" branch="true"/>
+		<conditional widget="main_menu/difficulty_select/difficulty_select_list_screen" if_failed="true"/>
+		<child widget="main_menu/campaign_select/menu_item_continue" x="194" y="283"/>
+		<child widget="main_menu/campaign_select/menu_item_new_campaign" x="192" y="319"/>
+		<child widget="main_menu/campaign_select/menu_item_load_game" x="192" y="355"/>
+		<child widget="main_menu/campaign_select/menu_item_back" x="192" y="391"/>
+	</widget>
+	<widget name="main_menu/campaign_select/header_load_game" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/campaign_select/header_load_game">
+	</widget>
+	<widget name="main_menu/campaign_select/load_level_extended_desc" width="640" height="480">
+		<child widget="main_menu/current_profile_name"/>
+		<child widget="main_menu/campaign_select/load_level_right_item" x="22" y="2"/>
+	</widget>
+	<widget name="main_menu/campaign_select/load_level_right_data" type="text" controller="1" left="417" top="258" width="146" height="136" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/campaign_select/load_level_right_item" controller="1" left="406" top="75" width="162" height="326" bitmap="bitmaps/spinner_list_3_wide_item_background">
+		<child widget="main_menu/campaign_select/load_level_right_name"/>
+		<child widget="main_menu/campaign_select/load_level_right_pic"/>
+		<child widget="main_menu/campaign_select/load_level_right_data"/>
+		<child widget="main_menu/solo_level_select/difficulty_indicator" x="416" y="343"/>
+		<child widget="main_menu/solo_level_select/difficulty_indicator" x="466" y="343"/>
+		<child widget="main_menu/solo_level_select/difficulty_indicator" x="516" y="343"/>
+	</widget>
+	<widget name="main_menu/campaign_select/load_level_right_name" type="text" controller="1" left="417" top="204" width="146" height="43" string_list="main_menu/map_list" string_index="2" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/campaign_select/load_level_right_pic" controller="1" left="419" top="87" width="140" height="114" bitmap="ui\shell\bitmaps\sp_levels">
+	</widget>
+	<widget name="main_menu/campaign_select/load_level_select_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/campaign_select/load_level_select_button_delete" y="1"/>
+		<child widget="main_menu/solo_level_select/solo_level_select_button_ok" x="380" y="1"/>
+		<child widget="common_button_back" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/campaign_select/load_level_select_button_delete" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="5" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mouse emit x event"/>
+		<on event="start" run="mouse emit x event"/>
+		<on event="left_mouse" run="mouse emit x event"/>
+	</widget>
+	<widget name="main_menu/campaign_select/load_level_select_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/campaign_select/load_level_extended_desc">
+		<data input="load game list update"/>
+		<on event="created" run="load game menu init"/>
+		<on event="deleted" run="load game menu dispose"/>
+		<on event="custom_activation" run="load game menu activated"/>
+		<on event="x" run="load game menu delete request" open="error/confirm_delete_savegame_modal_fullscreen"/>
+		<child widget="main_menu/new_select/list_item_0" x="20" y="73"/>
+		<child widget="main_menu/new_select/list_item_1" x="20" y="103"/>
+		<child widget="main_menu/new_select/list_item_2" x="20" y="133"/>
+		<child widget="main_menu/new_select/list_item_3" x="20" y="163"/>
+		<child widget="main_menu/new_select/list_item_4" x="20" y="193"/>
+		<child widget="main_menu/new_select/list_item_5" x="20" y="223"/>
+		<child widget="main_menu/new_select/list_item_6" x="20" y="253"/>
+		<child widget="main_menu/new_select/list_item_7" x="20" y="283"/>
+		<child widget="main_menu/new_select/list_item_8" x="20" y="313"/>
+		<child widget="main_menu/new_select/list_item_9" x="20" y="343"/>
+		<child widget="main_menu/new_select/list_item_10" x="20" y="373"/>
+		<child widget="main_menu/campaign_select/load_level_select_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/campaign_select/load_level_select_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<child widget="main_menu/new_select/sel_list_desc_bkd"/>
+		<child widget="main_menu/campaign_select/load_level_select_list"/>
+		<child widget="main_menu/campaign_select/header_load_game"/>
+	</widget>
+	<widget name="main_menu/campaign_select/menu_item_back" type="text" width="256" height="33" bitmap="main_menu/campaign_select/item_back" string_list="main_menu/main_menu_options" font="ui\small_ui" color="#000080FF">
+		<on event="a" back="true"/>
+		<on event="start" back="true"/>
+		<on event="left_mouse" back="true"/>
+	</widget>
+	<widget name="main_menu/campaign_select/menu_item_continue" type="text" width="256" height="33" bitmap="main_menu/campaign_select/item_continue" string_list="main_menu/main_menu_options" font="ui\small_ui" color="#000080FF">
+		<on event="a" run="campaign menu continue"/>
+		<on event="start" run="campaign menu continue"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/campaign_select/menu_item_load_game" type="text" width="256" height="33" bitmap="main_menu/campaign_select/item_load_game" string_list="main_menu/main_menu_options" font="ui\small_ui" color="#000080FF">
+		<on event="a" open="main_menu/campaign_select/load_level_select_screen"/>
+		<on event="start" open="main_menu/campaign_select/load_level_select_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/campaign_select/menu_item_new_campaign" type="text" width="256" height="33" bitmap="main_menu/campaign_select/item_new_campaign" string_list="main_menu/main_menu_options" string_index="1" font="ui\small_ui" color="#000080FF">
+		<on event="a" open="main_menu/solo_level_select/solo_level_select_screen"/>
+		<on event="start" open="main_menu/solo_level_select/solo_level_select_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+</menus>

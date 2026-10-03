@@ -114,6 +114,8 @@ GAME_FLAGS = [
 
 # the TOML parser the platform layer reads config.toml with (port_config.c)
 TOML_DIR = Path("port/third_party/tomlc17")
+EXPAT_DIR = Path("port/third_party/expat")
+EXPAT_SOURCES = ("xmlparse.c", "xmlrole.c", "xmltok.c")
 KCP_DIR = Path("port/third_party/kcp")
 MUSL_MATH_DIR = Path("port/third_party/musl-math")
 # the self-updater's TLS (port/linux/src/posix_update.c)
@@ -417,6 +419,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             f"-I{platform_dir}",
             f"-I{port_include}",
             f"-I{TOML_DIR}",
+            f"-I{EXPAT_DIR}",
             f"-I{KCP_DIR}",
             "-Isource -Isource/cseries",
             sdk_flags,
@@ -453,6 +456,9 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         # the settings file's parser (port/third_party/tomlc17), with the
         # platform layer's ABI (its structs hold doubles) and nothing else
         add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))
+        # the menus' XML parser (port/third_party/expat; menu_files.c)
+        for name in EXPAT_SOURCES:
+            add_object(EXPAT_DIR / name, " ".join([abi, "-std=gnu11", f"-I{EXPAT_DIR}", "-w"]))
         # internet play's reliable streams (port/third_party/kcp; p2p.c)
         add_object(KCP_DIR / "ikcp.c", " ".join([abi, "-std=gnu11", "-w"]))
         # the game's sin, pow and the rest, the same on every port

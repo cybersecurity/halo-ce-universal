@@ -93,7 +93,7 @@ is dead; version 8 is the first whose clients play by the host's rules
 (below), so a build without them joins no host of it; version 9 tells
 every machine of a player the host dropped for cheating, each client
 tells the host its Discord user, and a machine's join request carries its
-hardware id.
+hardware id; version 10 sends every player's ping for the scoreboard.
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
@@ -198,6 +198,9 @@ a pregame keep-alive every five seconds from the host
    - what a client's players pick up, which the host decides: the client
      shows it (the HUD's message, the sound, a powerup's screen flash);
      only that client is told;
+   - every two seconds, each player's ping (unreliable): the round trip
+     of its machine's messages to the host and back, as the host smooths
+     it, 0 for the host's own players, for the scoreboard;
    - twice a second and with every kill, the players' statistics that
      changed (once a second a few more, round them all, as the message is
      unreliable); when it changes (looked at five times a second, sent at

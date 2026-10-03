@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- padlock: rounded shackle over a solid body -->
+  <path d="M3,6 V3.2 A2.2,2.2 0 0 1 5.2,1 H7.8 A2.2,2.2 0 0 1 10,3.2 V6" fill="none" stroke="#2895ff" stroke-width="2"/>
+  <path d="M0,7 H13 V14 Q13,15 12,15 H1 Q0,15 0,14 Z" fill="#2895ff"/>
+</svg>

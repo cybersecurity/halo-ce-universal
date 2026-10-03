@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Embeds the high-res HUD textures (port/assets/hud, made by
 tools/hud_assets.py), the menus' titles (port/assets/titles, made by
-tools/title_assets.py) and the fonts the text is drawn with
-(port/assets/fonts) in the game as C data:
+tools/title_assets.py), the fonts the text is drawn with
+(port/assets/fonts) and the menus' files (port/assets/menus, made by
+tools/ce_menus.py) in the game as C data:
 
     python tools/embed_assets.py OUTPUT.c
 
@@ -32,6 +33,8 @@ TITLE_ASSETS = Path("port/assets/titles")
 TITLE_LIST = TITLE_ASSETS / "titles.json"
 FONT_ASSETS = Path("port/assets/fonts")
 FONT_LIST = FONT_ASSETS / "fonts.json"
+MENU_ASSETS = Path("port/assets/menus")
+MENU_LIST = MENU_ASSETS / "menus.json"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
@@ -53,13 +56,20 @@ def textures() -> List[tuple]:
     return result
 
 
+def menu_files() -> List[str]:
+    """The menus' files menus.json lists, relative to their folder."""
+    if not (ROOT / MENU_LIST).is_file():
+        return []
+    return json.loads((ROOT / MENU_LIST).read_text())["files"]
+
+
 def hud_asset_inputs() -> List[Path]:
     """The files the generated source is made from."""
-    inputs = [listing for listing in (LAYOUT, TITLE_LIST, FONT_LIST) if (ROOT / listing).is_file()]
+    inputs = [listing for listing in (LAYOUT, TITLE_LIST, FONT_LIST, MENU_LIST) if (ROOT / listing).is_file()]
     if not inputs:
         return []
     return [*inputs, *(folder / f"{asset['name']}.png" for folder, asset, _ in textures()),
-            *(FONT_ASSETS / name for name in font_files())]
+            *(FONT_ASSETS / name for name in font_files()), *(MENU_ASSETS / name for name in menu_files())]
 
 
 def hud_configure_inputs() -> List[Path]:
@@ -67,7 +77,8 @@ def hud_configure_inputs() -> List[Path]:
     folders, for files added or removed), not each file, which a change of a
     list may rename or remove."""
     inputs = []
-    for folder, listing in ((HUD_ASSETS, LAYOUT), (TITLE_ASSETS, TITLE_LIST), (FONT_ASSETS, FONT_LIST)):
+    for folder, listing in ((HUD_ASSETS, LAYOUT), (TITLE_ASSETS, TITLE_LIST), (FONT_ASSETS, FONT_LIST),
+                            (MENU_ASSETS, MENU_LIST)):
         if (ROOT / listing).is_file():
             inputs += [folder, listing]
     return inputs
@@ -159,6 +170,28 @@ def main() -> None:
         lines.append("\t{ 0 },")
     lines.append("};")
     lines.append(f"const unsigned int text_hires_embedded_count = {len(fonts)};")
+    lines.append("")
+    # the menus' files (menu_files.h)
+    lines.append('#include "menu_files.h"')
+    lines.append("")
+    menus = menu_files()
+    for index, name in enumerate(menus):
+        data = (ROOT / MENU_ASSETS / name).read_bytes()
+        if name.endswith(".png"):
+            png_size(data, name)
+        lines.append(f"static const unsigned int menu{index}[] = {{")
+        lines.extend(words(data))
+        lines.append("};")
+        lines.append("")
+    lines.append("const struct menu_file_embedded menu_files_embedded[] =")
+    lines.append("{")
+    for index, name in enumerate(menus):
+        size = (ROOT / MENU_ASSETS / name).stat().st_size
+        lines.append(f'\t{{ "{name}", menu{index}, {size} }},')
+    if not menus:
+        lines.append("\t{ 0 },")
+    lines.append("};")
+    lines.append(f"const unsigned int menu_files_embedded_count = {len(menus)};")
     output = Path(sys.argv[1])
     output.parent.mkdir(parents=True, exist_ok=True)
     text = "\n".join(lines) + "\n"

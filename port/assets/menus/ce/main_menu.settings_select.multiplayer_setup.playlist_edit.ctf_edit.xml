@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\ctf_edit (tools/ce_menus.py) -->
+<menus>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/assault_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_labels" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/assault_spinner" type="spinner" left="2" top="2" width="148" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_assault" font="ui\large_ui" color="#FF2896FF" align="center" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/captures_to_win_label" type="text" controller="1" width="320" height="22" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/captures_to_win_spinner" type="spinner" left="2" top="2" width="148" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_captures_to_win" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_button_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mp profile set ctf rules" back="true"/>
+		<on event="start" run="mp profile set ctf rules" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_options_help" type="text" controller="1" left="68" top="311" width="482" height="99" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/cap_ctf" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_options_help">
+		<data input="game settings lists text update"/>
+		<on event="created" run="mp profile init ctf rules"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/op_assault" x="54" y="73"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/op_single_flag" x="54" y="103"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/op_flag_must_reset" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/op_flag_at_home" x="54" y="163"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/op_captures_to_win" x="54" y="193"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/op_time_limit" x="54" y="223"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="created" run="NULL"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/header_rules"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_options_menu"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/flag_at_home_label" type="text" controller="1" width="320" height="22" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/flag_at_home_spinner" type="spinner" left="2" top="2" width="148" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_flag_at_home" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/flag_must_reset_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/flag_must_reset_spinner" type="spinner" left="2" top="2" width="148" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_flag_must_reset" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/op_assault" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/assault_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/assault_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/op_captures_to_win" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/captures_to_win_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/captures_to_win_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/op_flag_at_home" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/flag_at_home_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/flag_at_home_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/op_flag_must_reset" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/flag_must_reset_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/flag_must_reset_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/op_single_flag" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/single_flag_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/single_flag_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/op_time_limit" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/time_limit_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/time_limit_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/single_flag_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/single_flag_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_single_flag" font="ui\large_ui" color="#FF2896FF" align="center" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/time_limit_label" type="text" controller="1" width="320" height="22" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/ctf_labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/time_limit_spinner" type="spinner" left="2" top="2" width="148" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_time_limit" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+</menus>

@@ -4268,7 +4268,9 @@ boolean unit_throw_grenade_begin(
 			break;
 
 		default:
-			if (!weapon_prevents_grenade_throwing(weapon_index))
+			/* port: and with no weapon (a loadout of none), as melee
+			(bipeds.c), which weapon_prevents_grenade_throwing(NONE) prevents */
+			if (weapon_index == NONE || !weapon_prevents_grenade_throwing(weapon_index))
 			{
 				struct animation_graph *animation_graph;
 				struct animation *animation;
@@ -8608,6 +8610,23 @@ enum
 	_collision_result_breakable_surface_bit = 3,
 };
 
+/* port: the melee damage of a unit with no weapon (a gametype's loadout of
+none): its own, else (a player's biped has none: players always had a
+weapon) the blow of the globals' first multiplayer weapon, the assault
+rifle's. network_damage.c takes it as the player's. */
+long unit_unarmed_melee_damage(
+	long unit_index)
+{
+	struct unit_definition *unit_definition = unit_definition_get(unit_get(unit_index)->definition_index);
+	long weapon_definition_index;
+
+	if (unit_definition->unit.melee_damage.index!=NONE)
+		return unit_definition->unit.melee_damage.index;
+	weapon_definition_index = list_index_to_weapon_definition_index(0);
+	return weapon_definition_index!=NONE ?
+		weapon_definition_get(weapon_definition_index)->weapon.melee_attack_damage.index : NONE;
+}
+
 void unit_cause_player_melee_damage(
 	long unit_index)
 {
@@ -8775,6 +8794,20 @@ void unit_cause_player_melee_damage(
 		if (melee_damage_effect_index==NONE)
 		{
 			melee_damage_effect_index = unit_definition->unit.melee_damage.index;
+		}
+		/* port: a player with no weapon (a gametype's loadout of none), whose
+		biped has no blow of its own: unit_unarmed_melee_damage's, and its
+		response */
+		if (melee_damage_effect_index==NONE)
+		{
+			long weapon_definition_index = list_index_to_weapon_definition_index(0);
+
+			melee_damage_effect_index = unit_unarmed_melee_damage(unit_index);
+			if (weapon_definition_index!=NONE && melee_response_effect_index==NONE)
+			{
+				melee_response_effect_index =
+					weapon_definition_get(weapon_definition_index)->weapon.melee_attack_response.index;
+			}
 		}
 
 		if (best_object_index!=NONE)

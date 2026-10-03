@@ -75,10 +75,14 @@ static int names_differ(const char *a, const char *b)
 
 static int text_enabled(void)
 {
-	static int enabled = -1;
+	static int enabled;
+	static unsigned long read_at = (unsigned long)-1;
 
-	if (enabled < 0)
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
 		enabled = config_boolean("display.high_res_text");
+	}
 	return enabled;
 }
 

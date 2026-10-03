@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="256" height="64" viewBox="0 0 256 64">
+  <defs>
+    <path id="gA" d="M8.77,0L14.11,0L22.88,21.5L18.21,21.5L16.04,16.18L6.84,16.18L4.66,21.5L0,21.5ZM8.36,12.44L14.52,12.44L11.44,4.9Z"/>
+    <path id="gD" d="M0,0L11.75,0C16.21,0 19.83,3.62 19.83,8.08L19.83,13.42C19.83,17.88 16.21,21.5 11.75,21.5L0,21.5ZM4.76,17.67L10.59,17.67C13.07,17.67 15.08,15.66 15.08,13.18L15.08,8.32C15.08,5.84 13.07,3.83 10.59,3.83L4.76,3.83Z"/>
+    <path id="gE" d="M0,8.47C0,3.79 3.79,0 8.47,0L17.78,0L17.78,3.85L9.2,3.85C6.89,3.85 5.02,5.72 5.02,8.02L5.02,8.82L17.76,8.82L17.76,12.53L5.02,12.53L5.02,13.48C5.02,15.78 6.89,17.65 9.2,17.65L17.78,17.65L17.78,21.5L8.47,21.5C3.79,21.5 0,17.71 0,13.03Z"/>
+    <path id="gG" d="M0,8.45C0,3.78 3.78,0 8.45,0L20.01,0L20.01,3.85L10.12,3.85C7.16,3.85 4.77,6.24 4.77,9.2L4.77,12.3C4.77,15.26 7.16,17.65 10.12,17.65L15.25,17.65L15.25,12.54L9.09,12.54L9.09,8.83L20.01,8.83L20.01,21.27C20.01,21.4 19.91,21.5 19.79,21.5L8.45,21.5C3.78,21.5 0,17.72 0,13.05Z"/>
+    <path id="gL" d="M0,0L4.68,0L4.68,14.22C4.68,16.12 6.23,17.66 8.13,17.66L14.92,17.66L14.92,21.5L7.26,21.5C3.25,21.5 0,18.25 0,14.24Z"/>
+    <path id="gM" d="M0,0L6.86,0L12.21,16.25L17.56,0L24.43,0L24.43,21.5L19.96,21.5L19.96,5.76L14.69,21.5L9.73,21.5L4.46,5.76L4.46,21.5L0,21.5Z"/>
+    <path id="gO" d="M0,8.58C0,3.62 4.02,-0.4 8.98,-0.4L12.39,-0.4C17.35,-0.4 21.37,3.62 21.37,8.58L21.37,12.92C21.37,17.88 17.35,21.9 12.39,21.9L8.98,21.9C4.02,21.9 0,17.88 0,12.92ZM5.06,12.7C5.06,15.7 7.5,18.13 10.49,18.13L10.88,18.13C13.88,18.13 16.31,15.7 16.31,12.7L16.31,8.8C16.31,5.8 13.88,3.37 10.88,3.37L10.49,3.37C7.5,3.37 5.06,5.8 5.06,8.8Z"/>
+    <filter id="glow" filterUnits="userSpaceOnUse" x="0" y="0" width="256" height="64">
+      <feGaussianBlur stdDeviation="2.19"/>
+    </filter>
+  </defs>
+  <!-- "LOAD GAME" (highlighted: white with blue glow) -->
+  <g fill="#2895ff" stroke="#2895ff" stroke-width="6.3" stroke-linejoin="round" opacity="0.650" filter="url(#glow)">
+    <use href="#gL" transform="translate(46.38,6.57) scale(0.9037)"/>
+    <use href="#gO" transform="translate(59.7,6.57) scale(0.9037)"/>
+    <use href="#gA" transform="translate(79.27,6.57) scale(0.9037)"/>
+    <use href="#gD" transform="translate(101.4,6.57) scale(0.9037)"/>
+    <use href="#gG" transform="translate(131.75,6.57) scale(0.9037)"/>
+    <use href="#gA" transform="translate(150.76,6.57) scale(0.9037)"/>
+    <use href="#gM" transform="translate(172.76,6.57) scale(0.9037)"/>
+    <use href="#gE" transform="translate(197.33,6.57) scale(0.9037)"/>
+  </g>
+  <g id="text" fill="#fff">
+    <use href="#gL" transform="translate(46.38,6.57) scale(0.9037)"/>
+    <use href="#gO" transform="translate(59.7,6.57) scale(0.9037)"/>
+    <use href="#gA" transform="translate(79.27,6.57) scale(0.9037)"/>
+    <use href="#gD" transform="translate(101.4,6.57) scale(0.9037)"/>
+    <use href="#gG" transform="translate(131.75,6.57) scale(0.9037)"/>
+    <use href="#gA" transform="translate(150.76,6.57) scale(0.9037)"/>
+    <use href="#gM" transform="translate(172.76,6.57) scale(0.9037)"/>
+    <use href="#gE" transform="translate(197.33,6.57) scale(0.9037)"/>
+  </g>
+</svg>

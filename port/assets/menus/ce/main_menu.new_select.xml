@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu\new_select (tools/ce_menus.py) -->
+<menus>
+	<widget name="main_menu/new_select/list_item_0" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd_top" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/new_select/list_item_1" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/new_select/list_item_10" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/new_select/list_item_2" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/new_select/list_item_3" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/new_select/list_item_4" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/new_select/list_item_5" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/new_select/list_item_6" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/new_select/list_item_7" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/new_select/list_item_8" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/new_select/list_item_9" controller="1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+		<child widget="main_menu/new_select/scroll_up_button" x="40"/>
+		<child widget="main_menu/new_select/scroll_down_button" x="40"/>
+	</widget>
+	<widget name="main_menu/new_select/list_item_arrows" controller="1" width="385" height="28" color="#FF2896FF" align="center">
+		<child widget="main_menu/new_select/sel_arrow_right" x="8" y="4"/>
+		<child widget="main_menu/new_select/sel_arrow_right" x="14" y="4"/>
+		<child widget="main_menu/new_select/sel_arrow_right" x="20" y="4"/>
+		<child widget="main_menu/new_select/sel_arrow_left" x="355" y="4"/>
+		<child widget="main_menu/new_select/sel_arrow_left" x="361" y="4"/>
+		<child widget="main_menu/new_select/sel_arrow_left" x="367" y="4"/>
+	</widget>
+	<widget name="main_menu/new_select/list_item_text" type="text" controller="1" width="330" height="28" font="ui\large_ui" color="#FF2896FF" align="center" text_flags="no_focus_test" text_y="3">
+	</widget>
+	<widget name="main_menu/new_select/scroll_down_arrow" width="64" height="32" bitmap="bitmaps/arrow_sm_down">
+	</widget>
+	<widget name="main_menu/new_select/scroll_down_button" controller="1" width="300" height="28" bitmap="bitmaps/option_bkds_sm">
+		<child widget="main_menu/new_select/scroll_down_arrow" x="134" y="8"/>
+	</widget>
+	<widget name="main_menu/new_select/scroll_up_arrow" width="64" height="32" bitmap="bitmaps/arrow_sm_up">
+	</widget>
+	<widget name="main_menu/new_select/scroll_up_button" controller="1" width="300" height="28" bitmap="bitmaps/option_bkds_sm">
+		<child widget="main_menu/new_select/scroll_up_arrow" x="134" y="8"/>
+	</widget>
+	<widget name="main_menu/new_select/sel_arrow_left" width="6" height="28" bitmap="bitmaps/arrow_sm_left">
+	</widget>
+	<widget name="main_menu/new_select/sel_arrow_right" width="6" height="28" bitmap="bitmaps/arrow_sm_right">
+	</widget>
+	<widget name="main_menu/new_select/sel_list_desc_bkd" controller="1" left="400" top="73" width="240" height="405" bitmap="bitmaps/sel_list_desc_bkd">
+	</widget>
+</menus>

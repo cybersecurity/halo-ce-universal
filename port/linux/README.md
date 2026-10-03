@@ -91,30 +91,33 @@ backtrace to the standard error. To find the function at the address, enter
 
 ## Controls
 
-The keyboard and the mouse operate controller 1. The game adds the input of
-the first gamepad to controller 1. The other gamepads operate controllers 2
-to 4.
+The keyboard and the mouse are a control scheme of their own for the player
+of controller 1: each action has up to two keys or mouse buttons, which
+Settings > Controls Setup (or `[controls]` in `config.toml`) changes. The
+game adds the input of the first gamepad to controller 1. The other
+gamepads operate controllers 2 to 4. The profile's button layout (Settings >
+Gamepads) is the gamepads' only.
 
-| Key | Controller | Function in the game |
-| --- | --- | --- |
-| W, A, S, D | left stick | move |
-| mouse | (direct aim) | aim |
-| left mouse button | right trigger | fire |
-| right mouse button, G | left trigger | throw a grenade |
-| space, enter | A | jump, accept |
-| F, backspace, mouse button 4 | B | melee, back |
-| E, R | X | action, reload |
-| tab, mouse wheel | Y | change the weapon |
-| Q | white | flashlight |
-| X | black | change the grenade |
-| left ctrl, C | left stick click | crouch |
-| Z, middle mouse button | right stick click | zoom |
-| arrow keys | D-pad | |
-| escape | start | pause menu |
-| F1 | back | |
-| \` | | open the developer console |
-| F12 | | release or capture the mouse |
-| F11 | | change between fullscreen and window |
+| Action | Keys and buttons (default) |
+| --- | --- |
+| move | W, A, S, D |
+| aim | mouse (direct aim) |
+| fire | left mouse button |
+| throw a grenade | right mouse button, G |
+| jump (and skip a cutscene) | space |
+| crouch | left ctrl, C |
+| melee | F, mouse button 4 |
+| reload | R |
+| action (pick up, hold to swap weapons, enter or leave a vehicle; never reloads) | E |
+| change the weapon | mouse wheel, 1 |
+| change the grenade | X |
+| flashlight | Q |
+| zoom | Z, middle mouse button |
+| show the scores (hold) | tab |
+| pause menu | escape |
+
+Always: \` opens the developer console, F12 releases or captures the mouse,
+F11 changes between fullscreen and window.
 
 One movement of the mouse wheel changes the weapon one time. A second
 movement after a short pause changes it again.
@@ -128,9 +131,39 @@ In the menus, the mouse moves a pointer:
 - A right click goes back.
 - The mouse wheel moves through the items.
 
-The keyboard also operates the menus. When the game continues, the mouse
-aims again. A mouse button that you hold from the menu does not fire until
+The keyboard also operates the menus, with keys of its own: the arrow keys
+(and W, A, S, D) move, space or enter selects, escape or backspace goes
+back (escape resumes the game from the pause menu), delete deletes. When the game continues, the mouse aims again. A mouse button that you hold from the menu does not fire until
 you push it again.
+
+## Menus
+
+The menus are the PC version's (Halo Custom Edition's): its main menu and
+every screen it leads to (campaign, profiles, multiplayer with its server
+browser, direct IP and server setup, the gametype editor, and the profile's
+settings: controls, gamepads, mouse, audio, video, network and colour),
+laid out as it has them. Their pictures are the high-res redraws; the few
+that are not yet (3D renders, screenshots) are drawn from the Xbox's own
+menus where it has the same, else a placeholder, listed in
+`port/assets/menus/NON_HANDDRAWN.md`.
+
+The campaign is wired: Campaign, on player 1's profile (the one last used),
+continues its saved game, starts a level it has reached at a difficulty (New
+Game), or loads or deletes any profile's saved game (Load Game). Many of the
+other functions behind the screens are not wired to this game yet
+(`port/assets/menus/UNWIRED.md`): the lists they fill (profiles, maps,
+servers, key bindings) are empty, and the settings they change do not
+change. The screens open, close and move between each other as the PC
+version's. `display.menus = "xbox"` gives the Xbox's menus, which start every
+kind of game.
+
+The menus are XML files in `port/assets/menus` (`tools/ce_menus.py` writes
+them from the PC version's tags), which the game contains. To change them,
+put files in a `menus` folder next to `config.toml`: a file with the same
+path replaces one of the game's, and another `.xml` file is added.
+`port/assets/menus/README.md` describes the files. If a file has a problem,
+the game uses the Xbox's menus and the log names the file, the line and the
+problem.
 
 ## Settings
 
@@ -139,29 +172,43 @@ The settings are in `config.toml` next to the executable
 with the default values and a comment for each setting. To get the default
 values again, delete the file.
 
-The game reads the file one time, at start-up. If a key is not correct, or
-a value has the wrong type, the game writes the line to the log and uses the
-default value.
+The game reads the file at start-up. If a key is not correct, or a value
+has the wrong type, the game writes the line to the log and uses the default
+value. The Settings menu (Video, Mouse, Audio, Network and Controls Setup)
+changes the useful settings, writes them into the file (only their lines
+change) and applies them at once, but `audio.enabled`, and `display.menus`
+from the next main menu.
 
 Each setting has an environment variable. The environment variable changes
 the setting for one start of the game. It has priority over the file.
 
 | Setting | Default | Environment variable | Function |
 | --- | --- | --- | --- |
-| `display.fullscreen` | `true` | `HALO_FULLSCREEN` | `true`: fullscreen at the resolution of the display. The picture has 480 lines of the game and the width of the display. `false`: a window with the 640x480 picture of the Xbox. F11 changes between the two. |
+| `display.mode` | `""` | `HALO_DISPLAY_MODE` | `"fullscreen"`: the display, taken at its desktop resolution. `"borderless"`: a window over the whole desktop. Both draw at the resolution of the display, the picture 480 lines of the game and the width of the display. `"windowed"`: a window with the 640x480 picture of the Xbox, scaled. Empty: `display.fullscreen` decides (`true`: borderless). F11 changes between the window and the fullscreen mode. Video Setup sets it. |
+| `display.fullscreen` | `true` | `HALO_FULLSCREEN` | `true`: fullscreen at the resolution of the display. The picture has 480 lines of the game and the width of the display. `false`: a window with the 640x480 picture of the Xbox. Used when `display.mode` is empty. |
 | `display.window_scale` | `2` | `HALO_WINDOW_SCALE` | The size of the window, as a multiple of 640x480. You can change the size of the window. |
 | `display.vsync` | `true` | `HALO_NO_VSYNC=1` sets `false` | `true`: each frame waits for the display. |
+| `display.max_fps` | `0` | `HALO_MAX_FPS` | With vsync off, the most frames each second. `0`: twice the display's refresh rate. `-1`: no limit, which can hang some Intel graphics (Raptor Lake), resetting the desktop's graphics too. |
+| `debug.gpu_flush_draws` | `-1` | `HALO_GPU_FLUSH_DRAWS` | Flush the GPU's pipeline every this many draws. `-1`: every 3 on Intel graphics with Mesa's driver, which can otherwise hang in the game's long runs of small draws and reset the desktop's graphics too. `0`: never. |
 | `display.interpolation` | `true` | `HALO_INTERPOLATION` | `true`: one frame for each refresh of the display. `false`: 30 frames each second, as on the Xbox. Refer to "Frame rate". |
 | `display.direct_camera` | `true` | `HALO_DIRECT_CAMERA` | `true`: in first person, on foot, the view points where the player aims in each frame, not where the last tick left it. Refer to "Frame rate". |
 | `display.high_res_hud` | `true` | `HALO_HIGH_RES_HUD` | `true`: the HUD (meters, counters, panels and their outlines, the motion sensor, reticles, waypoints, scopes) is drawn from the high-res assets in `port/assets/hud`, 8x the size of the maps' bitmaps. The bitmaps with English text keep the maps' own. `false`: the maps' own bitmaps. |
 | `display.high_res_text` | `true` | `HALO_HIGH_RES_TEXT` | `true`: the menus' and HUD's text is drawn with the fonts in `port/assets/fonts` (Overpass, in place of the maps' Interstate) at the display's resolution, laid out as before, and the menus' titles are drawn from the high-res pictures in `port/assets/titles`. `false`: the maps' bitmap fonts and titles. |
-| `display.player_names` | `"all"` | `HALO_PLAYER_NAMES` | In multiplayer, whose names are drawn above their heads: `"all"`, `"allies"`, `"enemies"` or `"none"`. An ally's name is drawn above the triangle the game shows over teammates. An enemy's name shows only while the enemy is in sight and not camouflaged, so it never shows where an enemy hides. |
-| `display.player_name_scale` | `1.0` | `HALO_PLAYER_NAME_SCALE` | How large the players' names are drawn: `1.0` is the size of the HUD's text, from `0.25` to `4`. With high-res text, larger names are rasterized at their size, so they stay sharp. |
+| `display.menus` | `"pc"` | `HALO_MENUS` | `"pc"`: the PC version's menus, from the files in `port/assets/menus` and a `menus` folder next to `config.toml`. Refer to "Menus". `"xbox"`: the Xbox's menus. |
+| `display.player_names` | `"all"` | `HALO_PLAYER_NAMES` | In multiplayer, whose names are drawn above their heads: `"all"`, `"allies"`, `"enemies"` or `"none"`. An ally's name is drawn above the triangle the game shows over teammates. An enemy's name shows only while the enemy is in sight and not camouflaged, so it never shows where an enemy hides, and only as far away as the weapon in hand turns its reticle red over an enemy (at least 20 world units, the motion sensor's reach, and at most 70). |
+| `display.player_name_scale` | `1.0` | `HALO_PLAYER_NAME_SCALE` | How large the players' names are drawn: `1.0` is three quarters of the size of the HUD's text, from `0.25` to `4`. With high-res text, larger names are rasterized at their size, so they stay sharp. |
+| `display.scoreboard_team_layout` | `"teams"` | `HALO_SCOREBOARD_TEAM_LAYOUT` | How the multiplayer scoreboard (hold BACK, or tab) lists a team game's players. `"teams"`: a column for each team, red on the left and blue on the right. `"score"`: all the players in order of score. With more players than fit, the mouse wheel and Page Up / Page Down scroll the scoreboard. |
+| `display.scoreboard_background` | `true` | `HALO_SCOREBOARD_BACKGROUND` | `true`: the multiplayer scoreboard (hold BACK, or tab) has a panel behind its text, for clearer text. |
+| `display.scoreboard_background_color` | `"16, 16, 16, 150"` | `HALO_SCOREBOARD_BACKGROUND_COLOR` | The colour of the scoreboard's panel: `"red, green, blue, alpha"`, each from `0` to `255`. Alpha `0` is see-through, `255` is solid. |
 | `audio.enabled` | `true` | `HALO_NO_AUDIO=1` sets `false` | `false`: no audio device. The sound continues without output. |
 | `audio.volume` | `1.0` | `HALO_VOLUME` | The master volume. |
+| `audio.music_volume` | `1.0` | `HALO_MUSIC_VOLUME` | The music's volume, of the master volume. |
+| `audio.effects_volume` | `1.0` | `HALO_EFFECTS_VOLUME` | The volume of the other sounds (effects and speech), of the master volume. |
 | `input.mouse_sensitivity` | `1.0` | `HALO_MOUSE_SENSITIVITY` | The multiplier for the mouse aim. |
+| `input.mouse_vertical_sensitivity` | `0.0` | `HALO_MOUSE_VERTICAL_SENSITIVITY` | The multiplier for the vertical mouse aim. `0`: the same as `input.mouse_sensitivity`. |
 | `input.invert_mouse` | `false` | `HALO_MOUSE_INVERT=1` sets `true` | `true`: the vertical mouse aim is inverted. |
 | `input.mouse_aim_assist` | `false` | `HALO_MOUSE_AIM_ASSIST` | `true`: the magnetism of the controller also operates for the mouse. `false`: when the mouse moved after the right stick, the view is not slowed or dragged by a target. The autoaim of the bullets operates in both cases. |
+| `controls.<action>` | (the table in "Controls") | `HALO_KEY_<ACTION>` | The keys and mouse buttons of an action, up to two, separated by a comma: `move_forward`, `move_backward`, `strafe_left`, `strafe_right`, `jump`, `crouch`, `fire`, `throw_grenade`, `melee`, `reload`, `zoom`, `switch_weapon`, `switch_grenade`, `action`, `flashlight`, `scoreboard`, `pause`. Keys by their names (`"W"`, `"Space"`, `"Left Ctrl"`, `"F1"`), and `"Mouse Left"`, `"Mouse Right"`, `"Mouse Middle"`, `"Mouse 4"`, `"Mouse 5"`, `"Wheel"` (either way), `"Wheel Up"`, `"Wheel Down"`. |
 | `game.console_log` | `"important"` | `HALO_CONSOLE_LOG` | What the console shows on the screen. `"important"`: bans, players that the host drops for cheating, the reasons that the game refuses a command, and the asserts that stop the game. `"all"`: all the lines. `"none"`: only the asserts that stop the game. The output of a command always shows. `debug.txt` gets all the lines. |
 | `game.language` | `""` | `HALO_LANGUAGE` | The language of the menus: `ja`, `de`, `fr`, `es` or `it`. Empty: English. |
 | `paths.data` | `""` | `HALO_DATA_ROOT` | The data root. Refer to "Start the game". |
@@ -181,6 +228,7 @@ the setting for one start of the game. It has priority over the file.
 | `debug.screenshot_directory`, `debug.screenshot_every` | `""`, `0` | `HALO_SCREENSHOT_DIR`, `HALO_SCREENSHOT_EVERY` | The game writes each Nth frame to this folder as a BMP file. |
 | `debug.hidden_window`, `debug.null_renderer` | `false` | `HALO_HIDDEN_WINDOW`, `HALO_NULL_RENDERER` | `true`: no visible window, or no graphics. |
 | `debug.gpu_stats`, `debug.gpu_trace_frame`, `debug.gpu_trace_constants`, `debug.gpu_dump_shaders`, `debug.texture_dump_directory`, `debug.texture_log`, `debug.gl_debug`, `debug.texture_no_cache` | off | `HALO_GPU_STATS`, `HALO_GPU_TRACE`, `HALO_GPU_TRACE_CONSTANTS`, `HALO_GPU_DUMP_SHADERS`, `HALO_TEXTURE_DUMP`, `HALO_TEXTURE_LOG`, `HALO_GL_DEBUG`, `HALO_TEXTURE_NO_CACHE` | Tools to find problems in the graphics: counts for each frame, all the GL state of one frame, the GLSL code, the textures. |
+| `debug.menu_open` | `""` | `HALO_MENU_OPEN` | Start on this screen of the menus (`main_menu/settings_select/...`, as `port/assets/menus` names it), a player profile being edited, to look at it. |
 | `debug.gpu_skip_vertex_shaders`, `debug.gpu_debug_expression`, `debug.gpu_debug_flat`, `debug.gpu_debug_texture0` | off | `HALO_GPU_SKIP_VS`, `HALO_GPU_DEBUG_EXPR`, `HALO_GPU_DEBUG_FLAT`, `HALO_GPU_DEBUG_T0` | Tools to find problems in the graphics: skip the draws of a vertex shader, or replace the output of all pixel shaders with a GLSL expression (for example `t0.rgb`). |
 | `debug.network_test`, `debug.network_test_start`, `debug.network_test_kill`, `debug.network_test_score`, `debug.network_test_shoot`, `debug.network_test_vehicle`, `debug.network_test_pickup`, `debug.network_test_pickup_weapon`, `debug.test_input` | off | `HALO_NETWORK_TEST`, `HALO_NETWORK_TEST_START`, `HALO_NETWORK_TEST_KILL`, `HALO_NETWORK_TEST_SCORE`, `HALO_NETWORK_TEST_SHOOT`, `HALO_NETWORK_TEST_VEHICLE`, `HALO_NETWORK_TEST_PICKUP`, `HALO_NETWORK_TEST_PICKUP_WEAPON`, `HALO_TEST_INPUT` | Automatic tests of system link (`game/network_test.c`). Refer to `NETCODE.md`. |
 | `debug.solo_game` | `false` | `HALO_SOLO_GAME` | A system link or split screen game can start with one player, alone on this machine: to test multiplayer maps without a second machine. |
@@ -405,7 +453,13 @@ Only machines with the invite can find the game:
   `bans.txt`, and refuses a machine whose address or hardware id is in it.
 - The host can ban a player with `ban <player name>` in the developer
   console (Tab completes the name). Remove a line from `bans.txt` to unban.
-  Refer to `NETCODE.md`.
+  Refer to `NETCODE.md`. So that every player can be named, the host trims
+  the spaces around a name and removes characters that draw as nothing. A
+  letter with a mark is typed as the plain letter (`ban jose` for "José").
+  A name with nothing left to type becomes "Player", and a name that another
+  player already has gets a number ("Player 2"). The game refuses a profile
+  name that is blank, and a multiplayer game refuses a profile whose name was
+  made blank before this check.
 - An invite operates while the copy of the game that made it operates.
 
 ### Connection
@@ -554,7 +608,10 @@ Other changes:
 | `cseries/errors.c` | `debug.txt` stays open between lines. |
 | `networking/`, `game/`, `interface/`, `bungie_net/network/` and the pools of objects, effects and sounds | The system link limits and the memory for them. |
 | `game/`, `objects/`, `units/`, `networking/` | The distributed netcode. Refer to `NETCODE.md`. |
-| `cache/cache_files.c` | When a map's tags load and unload, the port finds the bitmaps that the high-res HUD replaces (`game/hud_hires_tags.c`). |
+| `cache/cache_files.c` | When a map's tags load and unload, the port finds the bitmaps that the high-res HUD replaces (`game/hud_hires_tags.c`), and adds the tags of the menus to the menus' map (`game/menu_tags.c`). |
+| `interface/ui_widget.c`, `interface/ui_widget_event_handler_functions.c`, `interface/ui_widget_game_data_input_functions.c` | The main menu is the PC version's from `port/assets/menus` (`display.menus`); the menus' widgets can call the port's functions (`game/menu_functions.c`) and send the PC version's custom activation event; the widgets' memory is 256 KB, not 16 KB. |
+| `input/input_abstraction.c`, `game/player_control.c`, `game/players.c`, `game/player_queues_new.c`, `units/units.h` | The keyboard and mouse's actions (`src/xinput_sdl.c`, `include/halo_keyboard.h`) join controller 1's game controls; their reload key reloads on its own, and their action key only acts (a control flag of the port's, sent with the player's action, stops the reload the controller's X falls back to). |
+| `sound/sound_manager.c`, `interface/hud.c`, `game/game_engine.c` | The music's and the other sounds' volumes; the HUD's and the scoreboard's settings are read again when Settings changes them. |
 | `interface/hud.c` | In multiplayer, players' names are drawn above their heads (`display.player_names`, `display.player_name_scale`). |
 | `rasterizer/rasterizer_text.c`, `text/draw_string.c` | Text is drawn from an atlas of the fonts' glyphs, rasterized at the display's resolution (`src/text_hires.c`), when the font has every character of the string. Text can be drawn scaled about a point (`rasterizer_text_set_scale`), as the players' names are. Each glyph's advance is centred on the font tag character's, so the layout is the same, and a glyph is cut at a text box only where the font tag's character visibly was. |
 

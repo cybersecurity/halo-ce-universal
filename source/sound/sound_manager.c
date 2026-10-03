@@ -1115,10 +1115,31 @@ static short sound_definition_promote(
 	return result;
 }
 
+/* port: config.toml's audio.music_volume and audio.effects_volume, read
+again when Settings changes them */
+double config_real(const char *name);
+unsigned long config_changes(void);
+
+static real sound_manager_port_volume(
+	short class_index)
+{
+	static unsigned long read_at = (unsigned long)-1;
+	static real music_volume = 1.f;
+	static real effects_volume = 1.f;
+
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
+		music_volume = PIN((real)config_real("audio.music_volume"), 0.f, 1.f);
+		effects_volume = PIN((real)config_real("audio.effects_volume"), 0.f, 1.f);
+	}
+	return class_index == _sound_class_music ? music_volume : effects_volume;
+}
+
 static real sound_manager_master_gain(
 	short class_index)
 {
-	real gain = sound_class_get_gain(class_index);
+	real gain = sound_class_get_gain(class_index) * sound_manager_port_volume(class_index);
 
 	if (class_index != _sound_class_scripted_dialog_to_player &&
 		class_index != _sound_class_scripted_dialog_to_other &&

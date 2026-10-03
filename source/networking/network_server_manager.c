@@ -472,6 +472,7 @@ symbols in this file:
 #include "text/unicode.h"
 
 #include "cache/cache_files.h"
+#include "interface/player_ui.h"
 
 /* port: internet play's Discord presence (port/linux/src/p2p.c) */
 void p2p_set_game_player_counts(int count, int maximum);
@@ -752,6 +753,9 @@ static void network_game_server_dump(
 	struct network_game_server *server);
 static void network_game_server_countdown_started(
 	struct network_game_server *server);
+static void network_game_server_variant_options(
+	struct game_variant const *variant,
+	struct game_variant_options *options);
 static void network_game_server_remove_players_gone_while_loading(
 	struct network_game_server *server);
 
@@ -861,8 +865,9 @@ static short *network_game_server_ingame_addition_count(
 	return NULL;
 }
 
-/* port: a player's name in ASCII (what is not ASCII, "?"), for the host's
-ban command */
+/* port: a player's name in ASCII (player_name_character_ascii: a letter
+with a mark its plain one, what is not ASCII else "?"), for the host's ban
+command */
 static void network_game_server_player_name_text(
 	struct network_player const *player,
 	char *text,
@@ -871,7 +876,7 @@ static void network_game_server_player_name_text(
 	long index;
 
 	for (index = 0; index < (long)NUMBEROF(player->name) && player->name[index] && index < size - 1; index++)
-		text[index] = player->name[index] >= 32 && player->name[index] < 127 ? (char)player->name[index] : '?';
+		text[index] = player_name_character_ascii(player->name[index]);
 	text[index] = 0;
 }
 
@@ -930,6 +935,8 @@ boolean network_game_server_ban_player(
 	struct network_game_server *server = global_network_game_server_get();
 	long found_index = NONE;
 	long match_count = 0;
+	long exact_index = NONE;
+	long exact_count = 0;
 	long index;
 	long machine_index;
 	char names[96] = "";
@@ -950,15 +957,25 @@ boolean network_game_server_ban_player(
 		/* (the whole name first) */
 		if (network_game_server_name_begins_with(name, text) && csstrlen(name) == csstrlen(text))
 		{
-			found_index = index;
-			match_count = 1;
-			break;
+			exact_index = index;
+			exact_count++;
 		}
 		if (network_game_server_name_begins_with(name, text))
 		{
 			found_index = index;
 			match_count++;
 		}
+	}
+	if (exact_count > 1)
+	{
+		/* (the host numbers players of the same name: network_server_message_handler.c) */
+		console_warning("ban: %ld players are named \"%s\"", exact_count, text);
+		return FALSE;
+	}
+	if (exact_count == 1)
+	{
+		found_index = exact_index;
+		match_count = 1;
 	}
 	if (!text[0])
 	{
@@ -1144,7 +1161,11 @@ struct network_game_server *network_game_server_create(
 			error(
 				_error_silent,
 				"failed to create the server connection");
-			network_game_server_dispose(server);
+			/* port: nothing to dispose of (the Xbox game disposed of it: its
+			client machines, all zero, have machine 0 with no connection,
+			which the dispose's machine check reads; the port in use, by
+			another copy of the game, gets here) */
+			network_game_server_memory_do_not_use_directly_in_use = FALSE;
 			server = NULL;
 		}
 	}
@@ -1780,6 +1801,22 @@ boolean network_game_server_game_is_open(
 		(TRUE == game_is_open) || (FALSE == game_is_open));
 
 	return game_is_open;
+}
+
+/* port: whether the host's game is being played (not its lobby, before or
+after one) */
+boolean network_game_server_playing(
+	struct network_game_server *server)
+{
+	return server->state == _network_game_server_state_ingame;
+}
+
+/* port: whether the machines are loading the game (its start sent, still
+in the pregame) */
+boolean network_game_server_game_is_loading(
+	struct network_game_server *server)
+{
+	return server->state == _network_game_server_state_pregame && server->sent_start_game_message;
 }
 
 boolean network_game_server_game_is_valid(
@@ -3103,6 +3140,7 @@ void network_game_server_change_game_variant(
 		server->state == _network_game_server_state_pregame);
 
 	csmemcpy(&server->game.variant, variant, sizeof(server->game.variant));
+	network_game_server_variant_options(&server->game.variant, &server->game.variant_options);
 
 	if (!network_game_server_send_game_data_pregame(server))
 	{
@@ -3741,6 +3779,58 @@ static short network_game_server_get_client_machine_count(
 	return client_machine_count;
 }
 
+/* port: the PC menus' server settings (port/linux/game/menu_functions.c):
+the game's name and the most players it takes, every game the server sets
+up; none (empty, 0) keeps the Xbox's (the machine's name, every player the
+native builds hold) */
+static struct
+{
+	wchar_t name[NETWORK_GAME_NAME_LENGTH];
+	long maximum_players;
+} network_game_server_port_settings;
+
+static void network_game_server_port_settings_apply(
+	struct network_game_server *server)
+{
+	if (network_game_server_port_settings.name[0])
+	{
+		ustrncpy(server->game.name, network_game_server_port_settings.name, NETWORK_GAME_NAME_LENGTH - 1);
+		server->game.name[NETWORK_GAME_NAME_LENGTH - 1] = 0;
+	}
+	if (network_game_server_port_settings.maximum_players > 0)
+	{
+		server->game.maximum_players = (byte)PIN(network_game_server_port_settings.maximum_players, 2,
+			MAXIMUM_NETWORK_PLAYER_COUNT);
+	}
+}
+
+void network_game_server_port_set_settings(
+	wchar_t const *name,
+	long maximum_players)
+{
+	struct network_game_server *server = global_network_game_server_get();
+
+	ustrncpy(network_game_server_port_settings.name, name ? name : L"", NETWORK_GAME_NAME_LENGTH - 1);
+	network_game_server_port_settings.name[NETWORK_GAME_NAME_LENGTH - 1] = 0;
+	network_game_server_port_settings.maximum_players = maximum_players;
+	if (server)
+		network_game_server_port_settings_apply(server);
+}
+
+/* port: a gametype's PC options: the menus' (player_ui_set_game_variant_options)
+when it is the menus' gametype, else its defaults */
+static void network_game_server_variant_options(
+	struct game_variant const *variant,
+	struct game_variant_options *options)
+{
+	struct game_variant chosen;
+
+	if (player_ui_game_variant_specified(&chosen) && !csmemcmp(&chosen, variant, sizeof(chosen)))
+		*options = *player_ui_get_game_variant_options();
+	else
+		game_variant_options_default(variant, options);
+}
+
 /**
  * @brief Opens the server's game for the stage its variant names. The
  * minimum player count is 1 with debug.solo_game, else 2.
@@ -3766,6 +3856,8 @@ static boolean network_game_server_setup_game_from_playlist(
 		server->game.map.version = 0;
 		server->game.minimum_players = network_game_solo_game() ? 1 : 2;
 		server->game.maximum_players = MAXIMUM_NETWORK_PLAYER_COUNT;
+		network_game_server_port_settings_apply(server);
+		network_game_server_variant_options(&server->game.variant, &server->game.variant_options);
 
 		if (server->game.variant.universal_variant.teams)
 		{
@@ -4182,6 +4274,35 @@ static boolean network_game_server_idle_pregame_tasks(
 	if (server->sent_start_game_message == FALSE)
 	{
 		long itr;
+
+		/* port: the gametype's auto team balance (game_variant_options):
+		the lobby's teams kept within a player of each other, the bigger
+		team's last player moved */
+		if (server->game.variant.universal_variant.teams && server->game.variant_options.auto_team_balance)
+		{
+			for (;;)
+			{
+				short count[2] = { 0, 0 };
+				long last[2] = { NONE, NONE };
+				short bigger;
+
+				for (itr = 0; itr < MAXIMUM_NETWORK_PLAYER_COUNT; itr++)
+				{
+					struct network_player *player = &server->game.players[itr];
+
+					if (network_player_is_valid(player) && VALID_INDEX(player->team_index, 2))
+					{
+						count[player->team_index]++;
+						last[player->team_index] = itr;
+					}
+				}
+				if (ABS(count[0] - count[1]) <= 1)
+					break;
+				bigger = count[0] > count[1] ? 0 : 1;
+				server->game.players[last[bigger]].team_index = 1 - bigger;
+				network_game_server_send_game_data_pregame(server);
+			}
+		}
 
 		/* send the lobby changes collected since the last settings update */
 		network_game_server_flush_game_data_pregame(server);

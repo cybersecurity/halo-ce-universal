@@ -508,6 +508,16 @@ rasterizer_draw_string(
 					MIN(render.camera.viewport_bounds.x1 - render.camera.viewport_bounds.x0, clip->x1),
 					MIN(render.camera.viewport_bounds.y1 - render.camera.viewport_bounds.y0, clip->y1));
 			}
+			/* port: text drawn scaled (rasterizer_text_set_scale) clipped where
+			it reaches the viewport once scaled: the clip as it is before the
+			scale */
+			if (text_scale != 1.0f)
+			{
+				viewport_bounds.x0 = (short)(text_scale_origin_x + (viewport_bounds.x0 - text_scale_origin_x) / text_scale);
+				viewport_bounds.x1 = (short)(text_scale_origin_x + (viewport_bounds.x1 - text_scale_origin_x) / text_scale);
+				viewport_bounds.y0 = (short)(text_scale_origin_y + (viewport_bounds.y0 - text_scale_origin_y) / text_scale);
+				viewport_bounds.y1 = (short)(text_scale_origin_y + (viewport_bounds.y1 - text_scale_origin_y) / text_scale);
+			}
 
 			memset(&parameters, 0, sizeof(parameters));
 			parameters.map_texture_scale[0].i = 1.0f / (real)bitmap->width;
@@ -626,6 +636,16 @@ rasterizer_draw_unicode_string(
 					FLOOR(clip->y0, 0),
 					MIN(render.camera.viewport_bounds.x1 - render.camera.viewport_bounds.x0, clip->x1),
 					MIN(render.camera.viewport_bounds.y1 - render.camera.viewport_bounds.y0, clip->y1));
+			}
+			/* port: text drawn scaled (rasterizer_text_set_scale) clipped where
+			it reaches the viewport once scaled: the clip as it is before the
+			scale */
+			if (text_scale != 1.0f)
+			{
+				viewport_bounds.x0 = (short)(text_scale_origin_x + (viewport_bounds.x0 - text_scale_origin_x) / text_scale);
+				viewport_bounds.x1 = (short)(text_scale_origin_x + (viewport_bounds.x1 - text_scale_origin_x) / text_scale);
+				viewport_bounds.y0 = (short)(text_scale_origin_y + (viewport_bounds.y0 - text_scale_origin_y) / text_scale);
+				viewport_bounds.y1 = (short)(text_scale_origin_y + (viewport_bounds.y1 - text_scale_origin_y) / text_scale);
 			}
 
 			memset(&parameters, 0, sizeof(parameters));

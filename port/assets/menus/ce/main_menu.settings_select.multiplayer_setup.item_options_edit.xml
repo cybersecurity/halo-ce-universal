@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu\settings_select\multiplayer_setup\item_options_edit (tools/ce_menus.py) -->
+<menus>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/header_item_options" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/multiplayer_setup/item_options_edit/header_item_options">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/item_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/item_button_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/item_button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mp profile set item options" back="true"/>
+		<on event="start" run="mp profile set item options" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_help" type="text" controller="1" left="68" top="321" width="482" height="79" string_list="main_menu/settings_select/multiplayer_setup/item_options_edit/cap_item_options" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_infinite_grenades_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_infinite_grenades_spinner" type="spinner" left="2" top="2" width="104" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/item_options_edit/var_infinite_grenades" font="ui\large_ui" color="#FF2896FF" align="center" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 108 19 114">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_help">
+		<data input="game settings lists text update"/>
+		<on event="created" run="mp profile init item options"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_infinite_grenades" x="54" y="73"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_weapon_set" x="54" y="103"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_starting_equipment" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_map_weapons" x="54" y="163"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_loadout" x="54" y="193"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_primary_weapon" x="54" y="223"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_secondary_weapon" x="54" y="253"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/item_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/header_item_options"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_menu"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_starting_equipment_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_starting_equipment_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/item_options_edit/var_starting_equipment" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_weapon_set_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_weapon_set_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/item_options_edit/var_weapon_set" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/op_infinite_grenades" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_infinite_grenades_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_infinite_grenades_spinner" x="337" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/op_starting_equipment" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_starting_equipment_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_starting_equipment_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/op_weapon_set" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_weapon_set_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_weapon_set_spinner" x="286" y="1"/>
+	</widget>
+</menus>

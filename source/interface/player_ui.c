@@ -225,6 +225,14 @@ static void clear_profile_edit_data(
 
 static long player1_last_used_profile_index = NONE;
 struct player_ui_globals player_ui_globals = { 0 };
+/* port: the PC options (game_engine.h) of the gametype being edited, as
+edit_profile's variant, and of the multiplayer gametype */
+static struct
+{
+	struct game_variant_options original;
+	struct game_variant_options current;
+} player_ui_edit_options;
+static struct game_variant_options player_ui_multiplayer_options;
 static char player1_profile_path[0x100] = { 0 };
 
 /* ---------- public code */
@@ -371,6 +379,13 @@ struct game_variant *player_ui_get_edit_playlist_profile(
 	return result;
 }
 
+/* port: the PC options of the gametype being edited (game_engine.h) */
+struct game_variant_options *player_ui_get_edit_playlist_options(
+	void)
+{
+	return player_ui_get_edit_playlist_profile() ? &player_ui_edit_options.current : NULL;
+}
+
 boolean player_ui_edit_profile_is_dirty(
 	void)
 {
@@ -412,7 +427,10 @@ boolean player_ui_edit_profile_is_dirty(
 				if (csmemcmp(
 					&player_ui_globals.edit_profile.original.variant,
 					&player_ui_globals.edit_profile.current.variant,
-					sizeof(struct game_variant)))
+					sizeof(struct game_variant)) ||
+					/* port: and its PC options */
+					csmemcmp(&player_ui_edit_options.original, &player_ui_edit_options.current,
+						sizeof(struct game_variant_options)))
 				{
 					result = TRUE;
 				}
@@ -554,7 +572,22 @@ void player_ui_set_game_variant(
 
 	csmemcpy(&player_ui_globals.multiplayer_variant, variant, sizeof(*variant));
 	player_ui_globals.multiplayer_variant_specified = TRUE;
+	/* port: its PC options, the defaults until they are given */
+	game_variant_options_default(variant, &player_ui_multiplayer_options);
 	return;
+}
+
+/* port: the PC options of the multiplayer gametype (player_ui_set_game_variant's) */
+void player_ui_set_game_variant_options(
+	struct game_variant_options const *options)
+{
+	player_ui_multiplayer_options = *options;
+}
+
+struct game_variant_options const *player_ui_get_game_variant_options(
+	void)
+{
+	return &player_ui_multiplayer_options;
 }
 
 boolean player_ui_game_variant_specified(
@@ -715,6 +748,9 @@ void player_ui_begin_editing_profile(
 					&player_ui_globals.edit_profile.current.variant,
 					&player_ui_globals.edit_profile.original.variant,
 					sizeof(struct game_variant));
+				/* port: and its PC options */
+				playlist_profile_get_options(profile_index, &player_ui_edit_options.original);
+				player_ui_edit_options.current = player_ui_edit_options.original;
 			}
 			else
 			{
@@ -785,9 +821,10 @@ boolean player_ui_save_profile(
 						player_ui_globals.edit_profile.current.variant.human_readable_game_description);
 					if (new_profile_index != NONE)
 					{
-						playlist_profile_save(
+						playlist_profile_save_with_options(
 							new_profile_index,
-							&player_ui_globals.edit_profile.current.variant);
+							&player_ui_globals.edit_profile.current.variant,
+							&player_ui_edit_options.current);
 						player_ui_globals.edit_profile_index = new_profile_index;
 						if (saved_game_file_get_path_to_enclosing_directory(
 							new_profile_index,
@@ -812,9 +849,10 @@ boolean player_ui_save_profile(
 			}
 			else
 			{
-				playlist_profile_save(
+				playlist_profile_save_with_options(
 					player_ui_globals.edit_profile_index,
-					&player_ui_globals.edit_profile.current.variant);
+					&player_ui_globals.edit_profile.current.variant,
+					&player_ui_edit_options.current);
 				if (saved_game_file_get_path_to_enclosing_directory(
 					player_ui_globals.edit_profile_index,
 					directory_path))

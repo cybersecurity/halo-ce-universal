@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu\multiplayer_type_select\connected (tools/ce_menus.py) -->
+<menus>
+	<widget name="main_menu/multiplayer_type_select/connected/connected_map_select_wrapper" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game tag_controller_index force_handle_mouse">
+		<child widget="main_menu/multiplayer_type_select/mp_map_select/mp_map_select_screen"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/connected/gametype_select_screen_wrapper" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game">
+		<child widget="main_menu/gametype_select/gametype_select_screen"/>
+	</widget>
+</menus>

@@ -343,6 +343,10 @@ static struct
 	long times[MAXIMUM_RECENT_WEAPONS];
 	long grenade_times[NUMBER_OF_UNIT_GRENADE_TYPES];
 	long driven_time;
+	/* (the blow of the player's unit with no weapon: units.c's
+	unit_unarmed_melee_damage) */
+	long unarmed_melee_damage_index;
+	long unarmed_time;
 	real hit_seconds;
 	long hit_seconds_time;
 } damage_players[MAXIMUM_TRACKED_PLAYERS];
@@ -1127,6 +1131,13 @@ static real distributed_player_deals(
 			*kinds |= grenade_kinds;
 		}
 	}
+	/* (a blow with no weapon: the unit's own, units.c) */
+	if (damage_players[player_index].unarmed_melee_damage_index == damage_index && damage_index != NONE &&
+		game_time_get() - damage_players[player_index].unarmed_time <= RECENT_WEAPON_TICKS)
+	{
+		rate = MAX(rate, MELEE_HITS_PER_SECOND);
+		SET_FLAG(*kinds, _damage_source_melee_bit, TRUE);
+	}
 	/* (a vehicle's collision is its driver's, physics.c; the damage it deals
 	a unit it kills is no one's) */
 	if (game_time_get() - damage_players[player_index].driven_time <= RECENT_WEAPON_TICKS &&
@@ -1409,6 +1420,8 @@ static void distributed_note_weapons(
 
 		if (player_index >= MAXIMUM_TRACKED_PLAYERS || unit_index == NONE)
 			continue;
+		damage_players[player_index].unarmed_melee_damage_index = unit_unarmed_melee_damage(unit_index);
+		damage_players[player_index].unarmed_time = game_time_get();
 		units[0] = unit_index;
 		units[1] = object_get(unit_index)->object.parent_object_index;
 		/* (a vehicle's collisions are its driver's, physics.c) */
@@ -2107,6 +2120,7 @@ void network_damage_new_game(
 
 		for (index = 0; index < MAXIMUM_RECENT_WEAPONS; index++)
 			damage_players[player_index].definition_indices[index] = NONE;
+		damage_players[player_index].unarmed_melee_damage_index = NONE;
 		for (index = 0; index < NUMBER_OF_UNIT_GRENADE_TYPES; index++)
 			damage_players[player_index].grenade_times[index] = -RECENT_WEAPON_TICKS - 1;
 		damage_players[player_index].driven_time = -RECENT_WEAPON_TICKS - 1;

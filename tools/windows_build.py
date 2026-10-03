@@ -49,6 +49,8 @@ SDL_DIR = THIRD_PARTY / f"SDL3-{SDL_VERSION}"
 #    frame chain.
 # the TOML parser the platform layer reads config.toml with (port_config.c)
 TOML_DIR = Path("port/third_party/tomlc17")
+EXPAT_DIR = Path("port/third_party/expat")
+EXPAT_SOURCES = ("xmlparse.c", "xmlrole.c", "xmltok.c", "random_rand_s.c")
 KCP_DIR = Path("port/third_party/kcp")
 
 
@@ -333,6 +335,10 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
             f"-include {tags_header}",
             f"-I{crt_include}",
             f"-I{PORT_DIR / 'include'}",
+            # the port's headers the game's units include (halo_keyboard.h,
+            # halo_menus.h), but not the Linux build's C runtime wrappers
+            # next to them, which no game unit includes in quotes
+            f"-iquote {LINUX_DIR / 'include'}",
             game_defines_and_includes(linux_config),
             # the Xbox SDK declarations (port/include/xdk) come before the
             # Windows SDK, which has headers of the same names
@@ -353,6 +359,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
             f"-I{linux_platform}",
             f"-I{PORT_DIR / 'include'}",
             f"-I{TOML_DIR}",
+            f"-I{EXPAT_DIR}",
             f"-I{KCP_DIR}",
             # halo_linux_winsock_names.h, but not the Linux build's C runtime
             # wrappers next to it
@@ -392,6 +399,10 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         # the settings file's parser (port/third_party/tomlc17), with the
         # platform layer's ABI and nothing else
         add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))
+        # the menus' XML parser (port/third_party/expat; menu_files.c), with
+        # its hash salt from rand_s
+        for name in EXPAT_SOURCES:
+            add_object(EXPAT_DIR / name, " ".join([abi, "-std=gnu11", f"-I{EXPAT_DIR}", "-w"]))
         # internet play's reliable streams (port/third_party/kcp; p2p.c)
         add_object(KCP_DIR / "ikcp.c", " ".join([abi, "-std=gnu11", "-w"]))
         # the game's sin, pow and the rest, the same on every port

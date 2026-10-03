@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The PC version's menus: ui\shell\main_menu\multiplayer_type_select\connected\4way_profile_select (tools/ce_menus.py) -->
+<menus>
+	<widget name="main_menu/multiplayer_type_select/connected/4way_profile_select/qtr_screen_profile_color_pic" controller="1" left="18" top="22" width="112" height="136" bitmap="ui\shell\bitmaps\colors_sm">
+	</widget>
+</menus>

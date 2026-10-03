@@ -71,6 +71,14 @@ void p2p_socket_closed(int socket, unsigned short datagram_port);
 from the main thread */
 const char *p2p_take_clipboard_text(void);
 
+/* whether a game this machine hosts may be joined from the internet (an
+invite, Discord): the PC menus' Create Game > Internet (the default), not
+> LAN */
+void p2p_set_hosting_allowed(int allowed);
+/* the invite link of the game this machine hosts (empty, 0: none, or LAN
+only) */
+int p2p_invite_link(char *link, int size);
+
 /* the hosted game's players and the most it takes, which Discord shows
 (0, 0: not hosting; until the game says, the machines the tunnel reaches
 are shown). The game's server calls it as they change (calling it with the
