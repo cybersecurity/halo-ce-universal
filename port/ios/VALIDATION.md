@@ -186,4 +186,9 @@ cases above are still unverified. Keep the PR in draft until those checks pass.
 - Unsigned IPA and signed DMG contain no user disc image or maps. Replacement
   HUD/title/font payloads are disabled in Apple guest builds, and the app icon
   is original geometric art. Signing does not establish legal clearance.
-- DMG notarization and actual AirDrop delivery are not yet verified.
+- The ring-artwork Mac release built from `55bbbf7e` was accepted by Apple
+  on 2026-10-03. App submission: `2ee63744-83dd-4188-8f02-3c3b74697397`;
+  DMG submission: `890c6e2f-6bdb-4678-883f-e5b452746859`. Both tickets were
+  stapled and validated. Gatekeeper accepted the final DMG and the app mounted
+  from it as `Notarized Developer ID`. The final package was also checked for
+  accidental game/private data. Actual AirDrop delivery remains unverified.
