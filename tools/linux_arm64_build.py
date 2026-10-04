@@ -24,7 +24,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .android_build import GUEST_ABI_FLAGS, SDL_TAG, TOML_DIR, fetch_third_party, generate_guest_image
-from .linux_build import MBEDTLS_DIR, MINIUPNPC_DEFINES, MINIUPNPC_DIR, compile_launcher, miniupnpc_sources
+from .linux_build import (MBEDTLS_DIR, MINIUPNPC_DEFINES, MINIUPNPC_DIR, compile_launcher, miniupnpc_sources,
+                          updater_defines)
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/linux/arm64")
@@ -78,7 +79,8 @@ def generate_linux_arm64_build(n: Writer, sln: Any) -> None:
         guest_cc=cc, gl_headers=GL_HEADERS, ar="llvm-ar", ld="ld.lld",
         builtins="$$($linux_arm64_cc -print-libgcc-file-name)", asm_target="aarch64-linux-gnu",
         abi_flags=LINUX_ARM64_GUEST_ABI_FLAGS, extra_runtime=[PORT_DIR / "guest_desktop.c"],
-        extra_imports=[PORT_DIR / "host_imports.list"])
+        extra_imports=[PORT_DIR / "host_imports.list"],
+        updater_cflags=updater_defines(getattr(sln, "port_release", False)))
 
     # ---------- SDL3, built from the same source as the guest's headers
 

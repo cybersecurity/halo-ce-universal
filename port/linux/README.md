@@ -8,6 +8,9 @@ gamepad input.
 The game is 32-bit code because its data (tags, cache files, saved games)
 contains 32-bit pointers, as on the Xbox.
 
+`ninja linux_arm64` builds the game for 64-bit ARM Linux. Refer to
+"64-bit ARM".
+
 ## Requirements
 
 You do not need the Xbox SDK. The declarations that the game uses are in
@@ -264,6 +267,9 @@ let the game write to it.
 
 Builds that you make yourself have no build number. They do not look for
 updates.
+
+The 64-bit ARM build downloads `halo-linux-arm64-release.zip` (or
+`-debug.zip`), not the x86 build.
 
 ## Frame rate
 
@@ -566,6 +572,61 @@ has a private party with the invite as its join secret. The host can send
 the invite with the invite button of Discord. When a person accepts it, that
 person joins the game. If the game does not operate, Discord starts it.
 The game sends the activity only to a Discord client of the same user.
+
+## 64-bit ARM
+
+`ninja linux_arm64` builds the game for 64-bit ARM Linux. It was tested on
+a Steam Frame (SteamOS, Adreno 750 with Mesa). Enter it on a 64-bit ARM
+computer: on such a computer, `ninja` without a target builds it.
+
+| Result | Item |
+| --- | --- |
+| `build/linux_arm64/halo` | The game, an AArch64 executable |
+| `build/linux_arm64/libSDL3.so.0` | SDL 3.4.16. The game finds it next to the executable. |
+
+The game data, the settings, the saved games, the controls and system link
+are the same as on x86. Linux arm64, x86 Linux, Windows and Android
+machines can play in the same game.
+
+### Requirements
+
+- Python and ninja.
+- clang with the `arm64_32` target (clang 22 operates), `ld.lld` and
+  `llvm-ar`. The option `--linux-arm64-cc` of `configure.py` selects a
+  different clang.
+- The OpenGL ES and EGL headers (`libgles-dev` and `libegl-dev` on Debian
+  and Ubuntu).
+- CMake, and the development files that SDL3 uses for X11, Wayland and
+  sound. Refer to the SDL documentation, or to the `linux-arm64` job in
+  `.github/workflows/build.yml`.
+- A network connection for the first build. `configure.py` downloads musl
+  1.2.5 and SDL 3.4.16 to `build/linux_arm64/third_party`.
+
+To start the game: OpenGL ES 3 (`libGLESv2.so.2`, `libEGL.so.1`, from Mesa
+for example). The release builds of GitHub Actions use glibc 2.35 or later.
+
+### How it operates
+
+64-bit ARM processors cannot execute 32-bit ARM code on Linux, as on
+Android. Thus this build operates as the Android port does: the game is
+ILP32 AArch64 code, a guest image in a 64-bit process. Refer to "How the
+port operates" in [port/android/README.md](../android/README.md#how-the-port-operates).
+
+- The guest image is the image of the Android build
+  (`generate_guest_image` in `tools/android_build.py`), with the desktop
+  code paths of the platform layer. The guest code has `HALO_ARM64_GUEST`
+  and `HALO_GLES`, not `HALO_ANDROID`.
+- The host is the Android host (`port/android/host`) as a Linux executable.
+  `arm64/host_main.c` replaces its `host_main.c`. The executable contains
+  the guest image (`arm64/guest_image.S`). The guest gets the environment
+  of the process, so the `HALO_` settings operate.
+- The desktop code paths use more of SDL than the Android app:
+  `arm64/guest_desktop.c` and `arm64/host_desktop.c` supply it, and
+  `arm64/host_imports.list` lists their imports. The guest does SDL's
+  threads, mutexes, atomic values, files and `SDL_GlobDirectory` itself.
+  The host does the windows, the displays, the 2D renderer, the dialogs
+  and the downloads of the self-updater (`src/posix_update.c`).
+- The renderer uses OpenGL ES, as on Android.
 
 ## What operates
 

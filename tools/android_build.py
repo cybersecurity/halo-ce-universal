@@ -209,7 +209,8 @@ def android_configure_inputs() -> List[Path]:
 def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix: str, label: str, build: Path,
                          third_party: Path, guest_cc: str, gl_headers: Path, ar: str, ld: str, builtins: str,
                          asm_target: str, abi_flags: List[str] = GUEST_ABI_FLAGS,
-                         extra_runtime: List[Path] = [], extra_imports: List[Path] = []) -> Dict[str, Path]:
+                         extra_runtime: List[Path] = [], extra_imports: List[Path] = [],
+                         updater_cflags: str = "") -> Dict[str, Path]:
     """The guest image (build/halo_guest.elf) and the host's import table, for
     the builds that run the game as ILP32 AArch64 code: Android, and Linux
     arm64 (tools/linux_arm64_build.py). The caller sets ${prefix}_guest_cc to
@@ -218,7 +219,9 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix:
     builtins are the archiver, the AArch64 linker and the compiler's runtime
     library; abi_flags are the guest's code generation and platform defines.
     extra_runtime are more guest runtime sources, and extra_imports more
-    lists of the host functions they import."""
+    lists of the host functions they import; updater_cflags are the desktop
+    self-updater's defines (port/linux/src/updater.c), for a guest that has
+    it."""
     musl_dir = third_party / f"musl-{MUSL_VERSION}"
     sdl_dir = third_party / "SDL3"
     guest_dir = build / "guest"
@@ -401,7 +404,10 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix:
     for source in sorted((LINUX_DIR / "src").glob("*.c")):
         if source.name.startswith("posix_") or source.name in guest_host_only:
             continue
-        objects.append(guest_object(source, platform_cflags))
+        if source.name == "updater.c" and updater_cflags:
+            objects.append(guest_object(source, f"{platform_cflags} {updater_cflags}"))
+        else:
+            objects.append(guest_object(source, platform_cflags))
     # the high-res HUD's textures (port/assets/hud; port/linux/src/hud_hires.c)
     for source in hud_assets_build(n, prefix, gen_dir / "hud_hires_assets.c"):
         objects.append(guest_object(source, platform_cflags))

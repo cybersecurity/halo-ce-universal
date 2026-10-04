@@ -1,6 +1,7 @@
 name: Build
 
-# Debug and release builds of the native ports (Linux, Windows, Android) for
+# Debug and release builds of the native ports (Linux, Linux arm64, Windows,
+# Android) for
 # every pushed commit, uploaded as artifacts. tools/ci_build.py does each
 # build; see it for the options.
 #
@@ -82,6 +83,65 @@ jobs:
         with:
           name: halo-linux-release
           path: dist/halo-linux-release
+          retention-days: 3
+
+  linux-arm64:
+    # Ubuntu 22.04 (glibc 2.35, so the build starts on older distributions
+    # too) on GitHub's 64-bit ARM runner, with clang 22 from apt.llvm.org (the
+    # guest's arm64_32 target) and the development files SDL3 builds with.
+    runs-on: ubuntu-24.04-arm
+    container: ubuntu:22.04
+    timeout-minutes: 40
+    steps:
+      - name: Install the toolchain
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl gnupg lsb-release \
+            software-properties-common git python3 ninja-build cmake make pkg-config ccache zip \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxfixes-dev \
+            libxtst-dev libxkbcommon-dev libwayland-dev wayland-protocols libegl-dev libgles-dev \
+            libgl-dev libdrm-dev libgbm-dev libpulse-dev libpipewire-0.3-dev libasound2-dev \
+            libudev-dev libdbus-1-dev libdecor-0-dev
+          curl -fsSL https://apt.llvm.org/llvm.sh -o llvm.sh
+          bash llvm.sh 22 && rm llvm.sh
+          apt-get install -y --no-install-recommends lld-22 llvm-22
+          for tool in clang ld.lld llvm-ar; do ln -sf "/usr/bin/$tool-22" "/usr/local/bin/$tool"; done
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-linux-arm64-${{ github.sha }}
+          restore-keys: ccache-linux-arm64-
+
+      # musl and SDL, which configure.py fetches
+      - uses: actions/cache@v4
+        with:
+          path: build/linux_arm64/third_party
+          key: linux-arm64-third-party-${{ hashFiles('tools/android_build.py') }}
+
+      - name: Debug
+        run: python3 tools/ci_build.py linux_arm64 debug
+
+      - name: Release
+        run: python3 tools/ci_build.py linux_arm64 release
+
+      - name: Compile cache
+        run: ccache --show-stats
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-linux-arm64-debug
+          path: dist/halo-linux-arm64-debug
+          retention-days: 3
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-linux-arm64-release
+          path: dist/halo-linux-arm64-release
           retention-days: 3
 
   android:
@@ -216,11 +276,11 @@ jobs:
           retention-days: 3
 
   release:
-    # The six builds as a release, tagged build-<run number> and marked latest
+    # The eight builds as a release, tagged build-<run number> and marked latest
     # (every file keeps its name from release to release, for the README's
     # latest/download links); then all but the newest five build-* releases
     # go, tags and all. Only for main, and only when every platform built.
-    needs: [linux, android, windows]
+    needs: [linux, linux-arm64, android, windows]
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -274,7 +334,7 @@ jobs:
     # without it): green when every platform built, red when one did not,
     # with each platform's result, this run's release (main only), and links
     # to the latest release's builds.
-    needs: [linux, android, windows, release]
+    needs: [linux, linux-arm64, android, windows, release]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -283,6 +343,7 @@ jobs:
         env:
           WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           LINUX: ${{ needs.linux.result }}
+          LINUX_ARM64: ${{ needs['linux-arm64'].result }}
           ANDROID: ${{ needs.android.result }}
           WINDOWS: ${{ needs.windows.result }}
           RELEASE_TAG: ${{ needs.release.outputs.tag }}
@@ -307,13 +368,13 @@ jobs:
               *) echo "➖ Skipped" ;;
             esac
           }
-          if [ "$LINUX" = success ] && [ "$ANDROID" = success ] && [ "$WINDOWS" = success ]; then
+          if [ "$LINUX" = success ] && [ "$LINUX_ARM64" = success ] && [ "$ANDROID" = success ] && [ "$WINDOWS" = success ]; then
             title="Build succeeded"; color=5763719
           else
             title="Build failed"; color=15548997
           fi
           latest="$SERVER/$REPOSITORY/releases/latest"
-          downloads="[Linux]($latest/download/halo-linux-release.zip) · [Windows]($latest/download/halo-windows-release.zip) · [Android]($latest/download/halo-android-release.zip) ([all builds]($latest))"
+          downloads="[Linux]($latest/download/halo-linux-release.zip) · [Linux arm64]($latest/download/halo-linux-arm64-release.zip) · [Windows]($latest/download/halo-windows-release.zip) · [Android]($latest/download/halo-android-release.zip) ([all builds]($latest))"
           if [ -n "$RELEASE_TAG" ]; then
             release="[$RELEASE_TAG]($SERVER/$REPOSITORY/releases/tag/$RELEASE_TAG)"
           else
@@ -324,12 +385,13 @@ jobs:
             --arg title "$title" --argjson color "$color" --arg url "$RUN_URL" \
             --arg description "[\`${SHA:0:7}\`]($COMMIT_URL) $subject — $ACTOR ($BRANCH)" \
             --arg release "$release" --arg downloads "$downloads" \
-            --arg linux "$(status "$LINUX")" --arg windows "$(status "$WINDOWS")" --arg android "$(status "$ANDROID")" \
+            --arg linux "$(status "$LINUX")" --arg linux_arm64 "$(status "$LINUX_ARM64")" --arg windows "$(status "$WINDOWS")" --arg android "$(status "$ANDROID")" \
             --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{embeds: [{
               title: $title, url: $url, color: $color, description: $description, timestamp: $timestamp,
               fields: [
                 {name: "Linux", value: $linux, inline: true},
+                {name: "Linux arm64", value: $linux_arm64, inline: true},
                 {name: "Windows", value: $windows, inline: true},
                 {name: "Android", value: $android, inline: true},
                 {name: "Release", value: $release},
