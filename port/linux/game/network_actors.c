@@ -119,11 +119,13 @@ struct distributed_actor_state_message
 struct host_actor
 {
 	long unit_index;
-	long noted_time;
+	/* given a control since the last send (the tick's control is noted in
+	game_tick, and sent after it, once the game's time has moved on) */
+	boolean noted;
 	struct unit_control_data control;
-	/* the latest impulse, when it happened, and its count */
+	/* the latest impulse, the entries it goes in yet, and its number */
 	short impulse;
-	long impulse_time;
+	short impulse_sends;
 	byte impulse_number;
 	boolean impulse_aligned;
 	real_vector2d impulse_alignment;
@@ -148,6 +150,9 @@ struct client_actor
 
 static struct host_actor host_actors[MAXIMUM_NETWORK_ACTORS];
 static short host_actor_count;
+/* (the host) numbers the impulses of every unit: an entry forgotten and
+made again keeps clear of the number a client last played for the unit */
+static byte host_impulse_number;
 
 static struct client_actor client_actors[MAXIMUM_NETWORK_ACTORS];
 static short client_actor_count;
@@ -190,7 +195,6 @@ static struct host_actor *host_actor_for(
 	csmemset(&host_actors[host_actor_count], 0, sizeof(host_actors[0]));
 	host_actors[host_actor_count].unit_index = unit_index;
 	host_actors[host_actor_count].impulse = NONE;
-	host_actors[host_actor_count].impulse_time = NONE;
 	return &host_actors[host_actor_count++];
 }
 
@@ -228,7 +232,6 @@ static boolean actor_unit_valid(
 /* (the host) the entry sent of an actor's unit */
 static void actor_state_from_unit(
 	struct host_actor const *actor,
-	long now,
 	struct distributed_actor_state *state)
 {
 	struct unit_datum *unit = unit_get(actor->unit_index);
@@ -256,7 +259,7 @@ static void actor_state_from_unit(
 	angles_pack(&actor->control.aiming_vector, state->aiming);
 	angles_pack(&actor->control.looking_vector, state->looking);
 	state->impulse = NO_IMPULSE;
-	if (actor->impulse != NONE && now - actor->impulse_time < IMPULSE_REPEAT_TICKS)
+	if (actor->impulse != NONE && actor->impulse_sends > 0)
 	{
 		state->impulse = (byte)actor->impulse;
 		state->impulse_number = actor->impulse_number;
@@ -406,7 +409,7 @@ void network_actors_note_control(
 	actor = host_actor_for(unit_index);
 	if (!actor)
 		return;
-	actor->noted_time = game_time_get();
+	actor->noted = TRUE;
 	actor->control = *control_data;
 }
 
@@ -425,8 +428,8 @@ void network_actors_note_impulse(
 	if (!actor)
 		return;
 	actor->impulse = animation_impulse;
-	actor->impulse_time = game_time_get();
-	actor->impulse_number++;
+	actor->impulse_sends = IMPULSE_REPEAT_TICKS;
+	actor->impulse_number = ++host_impulse_number;
 	actor->impulse_aligned = alignment_vector != NULL;
 	if (alignment_vector)
 		actor->impulse_alignment = *alignment_vector;
@@ -434,8 +437,9 @@ void network_actors_note_impulse(
 
 /* (the host, after each tick) to each client the units its actors drove
 this tick: those near the client's players every tick, the others less
-often, and any with a fresh impulse at once. A unit no actor drove this
-tick is forgotten. */
+often, and any with a fresh impulse in each of its next
+IMPULSE_REPEAT_TICKS ticks. A unit no actor drove this tick is
+forgotten. */
 void network_actors_host_tick(
 	void)
 {
@@ -452,12 +456,15 @@ void network_actors_host_tick(
 	{
 		struct host_actor *actor = &host_actors[index];
 
-		if (actor->noted_time != now || !actor_unit_valid(actor->unit_index))
+		if (!actor->noted || !actor_unit_valid(actor->unit_index))
 		{
 			host_actors[index--] = host_actors[--host_actor_count];
 			continue;
 		}
-		actor_state_from_unit(actor, now, &states[state_count++]);
+		actor_state_from_unit(actor, &states[state_count++]);
+		actor->noted = FALSE;
+		if (actor->impulse_sends > 0)
+			actor->impulse_sends--;
 	}
 	for (machine_number = 0; machine_number < machine_count; machine_number++)
 	{
