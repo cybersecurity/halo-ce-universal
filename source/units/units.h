@@ -124,6 +124,15 @@ enum
 		FLAG(_unit_control_swap_weapons_bit),
 };
 
+/* port: the keyboard's action key (port/linux/include/halo_keyboard.h), with
+the action: the action alone, not the reload the controller's X falls back
+to when there is nothing to act on (players.c). It goes with the player's
+action (and over the network) but never to the unit. */
+#define UNIT_CONTROL_PORT_ACTION_ONLY_BIT 15
+typedef char verify_unit_control_port_action_only_bit[
+	UNIT_CONTROL_PORT_ACTION_ONLY_BIT >= NUMBER_OF_UNIT_CONTROL_FLAGS &&
+	UNIT_CONTROL_PORT_ACTION_ONLY_BIT < 16 ? 1 : -1];
+
 enum
 {
 	_unit_state_idle = 0,

@@ -71,11 +71,66 @@ void p2p_socket_closed(int socket, unsigned short datagram_port);
 from the main thread */
 const char *p2p_take_clipboard_text(void);
 
+/* whether a game this machine hosts may be joined from the internet (an
+invite, Discord): the PC menus' Create Game > Internet (the default), not
+> LAN */
+void p2p_set_hosting_allowed(int allowed);
+/* the invite link of the game this machine hosts (empty, 0: none, or LAN
+only) */
+int p2p_invite_link(char *link, int size);
+
 /* the hosted game's players and the most it takes, which Discord shows
 (0, 0: not hosting; until the game says, the machines the tunnel reaches
 are shown). The game's server calls it as they change (calling it with the
 same counts again costs little) */
 void p2p_set_game_player_counts(int count, int maximum);
+
+/* ---- the server browser's public games (p2p_lobby.c) */
+
+/* whether the game this machine hosts for the internet (not LAN) is listed
+in everyone's server browser: Create Game's PUBLIC; a private game is
+reached only by its invite. Going private makes a new invite, if the old one
+was listed */
+void p2p_set_hosting_public(int public);
+/* the hosted game's details as listed (printable ASCII is kept; NULL leaves
+one as it was): the game's server calls it as they change (calling it with
+the same again costs little) */
+void p2p_set_game_listing(const char *name, const char *map, const char *gametype, int engine_type, int open,
+	int in_progress, int has_teams);
+/* the server browser: while on, the public games are gathered (asked for
+when turned on, and by p2p_lobby_refresh) */
+void p2p_lobby_browse(int on);
+void p2p_lobby_refresh(void);
+
+enum
+{
+	P2P_LISTING_NAME_SIZE = 32,
+	P2P_LISTING_MAP_SIZE = 32,
+	P2P_LISTING_GAMETYPE_SIZE = 24,
+	/* an invite link's text (P2P_LINK_SIZE) */
+	P2P_LISTING_INVITE_SIZE = 77,
+};
+
+struct p2p_listing
+{
+	char invite[P2P_LISTING_INVITE_SIZE];
+	/* the host's (its XNADDR's abEnet once reached) */
+	unsigned char identifier[6];
+	char name[P2P_LISTING_NAME_SIZE + 1];
+	char map[P2P_LISTING_MAP_SIZE + 1];
+	char gametype[P2P_LISTING_GAMETYPE_SIZE + 1];
+	unsigned char player_count, maximum_player_count, engine_type;
+	unsigned char open, in_progress, has_teams;
+	/* joining it failed this run (p2p_lobby_mark_failed) */
+	unsigned char failed;
+	/* milliseconds, -1 if not known */
+	short ping;
+};
+/* a copy of the public games found, in the order shown (the most players
+first; then those not failed, the open ones, by name); returns their count */
+int p2p_lobby_games(struct p2p_listing *games, int maximum_count);
+/* a game the browser could not join: kept, marked failed, for this run */
+void p2p_lobby_mark_failed(const unsigned char *identifier);
 
 /* the sizes of a Discord user's id and name as kept (with their end), and
 the text kept of either as told: only the characters allowed (digits in an

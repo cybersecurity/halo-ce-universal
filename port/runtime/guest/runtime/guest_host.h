@@ -110,4 +110,10 @@ int host_ios_room_ping(unsigned int address, unsigned int host, unsigned int epo
 unsigned int host_ios_render_height(void);
 int host_ios_metalfx_present(unsigned int texture, unsigned int width, unsigned int height, unsigned int output_width, unsigned int output_height);
 
+int host_ios_browser_mode(void);
+void host_ios_browser_open(void);
+int host_ios_browser_update(const void *listings, int count, void *chosen);
+void host_ios_browser_close(void);
+void host_ios_browser_error(const char *message);
+
 #endif

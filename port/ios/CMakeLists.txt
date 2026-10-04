@@ -19,7 +19,7 @@ add_executable(HaloCE MACOSX_BUNDLE
     ${HALO_PLATFORM_SOURCES} "${ROOT}/port/runtime/xiso.c" "${ROOT}/port/apple/game_store.m"
     host/host_main.m host/host_memory.c host/host_loader.c host/host_syscall.c host/host_gl.c host/host_debug.m host/host_metalfx.m host/host_graphics.m host/host_shader_cache.m host/guest_call.S
     host/host_thread.c host/host_sdl.c network/host_room.m network/room_bridge.c
-    "${ROOT}/port/web/src/web_net.c"
+    "${ROOT}/port/ios/network/host_web_net.c" "${ROOT}/port/ios/network/host_net.c" "${ROOT}/port/ios/network/host_browser.m"
     "${ROOT}/port/linux/src/posix_files.c" host/posix_net.c
     "${ROOT}/build/ios/host/bridges.c" "${ROOT}/build/ios/embedded/guest_image.S")
 target_include_directories(HaloCE PRIVATE host network "${ROOT}/port/web/src" "${ROOT}/port/runtime" "${ROOT}/port/runtime/include"
@@ -77,3 +77,6 @@ set_source_files_properties("${ROOT}/port/apple/DISTRIBUTION.md" PROPERTIES MACO
 
 target_sources(HaloCE PRIVATE LaunchScreen.storyboard)
 set_source_files_properties(LaunchScreen.storyboard PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+
+target_sources(HaloCE PRIVATE "${ROOT}/port/third_party/monocypher/LICENCE.md")
+set_source_files_properties("${ROOT}/port/third_party/monocypher/LICENCE.md" PROPERTIES MACOSX_PACKAGE_LOCATION Resources/Licenses/Monocypher)

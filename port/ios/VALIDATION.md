@@ -2,7 +2,7 @@
 
 This record applies to `apple/ios-web-multiplayer`, based on PR #12 at
 `eaa82e6803f3d3e67c91d7f2fa2b15ee04e195f5` and the iOS fork at
-`3f2c14101d3ae1c7f0c0a11993a43407fadbeb46`. Updated 2026-10-03.
+`3f2c14101d3ae1c7f0c0a11993a43407fadbeb46`. Updated 2026-10-04.
 Reports of gameplay on the original iOS fork are not validation of this merge.
 
 ## Observed locally
@@ -270,3 +270,37 @@ cases above are still unverified. Keep the PR in draft until those checks pass.
   and Gatekeeper checks pass. After extracting the final ZIP, the raw bundle
   name, full application name and short localized icon label still match.
   Sent `Halo-0.1.6-AppleSilicon.zip` to the MacBook using Taildrop.
+
+## Public servers — 0.1.7 (11), 2026-10-04
+
+- Signed iPhone 15 Pro build installed as `com.LoganShire.HaloCE`, preserving
+  imported game data and saves. Native networking is now the default.
+- Physical phone discovered 14 signed protocol-11 public listings. An initial
+  join investigation exposed the missing Darwin `recvmsg` sockaddr conversion;
+  the new native TCP/UDP sanitizer test reproduces that defect and passes with
+  the fix. This is separate from the earlier public-WASM protocol-6 mismatch.
+- Real Mac ARM64 client joined `[D] Slayer` through public MQTT discovery and
+  the native internet tunnel; the game logged successful machine admission,
+  player registration and `Multiplayer playing: Multiplayer is ready.` No
+  local fixture or WebRTC relay was used. This is a join/load smoke test,
+  not a sustained match or movement/fire replication test.
+- The first native join exposed upstream's protocol-11 settings extension
+  (13,092 to 13,120 bytes). Imported the PC game-rule extension from `c9ee319a`
+  and its client gameplay handling. Older incoming records expand to default
+  rules; Apple browser-room hosting emits the old settings layout. Browser
+  crossplay and mixed-version checkpoint migration need fresh validation;
+  the historical results above do not establish those for 0.1.7.
+- Quick-play timing regression: selecting a room/server inside the native
+  command pump advances the clock. Refreshing `now` after pumping avoids an
+  unsigned-wrap timeout immediately after selection. The production state
+  machine test covers this and passes with sanitizers.
+- `python3 tools/ios_test.py` passed: guest ABI/memory, audio, display, 16 XISO
+  tests, virtual room queues/sockets, shader cache, real Darwin TCP/UDP and
+  quick-play lifecycle. Both Apple release targets compiled successfully.
+- Server UI is an Apple presentation of upstream `c04765d7` P2P discovery,
+  not PR #69's optional HTTP list. Native automatic UPnP and hosting UI are
+  outside this change; NAT reachability is not guaranteed for every server.
+
+Developer-only launch variables: `HALO_NATIVE_TEST_BROWSER=1` opens the browser
+20 seconds after game event pumping starts; optional `HALO_NATIVE_TEST_JOIN`
+selects exactly one named server once. Neither is set in ordinary launches.

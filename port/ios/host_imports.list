@@ -1,1 +1,6 @@
 host_apple_poll_event
+host_ios_browser_mode
+host_ios_browser_open
+host_ios_browser_update
+host_ios_browser_close
+host_ios_browser_error

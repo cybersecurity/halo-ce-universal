@@ -3185,6 +3185,7 @@ void network_game_server_change_game_variant(
 		server->state == _network_game_server_state_pregame);
 
 	csmemcpy(&server->game.variant, variant, sizeof(server->game.variant));
+	game_variant_options_default(&server->game.variant, &server->game.variant_options);
 
 	if (!network_game_server_send_game_data_pregame(server))
 	{
@@ -3880,6 +3881,7 @@ static boolean network_game_server_setup_game_from_playlist(
 			server->game.minimum_players = 1;
 #endif
 		server->game.maximum_players = MAXIMUM_NETWORK_PLAYER_COUNT;
+		game_variant_options_default(&server->game.variant, &server->game.variant_options);
 
 		if (server->game.variant.universal_variant.teams)
 		{

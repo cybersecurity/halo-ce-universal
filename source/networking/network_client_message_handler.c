@@ -936,9 +936,12 @@ static boolean network_game_client_receive_game_settings_piece(
 {
 	boolean result = TRUE;
 
-	if (piece->total_size != sizeof(network_game_client_settings_staging) ||
+	/* Protocol 11 exists with and without the 28-byte PC rule extension.
+       Assemble either complete record, then expand the older layout. */
+    if ((piece->total_size != sizeof(network_game_client_settings_staging) &&
+         piece->total_size != sizeof(network_game_client_settings_staging) - sizeof(struct game_variant_options)) ||
 		piece->length > sizeof(piece->data) ||
-		piece->offset + piece->length > sizeof(network_game_client_settings_staging))
+		piece->offset + piece->length > piece->total_size)
 	{
 		network_event("got a message_server_game_settings_update piece for a different game layout");
 		network_game_client_settings_staging_size = 0;
@@ -965,6 +968,14 @@ static boolean network_game_client_receive_game_settings_piece(
 			network_game_client_settings_staging_size += piece->length;
 			if (network_game_client_settings_staging_size == piece->total_size)
 			{
+                if(piece->total_size != sizeof(network_game_client_settings_staging)) {
+                    byte *bytes=(byte *)&network_game_client_settings_staging;
+                    csmemmove(bytes+HALO_PORT_NETWORK_GAME_LOCAL_DATA_OFFSET,
+                        bytes+HALO_PORT_NETWORK_GAME_VARIANT_OPTIONS_OFFSET,
+                        sizeof(network_game_client_settings_staging.local_data));
+                    game_variant_options_default(&network_game_client_settings_staging.variant,
+                        &network_game_client_settings_staging.variant_options);
+                }
 				network_game_client_settings_staging_size = 0;
 				result = network_game_client_game_settings_updated(client, &network_game_client_settings_staging);
 				if (!result)

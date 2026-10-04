@@ -24,6 +24,11 @@ static boolean paused, migration_ready, cohort_ready, migration_supported;
 static unsigned long engine_epoch;
 static char last_phase[32];
 
+static unsigned long room_advance;
+int host_ios_browser_mode(void) { return 1; }
+void ios_room_pump(void) {
+    if(room_advance) { clock_ms+=room_advance;room_advance=0;ios_quick_play_begin(0,0x0a010203UL,0); }
+}
 unsigned long system_milliseconds(void) { return clock_ms; }
 const char *config_string(const char *name) { return !strcmp(name, "network.quick_play") ? mode : target; }
 double emscripten_get_now(void) { return (double)clock_ms; }
@@ -108,6 +113,14 @@ static void launch(const char *setting)
 
 int main(void)
 {
+#ifdef HALO_IOS_BROWSER
+    /* Native modal selection advances time inside the command pump. A stale
+       pre-pump clock would unsigned-wrap and instantly time out the new join. */
+    reset("");room_advance=5000;step(0,TRUE);
+    assert(quick_play.phase==QUICK_SETTLING && !aborts);
+    step(2000,TRUE);assert(quick_play.phase==QUICK_SEARCHING && created==1);
+#endif
+
     /* Room selection can start after normal menu startup, then start again
        after a previous session; no stale ownership/map/epoch is retained. */
     reset("");step(0,TRUE);assert(created==0 && quick_play.checked);

@@ -145,12 +145,17 @@ static void exportReport(UIViewController *presenter) {
 - (void)presentationControllerDidDismiss:(UIPresentationController *)presentationController {
     (void)presentationController;debugController=nil;host_ios_touch_focus();
 }
-- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {(void)table;(void)section;return halo_graphics_prefer_metal()?5:4;}
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {(void)table;(void)section;return halo_graphics_prefer_metal()?6:5;}
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
     (void)table;UITableViewCell *cell=[[UITableViewCell alloc]initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
     cell.detailTextLabel.numberOfLines=0;
     BOOL selectedMetal=halo_graphics_prefer_metal();
-    if(path.row==0) {
+    if(path.row==(selectedMetal?5:4)) {
+        cell.textLabel.text=@"Browser rooms (experimental)";
+        cell.detailTextLabel.text=@"Off: public server browser. On: WebRTC room codes. Relaunch after changing.";
+        UISwitch *toggle=[UISwitch new];toggle.on=[NSUserDefaults.standardUserDefaults boolForKey:@"HaloBrowserRooms"];
+        [toggle addTarget:self action:@selector(networkChanged:) forControlEvents:UIControlEventValueChanged];cell.accessoryView=toggle;
+    } else if(path.row==0) {
         cell.textLabel.text=@"Renderer";
         BOOL pending=selectedMetal!=halo_graphics_metal();
         cell.detailTextLabel.text=pending?@"Relaunch the app to use this renderer.":(halo_graphics_metal()?@"Metal via ANGLE. Changes apply after relaunch.":@"OpenGL ES. Changes apply after relaunch.");
@@ -174,6 +179,7 @@ static void exportReport(UIViewController *presenter) {
     }
     return cell;
 }
+- (void)networkChanged:(UISwitch *)sender {[NSUserDefaults.standardUserDefaults setBool:sender.on forKey:@"HaloBrowserRooms"];}
 - (void)rendererChanged:(UISegmentedControl *)sender {
     halo_graphics_set_preference(sender.selectedSegmentIndex==1);[self.tableView reloadData];
 }
@@ -230,6 +236,9 @@ void halo_debug_present(void) {
         [stack addArrangedSubview:self.recordButton];
         NSTextField *note=[NSTextField wrappingLabelWithString:@"Compile/link stalls are recorded automatically. First-use GPU recording adds synchronization overhead; disable it for normal play."];
         [stack addArrangedSubview:note];[note.widthAnchor constraintEqualToAnchor:stack.widthAnchor].active=YES;
+        NSButton *rooms=[NSButton checkboxWithTitle:@"Browser rooms (experimental; relaunch required)" target:self action:@selector(network:)];
+        rooms.state=[NSUserDefaults.standardUserDefaults boolForKey:@"HaloBrowserRooms"]?NSControlStateValueOn:NSControlStateValueOff;
+        [stack addArrangedSubview:rooms];
         [stack addArrangedSubview:[NSButton buttonWithTitle:@"AirDrop shader report…" target:self action:@selector(share:)]];
         [stack addArrangedSubview:[NSButton buttonWithTitle:@"Clear recorded events" target:self action:@selector(clear:)]];
         self.eventCount=[NSTextField labelWithString:@""];[stack addArrangedSubview:self.eventCount];
@@ -253,6 +262,7 @@ void halo_debug_present(void) {
     }
 }
 -(void)windowWillClose:(NSNotification *)notification {(void)notification;debugPresented=NO;}
+-(void)network:(NSButton *)item {[NSUserDefaults.standardUserDefaults setBool:item.state==NSControlStateValueOn forKey:@"HaloBrowserRooms"];}
 -(void)upscale:(NSButton *)item {BOOL on=item.state==NSControlStateValueOn;halo_metalfx_set_enabled(on);[NSUserDefaults.standardUserDefaults setBool:on forKey:@"HaloMetalFX"];[self refresh];}
 -(void)record:(NSButton *)item {BOOL on=item.state==NSControlStateValueOn;atomic_store(&recording,on);[drawnPrograms removeAllObjects];[NSUserDefaults.standardUserDefaults setBool:on forKey:@"HaloRecordShaderStalls"];[self refresh];}
 -(void)share:(id)sender {(void)sender;exportReport(nil);}

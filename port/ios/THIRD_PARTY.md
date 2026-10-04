@@ -31,3 +31,7 @@ The download is pinned by SHA-256 in `tools/ios_angle.py`. ANGLE and translator
 dependency notices (xxHash, ceval, glslang, SPIR-V headers/tools/cross, Abseil,
 and zlib) are copied into the app's `Licenses` directory. ANGLE receives only
 native graphics calls; it is not a browser or a WASM runtime.
+
+- Monocypher 4.0.3, vendored from upstream `c04765d7`, implements the signed
+  public-server listings. See `port/third_party/monocypher/LICENCE.md`; that
+  license is included in both app bundles under Licenses/Monocypher.

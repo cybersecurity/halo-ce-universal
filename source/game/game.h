@@ -150,6 +150,11 @@ void game_difficulty_level_set(short difficulty);
 short game_difficulty_level_get(void);
 short game_difficulty_level_get_ignore_easy(void);
 void game_set_game_variant(struct game_variant *variant);
+/* port: the PC options the game plays by (game_engine.h): the variant's
+defaults once it is set, then the network game's */
+struct game_variant_options;
+void game_set_game_variant_options(struct game_variant_options const *options);
+struct game_variant_options const *game_variant_options_get(void);
 void game_set_game_engine_index(short index);
 boolean game_all_quiet(
 	void);

@@ -261,7 +261,7 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         abi, code, "-std=gnu11", "-D_GNU_SOURCE", "-DHALO_LINUX_PLATFORM_LAYER", "-w",
         f"-include {prefix_header}", f"-include {platform_semantics_header}",
         f"-I{PORT_DIR}/include", f"-I{PORT_DIR}/src", f"-I{LINUX_DIR}/src", f"-I{LINUX_DIR}/include",
-        f"-I{TOML_DIR}", f"-I{KCP_DIR}", "-Isource -Isource/cseries",
+        f"-I{TOML_DIR}", f"-I{KCP_DIR}", "-Iport/third_party/monocypher", "-Isource -Isource/cseries",
         f"-I{SDL_DIR}/include", f"-idirafter {XDK_INCLUDE}",
     ])
     # posix_*.c talk to the C library only, with its own ABI (as on Linux)
@@ -280,6 +280,8 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         add_object(source, posix_cflags if source.name in ("web_stubs.c", "web_net.c") else platform_cflags)
     add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))
     add_object(KCP_DIR / "ikcp.c", " ".join([abi, "-std=gnu11", "-w"]))
+    for name in ("monocypher.c", "monocypher-ed25519.c"):
+        add_object(Path("port/third_party/monocypher") / name, " ".join([abi, "-std=gnu11", "-w"]))
     musl_math_cflags = " ".join([
         abi, "-std=gnu11", "-w", f"-I{MUSL_MATH_DIR}/include", f"-include {MUSL_MATH_DIR}/include/libm.h",
     ])

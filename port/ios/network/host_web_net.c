@@ -1,0 +1,24 @@
+/* Keep the PR #12 virtual sockets available as a separate transport. */
+#define posix_socket_last_error ios_web_posix_socket_last_error
+#define posix_socket ios_web_posix_socket
+#define posix_socket_close ios_web_posix_socket_close
+#define posix_socket_bind ios_web_posix_socket_bind
+#define posix_socket_connect ios_web_posix_socket_connect
+#define posix_socket_listen ios_web_posix_socket_listen
+#define posix_socket_accept ios_web_posix_socket_accept
+#define posix_socket_send ios_web_posix_socket_send
+#define posix_socket_sendto ios_web_posix_socket_sendto
+#define posix_socket_recv ios_web_posix_socket_recv
+#define posix_socket_recvfrom ios_web_posix_socket_recvfrom
+#define posix_socket_shutdown ios_web_posix_socket_shutdown
+#define posix_socket_set_nonblocking ios_web_posix_socket_set_nonblocking
+#define posix_socket_bytes_available ios_web_posix_socket_bytes_available
+#define posix_socket_set_nodelay ios_web_posix_socket_set_nodelay
+#define posix_socket_setsockopt ios_web_posix_socket_setsockopt
+#define posix_socket_getsockopt ios_web_posix_socket_getsockopt
+#define posix_socket_getsockname ios_web_posix_socket_getsockname
+#define posix_socket_getpeername ios_web_posix_socket_getpeername
+#define posix_socket_select ios_web_posix_socket_select
+#define posix_local_ipv4_address ios_web_posix_local_ipv4_address
+#define posix_resolve_ipv4 ios_web_posix_resolve_ipv4
+#include "../../web/src/web_net.c"

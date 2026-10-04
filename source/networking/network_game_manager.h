@@ -62,6 +62,8 @@ struct network_game
 	short __unknown426;
 	unsigned long random_seed;
 	long number_of_games_played;
+	/* port: the gametype's PC options (game_engine.h) */
+	struct game_variant_options variant_options;
 	struct network_game_local_data local_data;
 };
 

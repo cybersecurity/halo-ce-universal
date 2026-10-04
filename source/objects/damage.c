@@ -1381,6 +1381,8 @@ void object_cause_damage(
 	short body_part;
 	short object_number;
 	long damaged_object_indices[16];
+	/* port: the gametype's friendly fire (game_engine_friendly_damage) */
+	short friendly_damage;
 
 	/* the distributed netcode (port/linux/NETCODE.md): the host deals
 	damage; a client reports its own players' hits instead, and the host
@@ -1609,6 +1611,7 @@ void object_cause_damage(
 			body_damage_multiplier = 0.f;
 			being_damaged_flags = 0;
 			body_part = NONE;
+			friendly_damage = _friendly_damage_all;
 
 			if (collision_model_index != NONE)
 			{
@@ -1646,6 +1649,10 @@ void object_cause_damage(
 						being_damaged_flags,
 						_object_being_damaged_by_friendly_bit,
 						TRUE);
+					friendly_damage = game_engine_friendly_damage(damage->owner_player_index, current_object_index,
+						TEST_FLAG(damage->flags, _damage_area_of_effect_bit) ||
+						damage_definition->category == _damage_category_grenade ||
+						damage_definition->category == _damage_category_highexplosive);
 				}
 
 				if (damaged_object_count == 0 &&
@@ -1701,7 +1708,8 @@ void object_cause_damage(
 						TRUE);
 				}
 
-				if (!TEST_FLAG(damage->flags, _damage_bypasses_shields_bit) &&
+				if (friendly_damage != _friendly_damage_none &&
+					!TEST_FLAG(damage->flags, _damage_bypasses_shields_bit) &&
 					!TEST_FLAG(damage_definition->flags, _damage_skips_shields_bit) &&
 					current_object->object.maximum_shield_vitality > 0.f &&
 					(damaged_object_count == 0 ||
@@ -1720,7 +1728,8 @@ void object_cause_damage(
 						&total_damage);
 				}
 
-				if ((damaged_object_count == 0 ||
+				if (friendly_damage == _friendly_damage_all &&
+					(damaged_object_count == 0 ||
 						(parent_takes_body_damage &&
 							TEST_FLAG(
 								collision_model->resistance.flags,

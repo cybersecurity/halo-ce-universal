@@ -752,6 +752,18 @@ boolean network_game_server_send_game_settings_to_client_machine(
 	struct message_server_game_settings_update message;
 	long offset;
 
+#ifdef HALO_IOS_BROWSER
+    byte legacy_game[HALO_PORT_NETWORK_GAME_SIZE];
+    int host_ios_browser_mode(void);
+    if(host_ios_browser_mode() && game_size==sizeof(struct network_game)) {
+        csmemcpy(legacy_game,game,HALO_PORT_NETWORK_GAME_VARIANT_OPTIONS_OFFSET);
+        csmemcpy(legacy_game+HALO_PORT_NETWORK_GAME_VARIANT_OPTIONS_OFFSET,
+            (byte const *)game+HALO_PORT_NETWORK_GAME_LOCAL_DATA_OFFSET,
+            sizeof(((struct network_game *)0)->local_data));
+        game=legacy_game;game_size-=sizeof(struct game_variant_options);
+    }
+#endif
+
 	for (offset = 0; offset < game_size; offset += sizeof(message.data))
 	{
 		void *encoded_message;
@@ -1027,6 +1039,18 @@ boolean network_game_server_send_game_settings_to_all_machines(
 	/* every piece goes out even if one fails for a machine: the others
 	would otherwise keep the old settings (a machine whose connection failed
 	is closed, and is skipped when the update is sent again) */
+#ifdef HALO_IOS_BROWSER
+    byte legacy_game[HALO_PORT_NETWORK_GAME_SIZE];
+    int host_ios_browser_mode(void);
+    if(host_ios_browser_mode() && game_size==sizeof(struct network_game)) {
+        csmemcpy(legacy_game,game,HALO_PORT_NETWORK_GAME_VARIANT_OPTIONS_OFFSET);
+        csmemcpy(legacy_game+HALO_PORT_NETWORK_GAME_VARIANT_OPTIONS_OFFSET,
+            (byte const *)game+HALO_PORT_NETWORK_GAME_LOCAL_DATA_OFFSET,
+            sizeof(((struct network_game *)0)->local_data));
+        game=legacy_game;game_size-=sizeof(struct game_variant_options);
+    }
+#endif
+
 	for (offset = 0; offset < game_size; offset += sizeof(message.data))
 	{
 		void *encoded_message;

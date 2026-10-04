@@ -1,3 +1,4 @@
+#include "../network/network_mode.h"
 #include "host_graphics.h"
 #include "host_debug.h"
 #import "../../apple/game_store.h"
@@ -115,7 +116,10 @@ int main(int argc,char **argv) {
 #if HALO_MACOS
         env[env_count++]="HALO_DESKTOP_INPUT=1";
 #endif
-        env[env_count++]="HALO_NET_ONLINE=0";
+        halo_browser_rooms=[NSUserDefaults.standardUserDefaults boolForKey:@"HaloBrowserRooms"];
+        if([NSProcessInfo.processInfo.environment[@"HALO_IOS_TEST_ROOM"] length])halo_browser_rooms=1;
+        env[env_count++]=halo_browser_rooms?"HALO_NET_ONLINE=0":"HALO_NET_ONLINE=1";
+        host_logf(HOST_LOG_INFO,"Multiplayer transport: %s",halo_browser_rooms?"WebRTC rooms":"native public servers");
         env[env_count++]="TZ=UTC0";env[env_count++]=NULL;
         uint32_t *environment=host_low_map(sizeof(uint32_t)*env_count,PROT_READ|PROT_WRITE);
         for(size_t i=0;i<env_count-1;i++)environment[i]=copy_string(env[i]);environment[env_count-1]=0;

@@ -10,6 +10,8 @@ p2p_discord.c; see p2p.c for the design).
 
 #include "p2p.h"
 
+#include <pthread.h>
+
 enum
 {
 	/* a machine's identifier: from the hash of its public key (which is new
@@ -30,6 +32,17 @@ enum
 	link game's 128 machines (include/halo_port_limits.h) */
 	P2P_MAXIMUM_PEERS = 127,
 };
+
+typedef char p2p_listing_invite_size_assert[P2P_LISTING_INVITE_SIZE == P2P_LINK_SIZE ? 1 : -1];
+
+/* the prefix of a public game's slot (a key hash in hex follows), and the
+topic of queries (p2p_lobby.c) */
+#define P2P_LOBBY_SLOT_PREFIX "hceu/3/lobby/s/"
+#define P2P_LOBBY_QUERY_TOPIC "hceu/3/lobby/q"
+
+/* internet play's state (p2p.c), which the game's threads and the p2p
+thread share */
+extern pthread_mutex_t p2p_lock;
 
 struct p2p_candidate
 {
@@ -57,6 +70,10 @@ int p2p_local_candidates(struct p2p_candidate *candidates, int maximum_count);
 /* this run's X25519 public key (P2P_KEY_SIZE bytes), whose hash the
 identifier is (p2p_identifier) */
 const unsigned char *p2p_public_key(void);
+/* this run's Ed25519 public key (the X25519 one's, p2p_ed25519_to_x25519),
+and a signature with it */
+const unsigned char *p2p_signing_key(void);
+void p2p_sign(const void *message, int size, unsigned char *signature);
 /* the identifier of the machine with this public key */
 void p2p_identifier_for(const unsigned char *public_key, unsigned char *identifier);
 /* the hash of a public key an invite holds (P2P_KEY_HASH_SIZE bytes), and
@@ -87,6 +104,10 @@ int p2p_peer_reoffered(const unsigned char *identifier, const unsigned char *sec
 /* an invite that arrived on the p2p thread (from Discord, or another copy
 of the game) */
 void p2p_invite_received(const char *text);
+/* a new invite (token) for the game hosted, if its invite was listed in the
+server browser (going private: those who saw it must not get in); under
+p2p_lock */
+void p2p_new_invite_if_listed(void);
 
 /* ---------- p2p_signal.c: signalling through public MQTT brokers */
 
@@ -107,6 +128,19 @@ void p2p_signal_join(const unsigned char *host_hash, const unsigned char *token)
 void p2p_signal_stop_joining(void);
 /* whether any broker is connected */
 int p2p_signal_connected(void);
+/* the server browser's topics: the own slot and the queries (a listed
+game), and every slot (browsing) */
+void p2p_signal_lobby_topics(int listed, int browsing);
+/* publishes a listing to the own slot on every broker, retained, and again
+on each broker that connects later; closing: a tombstone, after which the
+slot is cleared and nothing is published again */
+void p2p_signal_lobby_publish(const unsigned char *listing, int size, int closing);
+/* asks the hosts to publish again */
+void p2p_signal_lobby_query(void);
+/* the game is quitting: the tombstone published (p2p_signal_lobby_publish)
+and the slot cleared on every ready broker now, whatever their buckets, and
+the connections closed cleanly */
+void p2p_signal_lobby_quit(void);
 
 /* ---------- p2p_crypto.c */
 
@@ -142,6 +176,47 @@ int p2p_equal(const void *first, const void *second, int size);
 /* X25519: scalar times point (NULL: the base point, which gives the public
 key of the secret key scalar) */
 void p2p_x25519(unsigned char *result, const unsigned char *scalar, const unsigned char *point);
+
+enum
+{
+	/* an Ed25519 seed (a run's key comes from one) and signature */
+	P2P_SEED_SIZE = 32,
+	P2P_SIGNATURE_SIZE = 64,
+	P2P_SHA512_SIZE = 64,
+};
+
+void p2p_sha512(const void *data, int size, unsigned char *digest);
+/* Ed25519 (with SHA-512): a seed's public key (P2P_KEY_SIZE bytes) and,
+unless NULL, its X25519 secret key (the scalar it signs with, whose X25519
+public key is p2p_ed25519_to_x25519 of the Ed25519 one) */
+void p2p_ed25519_public(const unsigned char *seed, unsigned char *public_key, unsigned char *x25519_secret);
+void p2p_ed25519_sign(const unsigned char *seed, const unsigned char *public_key, const void *message, int size,
+	unsigned char *signature);
+/* whether the signature is the key's, of the message (never for a key of
+small order, which anyone can sign for) */
+int p2p_ed25519_verify(const unsigned char *public_key, const void *message, int size,
+	const unsigned char *signature);
+/* the X25519 public key of an Ed25519 one; 0 if it has a small order */
+int p2p_ed25519_to_x25519(const unsigned char *public_key, unsigned char *x25519_public);
+
+/* ---------- p2p_lobby.c: public games' listings */
+
+/* the p2p thread's pass: the token of the game hosted for the internet
+(NULL if none) and its player counts */
+void p2p_lobby_update(const unsigned char *token, int player_count, int maximum_player_count);
+/* whether the game hosted is listed now, and whether the browser is open */
+int p2p_lobby_listed(void);
+int p2p_lobby_browsing(void);
+/* a message on a slot (its key hash in hex) through a broker; retained: the
+slot's retained copy, sent on subscribing */
+void p2p_lobby_slot_heard(const char *hash_text, const unsigned char *payload, int size, int retained);
+/* a query was heard */
+void p2p_lobby_query_heard(void);
+/* the game is quitting: a listed game's tombstone, and its slot cleared,
+written to the brokers at once; under p2p_lock */
+void p2p_lobby_quit(void);
+/* a key hash's slot */
+void p2p_lobby_slot_topic(const unsigned char *key_hash, char *topic, int size);
 
 /* ---------- p2p_discord.c: rich presence and invites through the Discord
 desktop client */

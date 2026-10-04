@@ -1,4 +1,4 @@
-/* Real OS sockets are internal; the game uses PR #12 virtual sockets. */
+/* Darwin implementation behind the native / WebRTC transport selection. */
 #define posix_socket_last_error ios_native_posix_socket_last_error
 #define posix_socket ios_native_posix_socket
 #define posix_socket_close ios_native_posix_socket_close
@@ -71,6 +71,12 @@ static ssize_t ios_sendto(int fd,const void *p,size_t n,int flags,const void *ad
 static ssize_t ios_recvfrom(int fd,void *p,size_t n,int flags,void *address,socklen_t *size) {
     ssize_t out=recvfrom(fd,p,n,flags,address,size);if(out>=0 && size)sockaddr_outward(address,*size);return out;
 }
+/* The shared helper uses recvmsg to detect truncated datagrams, not recvfrom. */
+static ssize_t ios_recvmsg(int fd,struct msghdr *message,int flags) {
+    ssize_t result=recvmsg(fd,message,flags);
+    if(result>=0)sockaddr_outward(message->msg_name,message->msg_namelen);
+    return result;
+}
 static int ios_getsockname(int fd,void *p,socklen_t *n) {int r=getsockname(fd,p,n);if(!r)sockaddr_outward(p,*n);return r;}
 static int ios_getpeername(int fd,void *p,socklen_t *n) {int r=getpeername(fd,p,n);if(!r)sockaddr_outward(p,*n);return r;}
 static ssize_t ios_getrandom(void *p,size_t size,unsigned flags) {(void)flags;arc4random_buf(p,size);return size;}
@@ -80,19 +86,20 @@ static ssize_t ios_getrandom(void *p,size_t size,unsigned flags) {(void)flags;ar
 #define accept4 ios_accept4
 #define sendto ios_sendto
 #define recvfrom ios_recvfrom
+#define recvmsg ios_recvmsg
 #define getsockname ios_getsockname
 #define getpeername ios_getpeername
 #define getrandom ios_getrandom
 #include "../../linux/src/posix_net.c"
 
-/* Browser rooms use ICE/STUN/TURN; native router forwarding is disabled. */
+/* Native clients use upstream STUN/hole punching. Router forwarding is not enabled. */
 int posix_upnp_forward_udp(unsigned short port, unsigned short preferred_port,
     posix_ulong *address, unsigned short *external_port, char *error, int error_size)
 {
     (void)port; (void)preferred_port;
     if (address) *address = 0;
     if (external_port) *external_port = 0;
-    if (error && error_size > 0) snprintf(error, (size_t)error_size, "Browser rooms use WebRTC");
+    if (error && error_size > 0) snprintf(error, (size_t)error_size, "Router port forwarding is unavailable on this Apple build");
     return 0;
 }
 void posix_upnp_stop_forwarding_udp(unsigned short port) { (void)port; }

@@ -281,6 +281,9 @@ symbols in this file:
 definition's signature */
 short unit_get_local_player_index(long unit_index);
 #endif
+/* port: an unarmed player's melee's length, in ticks (a weapon's is about
+this: its first person melee animation, sped up a quarter) */
+#define UNARMED_MELEE_TICKS 16
 
 /* ---------- constants */
 
@@ -4292,12 +4295,25 @@ boolean biped_update(
 					biped_index,
 					unit_get(biped_index)->unit.current_weapon_index);
 
-				if (!weapon_prevents_melee_attack(weapon_index) &&
+				/* (port: and with no weapon, which prevents it in the
+				Xbox game: a gametype's loadout of none) */
+				if ((weapon_index == NONE || !weapon_prevents_melee_attack(weapon_index)) &&
 					biped->unit.current_zoom_level==NONE)
 				{
 					short melee_speedup_ticks;
 
 					unit_animation_start_action(biped_index, _unit_animation_action_melee);
+					/* port: a player with no weapon (a gametype's loadout of
+					none) melees too: in a weapon's usual time, the hit
+					halfway (the Xbox game read the timing from the weapon's
+					animations, through a weapon it did not check) */
+					if (weapon_index == NONE)
+					{
+						biped->biped.player_melee_ticks = UNARMED_MELEE_TICKS;
+						biped->biped.player_melee_attack_tick = UNARMED_MELEE_TICKS / 2;
+					}
+					else
+					{
 					weapon_stop_reload(weapon_index);
 					first_person_weapon_message_from_unit(
 						biped_index,
@@ -4313,6 +4329,7 @@ boolean biped_update(
 							_weapon_first_person_animation_time_private_key_frame,
 							_first_person_weapon_animation_melee,
 							NONE);
+					}
 
 					melee_speedup_ticks = biped->biped.player_melee_ticks >> 2;
 					biped->biped.player_melee_ticks -= melee_speedup_ticks;

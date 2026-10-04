@@ -571,6 +571,9 @@ symbols in this file:
 #include "networking/network_migration.h"
 #include "../../port/web/src/web_ping.h"
 #endif
+#include "networking/network_game_manager.h"
+/* (network_server_manager_internal.h's: the host's game record) */
+struct network_game *network_game_server_get_game(struct network_game_server *server);
 #include "objects.h"
 #include "objects/damage_effect_definitions.h"
 #include "physics/collision_features.h"
@@ -626,11 +629,6 @@ enum
 
 enum
 {
-	_game_variant_generic_starting_equipment_bit = 5,
-};
-
-enum
-{
 	_game_engine_all = 12,
 	_game_engine_all_non_team,
 	_game_engine_all_normal,
@@ -680,6 +678,10 @@ enum game_engine_weapons
 	_game_engine_weapons_short_range,
 	_game_engine_weapons_human,
 	_game_engine_weapons_no_grenades,
+	/* port: the PC version's */
+	_game_engine_weapons_covenant,
+	_game_engine_weapons_classic,
+	_game_engine_weapons_heavy,
 	NUMBER_OF_GAME_ENGINE_WEAPON_SETS,
 };
 
@@ -1096,6 +1098,7 @@ static void game_engine_generate_title_string(
 {
 	wchar_t *secondary_string;
 	wchar_t life_string[128];
+	wchar_t time_left_string[160];
 	wchar_t score_string[256];
 	long string_list_index;
 	wchar_t *format_string;
@@ -1161,6 +1164,24 @@ static void game_engine_generate_title_string(
 			secondary_string = life_string;
 			break;
 		}
+	}
+
+	/* port: the gametype's time limit's time left (game_variant_options) */
+	if (game_variant_options_get()->time_limit > 0 &&
+		game_engine_globals.postgame_state == game_engine_mode_active)
+	{
+		long left = game_variant_options_get()->time_limit * 60L * TICKS_PER_SECOND - game_time_get();
+		wchar_t time_string[32];
+
+		ticks_to_unicode_time_string(MAX(left, 0), NUMBEROF(time_string), time_string);
+		if (secondary_string[0] && secondary_string != time_left_string)
+		{
+			usnprintf(time_left_string, NUMBEROF(time_left_string), L"%s, %s left", secondary_string, time_string);
+		}
+		else
+			usnprintf(time_left_string, NUMBEROF(time_left_string), L"%s left", time_string);
+		time_left_string[NUMBEROF(time_left_string) - 1] = 0;
+		secondary_string = time_left_string;
 	}
 
 	if (game_engine_globals.postgame_state == game_engine_mode_postgame_delay)
@@ -1780,6 +1801,7 @@ long distributed_player_ping(short player_index);
 /* port_config.c's */
 int config_boolean(const char *name);
 const char *config_string(const char *name);
+unsigned long config_changes(void);
 /* cinematics.c's */
 void draw_quad(rectangle2d *rectangle, pixel32 color);
 
@@ -1788,16 +1810,18 @@ text, its colour "red, green, blue, alpha" (0 to 255 each), or 0 for none */
 static pixel32 scoreboard_background_color(
 	void)
 {
-	static boolean read = FALSE;
+	static unsigned long read_at = (unsigned long)-1;
 	static pixel32 color = 0;
 
-	if (!read)
+	/* (read again when Settings changes it) */
+	if (read_at != config_changes())
 	{
 		char const *text = config_string("display.scoreboard_background_color");
 		long parts[4] = { 16, 16, 16, 150 };
 		short part;
 
-		read = TRUE;
+		read_at = config_changes();
+		color = 0;
 		if (!config_boolean("display.scoreboard_background"))
 			return color;
 		for (part = 0; part < 4 && text && *text; part++)
@@ -1888,11 +1912,13 @@ static boolean scoreboard_team_columns(
 	void)
 {
 	static short setting = NONE;
+	static unsigned long read_at = (unsigned long)-1;
 
-	if (setting == NONE)
+	if (read_at != config_changes())
 	{
 		char const *value = config_string("display.scoreboard_team_layout");
 
+		read_at = config_changes();
 		setting = value && !csstrcmp(value, "score") ? FALSE : TRUE;
 	}
 
@@ -3725,6 +3751,24 @@ boolean game_engine_showing_postgame(
 	return game_engine != NULL && game_engine_globals.postgame_state == game_engine_mode_postgame_rasterize;
 }
 
+void game_variant_options_default(
+	struct game_variant const *variant,
+	struct game_variant_options *options)
+{
+	csmemset(options, 0, sizeof(*options));
+	options->friendly_fire = _friendly_fire_on;
+	options->loadout = _loadout_category;
+	options->primary_weapon = _loadout_weapon_assault_rifle;
+	options->secondary_weapon = _loadout_weapon_pistol;
+	options->radar_players = variant &&
+		!TEST_FLAG(variant->universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit) ?
+		_radar_players_none : _radar_players_all;
+	options->vehicle_set[0] = options->vehicle_set[1] =
+		variant ? (byte)variant->universal_variant.vehicle_set : 0;
+
+	return;
+}
+
 boolean game_engine_force_single_screen(
 	void)
 {
@@ -4198,6 +4242,99 @@ static void game_engine_update_teleporter(
 	return;
 }
 
+/* port: the gametype's vehicle respawn time (game_variant_options): the
+host puts a vehicle destroyed, or left empty away from where the map put
+it, back there after the time (the clients get the host's: the distributed
+netcode). Vehicles otherwise stay where they are left (the Xbox game's). */
+enum
+{
+	MAXIMUM_VEHICLE_HOMES = 64
+};
+
+static struct
+{
+	long object_index;
+	long definition_index;
+	real_point3d position;
+	real_vector3d forward;
+	real_vector3d up;
+	long idle_since;
+} game_engine_vehicle_homes[MAXIMUM_VEHICLE_HOMES];
+static short game_engine_vehicle_home_count = NONE;
+
+static void game_engine_update_vehicle_respawn(
+	void)
+{
+	long respawn_ticks = game_variant_options_get()->vehicle_respawn_time * TICKS_PER_SECOND;
+	long now = game_time_get();
+	short index;
+
+	if (respawn_ticks <= 0 || network_game_distributed_client() || now % TICKS_PER_SECOND)
+		return;
+	/* (where the map put them: the vehicles there at the first look) */
+	if (game_engine_vehicle_home_count == NONE)
+	{
+		struct object_iterator iterator;
+
+		game_engine_vehicle_home_count = 0;
+		object_iterator_new(&iterator, _object_mask_vehicle, 0);
+		while (object_iterator_next(&iterator) && game_engine_vehicle_home_count < MAXIMUM_VEHICLE_HOMES)
+		{
+			struct object_datum *object = object_get(iterator.index);
+			short home = game_engine_vehicle_home_count++;
+
+			game_engine_vehicle_homes[home].object_index = iterator.index;
+			game_engine_vehicle_homes[home].definition_index = object->definition_index;
+			game_engine_vehicle_homes[home].position = object->object.position;
+			object_get_orientation(iterator.index, &game_engine_vehicle_homes[home].forward,
+				&game_engine_vehicle_homes[home].up);
+			game_engine_vehicle_homes[home].idle_since = NONE;
+		}
+	}
+	for (index = 0; index < game_engine_vehicle_home_count; index++)
+	{
+		struct unit_datum *vehicle = unit_try_and_get(game_engine_vehicle_homes[index].object_index);
+		boolean waiting = TRUE;
+
+		if (vehicle && !TEST_FLAG(vehicle->object.damage_flags, _object_dead_bit))
+		{
+			real dx = vehicle->object.position.x - game_engine_vehicle_homes[index].position.x;
+			real dy = vehicle->object.position.y - game_engine_vehicle_homes[index].position.y;
+			real dz = vehicle->object.position.z - game_engine_vehicle_homes[index].position.z;
+
+			long child_index;
+
+			/* (empty: no rider among its children, which hold its own
+			weapons too) */
+			waiting = vehicle->unit.driver_object_index == NONE && vehicle->unit.gunner_object_index == NONE &&
+				dx * dx + dy * dy + dz * dz > 4.0f;
+			for (child_index = vehicle->object.first_child_object_index; waiting && child_index != NONE;
+				child_index = object_get(child_index)->object.next_object_index)
+			{
+				if (object_get(child_index)->object.type == _object_type_biped)
+					waiting = FALSE;
+			}
+		}
+		if (!waiting)
+			game_engine_vehicle_homes[index].idle_since = NONE;
+		else if (game_engine_vehicle_homes[index].idle_since == NONE)
+			game_engine_vehicle_homes[index].idle_since = now;
+		else if (now - game_engine_vehicle_homes[index].idle_since >= respawn_ticks)
+		{
+			struct object_placement_data placement_data;
+
+			if (vehicle)
+				object_delete(game_engine_vehicle_homes[index].object_index);
+			object_placement_data_new(&placement_data, game_engine_vehicle_homes[index].definition_index, NONE);
+			placement_data.position = game_engine_vehicle_homes[index].position;
+			placement_data.forward = game_engine_vehicle_homes[index].forward;
+			placement_data.up = game_engine_vehicle_homes[index].up;
+			game_engine_vehicle_homes[index].object_index = object_new(&placement_data);
+			game_engine_vehicle_homes[index].idle_since = NONE;
+		}
+	}
+}
+
 void game_engine_update(
 	void)
 {
@@ -4207,6 +4344,7 @@ void game_engine_update(
 		game_engine_update_purge();
 		game_engine_update_weapons();
 		game_engine_update_item_spawn();
+		game_engine_update_vehicle_respawn();
 
 		{
 			struct data_iterator player_iterator;
@@ -4357,6 +4495,10 @@ enum
 	_equipment_created_at_rest_bit = 0,
 };
 
+/* port: each player's friendly fire penalty (game_variant_options), added to
+his next respawn: by the player's absolute index */
+static short game_engine_betrayal_penalty[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+
 void game_engine_player_killed(
 	long killing_player_index,
 	long killing_object_index,
@@ -4426,6 +4568,56 @@ void game_engine_player_killed(
 
 	if (!player_kill)
 		dead_player->respawn_timer += global_variant.universal_variant.suicide_penalty;
+
+	/* port: the gametype's auto team balance (game_variant_options): the host
+	moves the dead to the other team when his is two or more bigger (his
+	next unit is the other team's, which the clients take it from:
+	network_player_attach_unit) */
+	if (global_variant.universal_variant.teams && game_variant_options_get()->auto_team_balance &&
+		!network_game_distributed_client() && VALID_INDEX(dead_player->team_index, 2) && !dead_player->quit_out_of_game)
+	{
+		struct data_iterator iterator;
+		struct player_datum *player;
+		short count[2] = { 0, 0 };
+
+		data_iterator_new(&iterator, player_data);
+		while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		{
+			if (!player->quit_out_of_game && VALID_INDEX(player->team_index, 2))
+				count[player->team_index]++;
+		}
+		if (count[dead_player->team_index] >= count[1 - dead_player->team_index] + 2)
+		{
+			struct network_game_server *server = global_network_game_server_get();
+			struct network_game *game = server ? network_game_server_get_game(server) : NULL;
+			long list_index = dead_player->network_player_data.player_list_index;
+
+			dead_player->team_index = 1 - dead_player->team_index;
+			dead_player->network_player_data.team_index = (char)dead_player->team_index;
+			/* (and the host's game record, which late joins count and the
+			lobby shows) */
+			if (game && VALID_INDEX(list_index, HALO_PORT_MAXIMUM_NETWORK_PLAYERS))
+				game->players[list_index].team_index = (char)dead_player->team_index;
+		}
+	}
+
+	/* port: the gametype's friendly fire penalty: the team killer's next
+	respawn later (the dead's own, if he has one waiting) */
+	{
+		long dead_absolute = DATUM_INDEX_TO_ABSOLUTE_INDEX(dead_player_index);
+
+		if (dead_absolute < HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+		{
+			dead_player->respawn_timer += game_engine_betrayal_penalty[dead_absolute];
+			game_engine_betrayal_penalty[dead_absolute] = 0;
+		}
+		if (friendly_fire && valid_players && !same_player && global_variant.universal_variant.teams &&
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(killing_player_index) < HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+		{
+			game_engine_betrayal_penalty[DATUM_INDEX_TO_ABSOLUTE_INDEX(killing_player_index)] =
+				(short)(game_variant_options_get()->friendly_fire_penalty * TICKS_PER_SECOND);
+		}
+	}
 
 	dead_player->respawn_timer = MAX(dead_player->respawn_timer, 90);
 	dead_player = player_get(dead_player_index);
@@ -4615,6 +4807,16 @@ boolean game_engine_has_shield(
 	return has_shield;
 }
 
+/* port: the local player whose motion sensor is drawn (motion_sensor.c),
+for the gametype's FRIENDS radar (game_variant_options) */
+static short game_engine_motion_sensor_local_player = NONE;
+
+void game_engine_motion_sensor_viewer(
+	short local_player_index)
+{
+	game_engine_motion_sensor_local_player = local_player_index;
+}
+
 boolean game_engine_draw_object_in_motion_sensor(
 	long unit_index)
 {
@@ -4622,6 +4824,16 @@ boolean game_engine_draw_object_in_motion_sensor(
 
 	if (game_engine)
 		draw_object = TEST_FLAG(global_variant.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit);
+	/* port: friends only: the viewer's team's */
+	if (draw_object && game_engine && global_variant.universal_variant.teams &&
+		game_variant_options_get()->radar_players == _radar_players_friends &&
+		game_engine_motion_sensor_local_player != NONE)
+	{
+		long player_index = local_player_get_player_index(game_engine_motion_sensor_local_player);
+		struct player_datum *viewer = player_index != NONE ? player_try_and_get(player_index) : NULL;
+
+		draw_object = viewer && object_get(unit_index)->object.owner_team_index == viewer->team_index;
+	}
 
 	return draw_object;
 }
@@ -4895,6 +5107,12 @@ boolean game_engine_should_end_game(
 
 	if (game_engine && !multiple_teams_alive())
 		should_end_game = TRUE;
+	/* port: the gametype's time limit (game_variant_options) */
+	if (game_engine && game_variant_options_get()->time_limit > 0 &&
+		game_time_get() >= game_variant_options_get()->time_limit * 60L * TICKS_PER_SECOND)
+	{
+		should_end_game = TRUE;
+	}
 
 	return should_end_game;
 }
@@ -6703,6 +6921,8 @@ void game_engine_initialize_for_new_map(
 		game_engine_intialize_queued_sounds();
 		csmemset(global_goal, 0, sizeof(global_goal));
 		game_engine_globals.next_team_index = 0;
+		csmemset(game_engine_betrayal_penalty, 0, sizeof(game_engine_betrayal_penalty));
+		game_engine_vehicle_home_count = NONE;
 		timeout_for_endgame_sound = 0;
 		game_engine_network_state_read = FALSE;
 
@@ -6732,6 +6952,9 @@ void game_engine_player_added(
 	long player_index)
 {
 	initialize_player_multiplayer_data(player_index);
+	/* port: not the friendly fire penalty of the slot's last player */
+	if (DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index) < HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+		game_engine_betrayal_penalty[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)] = 0;
 
 	if (game_engine)
 	{
@@ -6849,6 +7072,146 @@ real game_engine_get_starting_location_rating(
 	return default_starting_location_rate_function(player_index, starting_location);
 }
 
+/* port: the gametype's vehicles of each team (game_variant_options) */
+static byte game_engine_vehicles_placed[2][NUMBER_OF_VARIANT_VEHICLES];
+
+void game_engine_vehicle_placement_begin(
+	void)
+{
+	csmemset(game_engine_vehicles_placed, 0, sizeof(game_engine_vehicles_placed));
+}
+
+/* a vehicle definition's type: the globals' multiplayer vehicles (warthog,
+ghost, scorpion), else by its tag's name; NONE for none of them */
+static short game_engine_variant_vehicle_type(
+	long definition_index)
+{
+	struct game_globals *game_globals = scenario_get_game_globals();
+	struct game_globals_multiplayer_information *information;
+	char const *name;
+	short index;
+
+	if (definition_index == NONE)
+		return NONE;
+	if (game_globals->multiplayer_information.count > 0)
+	{
+		information = TAG_BLOCK_GET_ELEMENT(&game_globals->multiplayer_information, 0,
+			struct game_globals_multiplayer_information);
+		for (index = 0; index < 3 && index < information->vehicles.count; index++)
+		{
+			if (TAG_BLOCK_GET_ELEMENT(&information->vehicles, index, struct game_globals_vehicle)->vehicle.index ==
+				definition_index)
+			{
+				return index == 0 ? _variant_vehicle_warthog : index == 1 ? _variant_vehicle_ghost :
+					_variant_vehicle_scorpion;
+			}
+		}
+	}
+	name = tag_get_name(definition_index);
+	if (!name)
+		return NONE;
+	if (strstr(name, "rwarthog") || strstr(name, "rocket"))
+		return _variant_vehicle_rocket_warthog;
+	if (strstr(name, "banshee"))
+		return _variant_vehicle_banshee;
+	if (strstr(name, "turret"))
+		return _variant_vehicle_gun_turret;
+	if (strstr(name, "warthog"))
+		return _variant_vehicle_warthog;
+	if (strstr(name, "ghost"))
+		return _variant_vehicle_ghost;
+	if (strstr(name, "scorpion"))
+		return _variant_vehicle_scorpion;
+	return NONE;
+}
+
+/* the team whose spawn points are nearest the point (red's if none) */
+static short game_engine_nearest_team(
+	real_point3d const *point)
+{
+	struct scenario *scenario = global_scenario_get();
+	real best = -1.0f;
+	short team = 0;
+	long index;
+
+	for (index = 0; index < scenario->players.count; index++)
+	{
+		struct player_starting_location *location =
+			TAG_BLOCK_GET_ELEMENT(&scenario->players, index, struct player_starting_location);
+		real dx = location->position.x - point->x;
+		real dy = location->position.y - point->y;
+		real dz = location->position.z - point->z;
+		real distance = dx * dx + dy * dy + dz * dz;
+
+		if (VALID_INDEX(location->team_index, 2) && (best < 0.0f || distance < best))
+		{
+			best = distance;
+			team = location->team_index;
+		}
+	}
+	return team;
+}
+
+boolean game_engine_vehicle_placement_allowed(
+	struct scenario_object_datum const *placement,
+	struct tag_block *palette)
+{
+	struct game_variant_options const *options = game_variant_options_get();
+	short side, type;
+	byte set;
+
+	if (!game_engine || placement->palette_entry_index == NONE)
+		return TRUE;
+	side = global_variant.universal_variant.teams ? game_engine_nearest_team(&placement->position) : 0;
+	set = options->vehicle_set[side];
+	type = game_engine_variant_vehicle_type(TAG_BLOCK_GET_ELEMENT(palette, placement->palette_entry_index,
+		struct scenario_object_palette_entry)->reference.index);
+	/* (the map's own: the multiplayer ones of the globals, as the Xbox
+	game's remap allows) */
+	if (set == _game_engine_vehicles_default)
+		return type == NONE || type <= _variant_vehicle_scorpion;
+	if (type == NONE)
+		return set != _game_engine_vehicles_none;
+	if (set == VARIANT_VEHICLE_SET_CUSTOM)
+	{
+		if (game_engine_vehicles_placed[side][type] >= options->vehicle_counts[side][type])
+			return FALSE;
+		game_engine_vehicles_placed[side][type]++;
+		return TRUE;
+	}
+	/* (the sets: none, then each type alone, in the options' order) */
+	return set != _game_engine_vehicles_none && set - _game_engine_vehicles_warthog == type;
+}
+
+/* port: the gametype's friendly fire (game_variant_options) on a teammate's
+hit of the object (its damage marked friendly: object_cause_damage): all of
+it, none, its shields only, or explosives' only. A player's own hit of
+himself, or of what is not a player's teammate's, is the game's own. */
+short game_engine_friendly_damage(
+	long attacker_player_index,
+	long object_index,
+	boolean explosive)
+{
+	struct game_variant_options const *options = game_variant_options_get();
+	struct player_datum *attacker;
+
+	if (!game_engine || !global_variant.universal_variant.teams || attacker_player_index == NONE ||
+		options->friendly_fire == _friendly_fire_on)
+	{
+		return _friendly_damage_all;
+	}
+	attacker = (struct player_datum *)datum_try_and_get(player_data, attacker_player_index);
+	if (!attacker || attacker->unit_index == object_index)
+		return _friendly_damage_all;
+	switch (options->friendly_fire)
+	{
+	case _friendly_fire_off: return _friendly_damage_none;
+	case _friendly_fire_shields_only: return _friendly_damage_shields;
+	case _friendly_fire_explosives_only: return explosive ? _friendly_damage_all : _friendly_damage_none;
+	}
+	return _friendly_damage_all;
+}
+
 real game_engine_get_damage_multiplier(
 	long damaging_player_index,
 	long damaged_player_index)
@@ -6903,14 +7266,22 @@ long game_engine_remap_vehicle(
 		vehicle1 = TAG_BLOCK_GET_ELEMENT(vehicles, 1, struct game_globals_vehicle);
 		vehicle2 = TAG_BLOCK_GET_ELEMENT(vehicles, 2, struct game_globals_vehicle);
 
+		/* (port: and the other types a gametype's sets name, which a map may
+		have: game_engine_variant_vehicle_type) */
 		if (result != vehicle0->vehicle.index &&
 			result != vehicle1->vehicle.index &&
-			result != vehicle2->vehicle.index)
+			result != vehicle2->vehicle.index &&
+			((game_variant_options_get()->vehicle_set[0] == _game_engine_vehicles_default &&
+				game_variant_options_get()->vehicle_set[1] == _game_engine_vehicles_default) ||
+				game_engine_variant_vehicle_type(result) == NONE))
 		{
 			result = NONE;
 		}
 
-		switch (global_variant.universal_variant.vehicle_set)
+		/* port: the per-team sets decide at placement
+		(game_engine_vehicle_placement_allowed) */
+		switch (game_variant_options_get()->vehicle_set[0] == game_variant_options_get()->vehicle_set[1] ?
+			global_variant.universal_variant.vehicle_set : _game_engine_vehicles_default)
 		{
 		case _game_engine_vehicles_none:
 			result = NONE;
@@ -6960,6 +7331,10 @@ long game_engine_remap_weapon(
 	{
 		return weapon_definition_index;
 	}
+
+	/* port: a custom loadout (game_variant_options) has no weapon set */
+	if (game_variant_options_get()->loadout == _loadout_custom)
+		return weapon_definition_index;
 
 	if (weapon_list_index == _weapon_list_flamethrower)
 		weapon_list_index = _weapon_list_rocket_launcher;
@@ -7056,6 +7431,47 @@ long game_engine_remap_weapon(
 		case _weapon_list_plasma_pistol:
 			weapon_list_index = _weapon_list_pistol;
 			break;
+		}
+		break;
+
+	/* port: the PC version's sets. Covenant: the Covenant's weapons (the
+	fuel rod, where the map has one, for the rocket launcher) */
+	case _game_engine_weapons_covenant:
+		switch (weapon_list_index)
+		{
+		case _weapon_list_assault_rifle:
+			weapon_list_index = _weapon_list_plasma_rifle;
+			break;
+
+		case _weapon_list_pistol:
+			weapon_list_index = _weapon_list_plasma_pistol;
+			break;
+
+		case _weapon_list_shotgun:
+		case _weapon_list_sniper_rifle:
+			weapon_list_index = _weapon_list_needler;
+			break;
+
+		case _weapon_list_rocket_launcher:
+			weapon_list_index = list_index_to_weapon_definition_index(_weapon_list_gravity_rifle) != NONE ?
+				_weapon_list_gravity_rifle : _weapon_list_needler;
+			break;
+		}
+		break;
+
+	/* classic: the Xbox game's weapons (no fuel rod: the flamethrower is
+	already a rocket launcher) */
+	case _game_engine_weapons_classic:
+		if (weapon_list_index == _weapon_list_gravity_rifle)
+			weapon_list_index = _weapon_list_rocket_launcher;
+		break;
+
+	/* heavy weapons: rocket launchers, and fuel rods where the map has them */
+	case _game_engine_weapons_heavy:
+		if (weapon_list_index != _weapon_list_gravity_rifle ||
+			list_index_to_weapon_definition_index(_weapon_list_gravity_rifle) == NONE)
+		{
+			weapon_list_index = _weapon_list_rocket_launcher;
 		}
 		break;
 	}
@@ -8133,6 +8549,71 @@ static void handle_custom_starting_equipment(
 	return;
 }
 
+/* port: a custom loadout's weapon's place in the globals' weapon list
+(game_engine_h's _loadout_weapon_*, from the assault rifle); random: one
+of those the map has */
+static long game_engine_loadout_weapon_definition(
+	byte weapon)
+{
+	static short const list_indices[] =
+	{
+		_weapon_list_assault_rifle, _weapon_list_pistol, _weapon_list_shotgun, _weapon_list_sniper_rifle,
+		_weapon_list_rocket_launcher, _weapon_list_plasma_pistol, _weapon_list_plasma_rifle, _weapon_list_needler,
+		_weapon_list_gravity_rifle, _weapon_list_flamethrower
+	};
+	short index;
+
+	if (weapon == _loadout_weapon_random)
+	{
+		long available[NUMBEROF(list_indices)];
+		short count = 0;
+
+		for (index = 0; index < NUMBEROF(list_indices); index++)
+		{
+			long definition_index = list_index_to_weapon_definition_index(list_indices[index]);
+
+			if (definition_index != NONE)
+				available[count++] = definition_index;
+		}
+		return count ? available[local_random_range(0, count)] : NONE;
+	}
+	index = (short)(weapon - _loadout_weapon_assault_rifle);
+	return index >= 0 && index < NUMBEROF(list_indices) ? list_index_to_weapon_definition_index(list_indices[index]) :
+		NONE;
+}
+
+/* port: the unit's weapons the loadout's (its others gone): the primary,
+then the secondary */
+static void game_engine_give_loadout(
+	long unit_index)
+{
+	struct game_variant_options const *options = game_variant_options_get();
+	byte const weapons[2] = { options->primary_weapon, options->secondary_weapon };
+	boolean first = TRUE;
+	short index;
+
+	unit_delete_all_weapons(unit_index);
+	for (index = 0; index < 2; index++)
+	{
+		long definition_index = game_engine_loadout_weapon_definition(weapons[index]);
+		struct object_placement_data placement_data;
+		long weapon_index;
+
+		if (definition_index == NONE)
+			continue;
+		object_placement_data_new(&placement_data, definition_index, NONE);
+		weapon_index = object_new(&placement_data);
+		if (weapon_index == NONE)
+			continue;
+		if (!first && unit_has_weapon_definition_index(unit_index, definition_index))
+			object_delete(weapon_index);
+		else if (unit_add_weapon_to_inventory(unit_index, weapon_index, first ? 2 : 0))
+			first = FALSE;
+		else
+			object_delete(weapon_index);
+	}
+}
+
 void game_engine_postspawn_player_update(
 	long player_index)
 {
@@ -8181,7 +8662,12 @@ void game_engine_postspawn_player_update(
 			fragmentation_grenade_count;
 		long starting_plasma_grenade_count = 0;
 
-		if (!TEST_FLAG(global_variant.universal_variant.flags, _game_variant_generic_starting_equipment_bit))
+		/* port: a custom loadout's weapons (game_variant_options) */
+		if (game_variant_options_get()->loadout == _loadout_custom)
+		{
+			game_engine_give_loadout(unit_index);
+		}
+		else if (!TEST_FLAG(global_variant.universal_variant.flags, _game_variant_generic_starting_equipment_bit))
 		{
 			handle_custom_starting_equipment(
 				unit_index,

@@ -142,6 +142,9 @@ boolean web_quick_play_pistol_starts(void)
 
 boolean web_match_migration_enabled(void)
 {
+#ifdef HALO_IOS_BROWSER
+    { int host_ios_browser_mode(void); if(!host_ios_browser_mode())return FALSE; }
+#endif
 	return quick_play.owned && (quick_play.phase == QUICK_PLAYING || quick_play.phase == QUICK_HOLD ||
 		quick_play.phase == QUICK_RECONNECTING || quick_play.phase == QUICK_MIGRATING || quick_play.phase == QUICK_BLOCKED);
 }
@@ -170,7 +173,7 @@ void quick_play_update(boolean main_menu_loaded)
 
 	/* Explicit cancellation wins over any queued election or hold. */
 #ifdef HALO_IOS_BROWSER
-	{ void ios_room_pump(void); ios_room_pump(); }
+	{ void ios_room_pump(void); ios_room_pump(); now = system_milliseconds(); }
 #endif
 	if (web_quick_play_take_cancel() && quick_play.phase != QUICK_OFF)
 	{

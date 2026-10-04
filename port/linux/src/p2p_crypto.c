@@ -6,10 +6,11 @@ private (p2p.c): SHA-256 (FIPS 180-4) and HMAC-SHA256 (RFC 2104), from
 which an invite's topics and keys are derived; ChaCha20-Poly1305 (RFC 8439)
 with additional data, which seals the tunnel's packets (a counter for their
 nonce) and, with a random nonce sent ahead of the ciphertext, signalling's
-messages; and X25519 (RFC 7748), with which two machines agree on their
-tunnel's keys without sending them. The public brokers carry sealed
-messages, so only holders of the invite read them; the tunnel's packets are
-sealed with keys only its two machines have.
+messages; X25519 (RFC 7748), with which two machines agree on their
+tunnel's keys without sending them; and Ed25519 (RFC 8032, Monocypher's),
+with which a host signs its public game's listing (p2p_lobby.c). The public
+brokers carry sealed messages, so only holders of the invite read them; the
+tunnel's packets are sealed with keys only its two machines have.
 */
 
 #ifdef HALO_RELAY
@@ -19,6 +20,9 @@ sealed with keys only its two machines have.
 #endif
 #include "posix.h"
 #include "p2p_internal.h"
+
+#include "monocypher.h"
+#include "monocypher-ed25519.h"
 
 #include <string.h>
 
@@ -593,4 +597,69 @@ void p2p_x25519(unsigned char *result, const unsigned char *scalar, const unsign
 	field_invert(c, c);
 	field_multiply(a, a, c);
 	field_pack(result, a);
+}
+
+/* ---------- Ed25519 (RFC 8032, with SHA-512), from Monocypher
+(port/third_party/monocypher): a run's key, from which its X25519 key also
+comes, signs the listing of a public game (p2p_lobby.c) */
+
+void p2p_sha512(const void *data, int size, unsigned char *digest)
+{
+	crypto_sha512(digest, data, (size_t)size);
+}
+
+void p2p_ed25519_public(const unsigned char *seed, unsigned char *public_key, unsigned char *x25519_secret)
+{
+	unsigned char copy[P2P_SEED_SIZE];
+	unsigned char secret_key[64];
+	unsigned char hash[64];
+
+	/* (the key pair's making wipes the seed it is given) */
+	memcpy(copy, seed, sizeof(copy));
+	crypto_ed25519_key_pair(secret_key, public_key, copy);
+	if (x25519_secret)
+	{
+		/* the scalar Ed25519 signs with: X25519 clamps it the same way */
+		p2p_sha512(seed, P2P_SEED_SIZE, hash);
+		memcpy(x25519_secret, hash, P2P_KEY_SIZE);
+	}
+	crypto_wipe(secret_key, sizeof(secret_key));
+	crypto_wipe(hash, sizeof(hash));
+}
+
+void p2p_ed25519_sign(const unsigned char *seed, const unsigned char *public_key, const void *message, int size,
+	unsigned char *signature)
+{
+	unsigned char secret_key[64];
+
+	/* (Monocypher's secret key: the seed, then the public key) */
+	memcpy(secret_key, seed, P2P_SEED_SIZE);
+	memcpy(secret_key + P2P_SEED_SIZE, public_key, P2P_KEY_SIZE);
+	crypto_ed25519_sign(signature, secret_key, message, (size_t)size);
+	crypto_wipe(secret_key, sizeof(secret_key));
+}
+
+int p2p_ed25519_to_x25519(const unsigned char *public_key, unsigned char *x25519_public)
+{
+	static const unsigned char zero[P2P_KEY_SIZE];
+	static const unsigned char scalar[P2P_KEY_SIZE] = { 1 };
+	unsigned char product[P2P_KEY_SIZE];
+
+	crypto_eddsa_to_x25519(x25519_public, public_key);
+	/* a point of small order (whose multiple by a clamped scalar, a
+	multiple of 8, is 0) has signatures anyone can make, and secrets anyone
+	knows */
+	crypto_x25519(product, scalar, x25519_public);
+	return !p2p_equal(product, zero, P2P_KEY_SIZE);
+}
+
+int p2p_ed25519_verify(const unsigned char *public_key, const void *message, int size,
+	const unsigned char *signature)
+{
+	unsigned char x25519_public[P2P_KEY_SIZE];
+
+	/* (Monocypher's check turns away an S past the group's order: one
+	signature a message) */
+	return p2p_ed25519_to_x25519(public_key, x25519_public) &&
+		crypto_ed25519_check(signature, public_key, message, (size_t)size) == 0;
 }

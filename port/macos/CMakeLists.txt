@@ -19,7 +19,7 @@ add_executable(HaloCE MACOSX_BUNDLE
     ${HALO_PLATFORM_SOURCES} "${ROOT}/port/runtime/xiso.c" "${ROOT}/port/apple/game_store.m"
     ../ios/host/host_main.m ../ios/host/host_memory.c ../ios/host/host_loader.c ../ios/host/host_syscall.c ../ios/host/host_gl.c ../ios/host/host_debug.m ../ios/host/host_metalfx.m ../ios/host/host_graphics.m ../ios/host/host_shader_cache.m ../ios/host/guest_call.S
     ../ios/host/host_thread.c ../ios/host/host_sdl.c ../ios/network/host_room.m ../ios/network/room_bridge.c
-    "${ROOT}/port/web/src/web_net.c"
+    "${ROOT}/port/ios/network/host_web_net.c" "${ROOT}/port/ios/network/host_net.c" "${ROOT}/port/ios/network/host_browser.m"
     "${ROOT}/port/linux/src/posix_files.c" ../ios/host/posix_net.c
     "${ROOT}/build/ios/host/bridges.c" "${ROOT}/build/ios/embedded/guest_image.S")
 target_include_directories(HaloCE PRIVATE ../ios/host ../ios/network "${ROOT}/port/web/src" "${ROOT}/port/runtime" "${ROOT}/port/runtime/include"
@@ -83,3 +83,6 @@ set_source_files_properties(Community.icns PROPERTIES MACOSX_PACKAGE_LOCATION Re
 # the full, unlocalized CFBundleDisplayName.
 target_sources(HaloCE PRIVATE en.lproj/InfoPlist.strings)
 set_source_files_properties(en.lproj/InfoPlist.strings PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+
+target_sources(HaloCE PRIVATE "${ROOT}/port/third_party/monocypher/LICENCE.md")
+set_source_files_properties("${ROOT}/port/third_party/monocypher/LICENCE.md" PROPERTIES MACOSX_PACKAGE_LOCATION Resources/Licenses/Monocypher)

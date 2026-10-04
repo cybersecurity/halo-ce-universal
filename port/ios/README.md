@@ -212,22 +212,49 @@ the Files picker. On iPadOS 26 and later it also requests the interface
 orientation lock for the full-screen scene; portrait is excluded from the
 app's orientation masks. iPadOS controls windowed multitasking and may
 letterbox the landscape app when a full-screen orientation lock is unavailable.
-The desktop UDP invite service and clipboard joining default to off on iOS;
-browser rooms use the separate transport described below. Bink intro videos remain unsupported by the upstream port.
+Public-server discovery and native UDP/KCP connections are enabled by default.
+Browser rooms remain an optional, separate transport described below. Bink intro videos remain unsupported by the upstream port.
 
-## Browser multiplayer (draft)
+## Public server browser
+
+Open **Multiplayer → System Link** to browse public native servers. Tap a row
+(or select it and press Join on macOS). Refresh requests updated listings;
+Cancel returns to the game. Full/closed servers and Halo PC/Custom Edition
+(`@ce`) maps produce a message instead of attempting an unsupported join.
+Only network-version-11 signed listings are shown. A matching original Xbox
+map is still required; discovery does not guarantee a server is reachable.
+Keep the app in the foreground while connecting and playing.
+
+Discovery uses upstream commit `c04765d7`'s `p2p_lobby.c`, Ed25519 signatures,
+MQTT brokers and invite joining. Apple supplies a UIKit/AppKit list instead
+of importing the PC menu assets. Connections use the shared native STUN,
+UDP tunnel and KCP implementation; automatic router port forwarding is not
+implemented on Apple. PR #69's optional HTTP list and sorting enhancements
+are not included.
+
+Upstream commit `c9ee319a` added 28 bytes of PC game rules to the settings
+record without increasing network version 11. The relevant rule logic and
+record layout are included. Receiving older settings records supplies the
+original default rules. In browser-room mode, Apple emits the older settings
+layout; mixed-version checkpoint/migration compatibility has not been revalidated.
+
+## Browser multiplayer (experimental)
 
 This integration is based on [PR #12](https://github.com/cybersecurity/halo-ce-universal/pull/12)
-at `eaa82e6803f3d3e67c91d7f2fa2b15ee04e195f5`. Build the web client from that
-revision (or this branch). Both use network version **11**. An older deployed
-web demo may have another network version and is not a supported comparison.
+at `eaa82e6803f3d3e67c91d7f2fa2b15ee04e195f5`. Prefer a web client built
+from this branch. Network version **11** alone is insufficient to prove
+compatibility: upstream changed its game-settings layout within that version.
+The public web demos checked on 2026-10-04 use network version **6** and cannot
+join this app. Previous pinned-build crossplay/migration results predate the
+native-server update and are historical evidence, not validation of this build.
 Both players need matching original Xbox maps. Protocol compatibility does not
 establish compatibility between different game-data releases.
 
-After map import, the app opens Halo's main menu. Select **Multiplayer →
-System Link** to open the native online-room form, then enter the web player's
+Enable **Browser rooms (experimental)** in Settings (shake on iOS), then
+relaunch. Socket transport is fixed at startup so existing sockets cannot
+change underneath the game. Select **Multiplayer → System Link** to open the native online-room form, then enter the web player's
 room code and choose **Join room**. The original Xbox maps supply the System
-Link label; on this iOS target it opens browser-compatible online rooms.
+Link label; in browser-room mode it opens the room chooser.
 The keyboard stays closed until the code field is tapped. The form scrolls,
 and Cancel/Join stay above the keyboard in landscape.
 The shared room controller elects a host and starts quick play, initially
@@ -258,8 +285,8 @@ in `Documents/browser-room.json` (use your own server and credentials):
 {"turn":{"urls":["turn:relay.example.com:3478"],"username":"player","credential":"secret"}}
 ```
 
-This file stays outside the bundle and repository. The desktop native UDP
-invite protocol is a different transport and is not bridged by this change.
+This file stays outside the bundle and repository. The native public-server
+protocol is a different transport; the app does not bridge native servers to WebRTC rooms.
 
 ### Provenance and scope
 

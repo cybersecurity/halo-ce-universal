@@ -707,7 +707,11 @@ boolean network_game_create_game_objects(
 	}
 
 	if (game->variant.game_engine_index)
+	{
 		game_set_game_variant(&game->variant);
+		/* port: and its PC options */
+		game_set_game_variant_options(&game->variant_options);
+	}
 
 	if (game_load(&options))
 	{

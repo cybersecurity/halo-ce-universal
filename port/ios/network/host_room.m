@@ -138,9 +138,12 @@ static void network_error(NSString *message) {
 void host_ios_room_report(const char *json) {
     NSString *copy = [NSString stringWithUTF8String:json];
     void (^append)(void) = ^{
-        if (!transport) return;
         NSDictionary *value = [NSJSONSerialization JSONObjectWithData:[copy dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
         if (!value) return;
+        NSString *phase=value[@"phase"], *message=value[@"message"];
+        if(![phase isEqualToString:@"checkpoint"])host_logf(HOST_LOG_INFO,"Multiplayer %s: %s",phase.UTF8String,message.UTF8String);
+        if([phase isEqualToString:@"error"]){void host_ios_browser_error(const char *);host_ios_browser_error(message.UTF8String);}
+        if (!transport) return;
         if (reports.count >= 128) {
             network_error(@"Room status queue overflow; restart to reconnect."); transport = nil; return;
         }
@@ -150,6 +153,12 @@ void host_ios_room_report(const char *json) {
 }
 
 void host_ios_room_tick(void) {
+    // Opt-in device test navigation, never enabled in normal launches.
+    static double test_started;static BOOL test_opened;
+    if(!test_started)test_started=CACurrentMediaTime();
+    if(!test_opened && [NSProcessInfo.processInfo.environment[@"HALO_NATIVE_TEST_BROWSER"] boolValue] && CACurrentMediaTime()-test_started>20) {
+        test_opened=YES;const uint32_t command[4]={7,0,0,0};ios_room_queue_command(command);
+    }
     if (!transport || in_flight || !NSThread.isMainThread || CACurrentMediaTime() - last_tick < .008) return;
     last_tick = CACurrentMediaTime();
     NSMutableData *out = [NSMutableData dataWithLength:256 * 1024];

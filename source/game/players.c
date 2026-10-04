@@ -1452,6 +1452,10 @@ void network_player_attach_unit(
 	struct player_datum *player = player_get(player_index);
 	struct unit_datum *unit = unit_get(unit_index);
 
+	/* port: the host's team for the player (auto team balance moves a
+	player to the other team at his death: game_engine_player_killed) */
+	if (game_engine_has_teams() && unit->object.owner_team_index >= 0 && unit->object.owner_team_index < 2)
+		player->team_index = unit->object.owner_team_index;
 	unit->object.owner_player_index = player_index;
 	unit->object.owner_team_index = (short)player->team_index;
 	unit->unit.player_index = player_index;
@@ -3721,9 +3725,12 @@ void players_update_before_game(
 				if (!players_globals->input_disabled)
 				{
 					network_player_log_idle_action(iterator.datum_index, action->control_flags);
+					/* port: not for the keyboard's action key, which only acts
+					(units.h, UNIT_CONTROL_PORT_ACTION_ONLY_BIT) */
 					if (TEST_FLAG(action->control_flags, _unit_control_action_bit) &&
 						unit->object.parent_object_index == NONE &&
-						!player_handle_action(iterator.datum_index))
+						!player_handle_action(iterator.datum_index) &&
+						!TEST_FLAG(action->control_flags, UNIT_CONTROL_PORT_ACTION_ONLY_BIT))
 					{
 						SET_FLAG(action->control_flags, _unit_control_weapon_reload_bit, TRUE);
 					}
@@ -3761,7 +3768,8 @@ void players_update_before_game(
 						action->desired_weapon_index = unit->unit.current_weapon_index;
 					}
 
-					control_data.control_flags = (word)action->control_flags;
+					control_data.control_flags =
+						(word)(action->control_flags & ~FLAG(UNIT_CONTROL_PORT_ACTION_ONLY_BIT));
 					player_aiming_vector_from_facing(
 						iterator.datum_index,
 						&control_data.aiming_vector,
