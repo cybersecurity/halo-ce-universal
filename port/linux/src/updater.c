@@ -50,6 +50,10 @@ update.h's: posix_update.c on Linux, win32_update.c on Windows.
 #ifdef _WIN32
 #define UPDATE_PLATFORM "windows"
 #define PATH_SEPARATOR "\\"
+#elif defined(HALO_ARM64_GUEST)
+/* the 64-bit ARM build (port/linux/arm64) */
+#define UPDATE_PLATFORM "linux-arm64"
+#define PATH_SEPARATOR "/"
 #else
 #define UPDATE_PLATFORM "linux"
 #define PATH_SEPARATOR "/"

@@ -19,15 +19,6 @@ so the audio callback is handed to a thread that has one.
 
 #define HANDLE_COUNT 256
 
-enum handle_type
-{
-	_handle_free,
-	_handle_window,
-	_handle_context,
-	_handle_gamepad,
-	_handle_audio,
-};
-
 struct handle
 {
 	int type;
@@ -37,7 +28,7 @@ struct handle
 static struct handle handles[HANDLE_COUNT];
 static pthread_mutex_t handle_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static uint32_t handle_new(int type, void *object)
+uint32_t host_sdl_handle_new(int type, void *object)
 {
 	uint32_t index;
 
@@ -68,7 +59,7 @@ static uint32_t handle_new(int type, void *object)
 	return 0;
 }
 
-static void *handle_get(uint32_t handle, int type)
+void *host_sdl_handle_get(uint32_t handle, int type)
 {
 	void *object = NULL;
 
@@ -79,6 +70,16 @@ static void *handle_get(uint32_t handle, int type)
 		object = handles[handle].object;
 	pthread_mutex_unlock(&handle_lock);
 	return object;
+}
+
+void host_sdl_handle_free(uint32_t handle)
+{
+	if (handle == 0 || handle >= HANDLE_COUNT)
+		return;
+	pthread_mutex_lock(&handle_lock);
+	handles[handle].type = _handle_free;
+	handles[handle].object = NULL;
+	pthread_mutex_unlock(&handle_lock);
 }
 
 /* ---------- general */
@@ -122,12 +123,12 @@ int64_t host_sdl_thread_id(void)
 
 uint32_t host_sdl_create_window(const char *title, int width, int height, int64_t flags)
 {
-	return handle_new(_handle_window, SDL_CreateWindow(title, width, height, (SDL_WindowFlags)flags));
+	return host_sdl_handle_new(_handle_window, SDL_CreateWindow(title, width, height, (SDL_WindowFlags)flags));
 }
 
 void host_sdl_window_size_in_pixels(uint32_t window, int *width, int *height)
 {
-	SDL_Window *object = handle_get(window, _handle_window);
+	SDL_Window *object = host_sdl_handle_get(window, _handle_window);
 
 	*width = 0;
 	*height = 0;
@@ -137,7 +138,7 @@ void host_sdl_window_size_in_pixels(uint32_t window, int *width, int *height)
 
 int host_sdl_set_relative_mouse(uint32_t window, int enabled)
 {
-	SDL_Window *object = handle_get(window, _handle_window);
+	SDL_Window *object = host_sdl_handle_get(window, _handle_window);
 
 	return object ? SDL_SetWindowRelativeMouseMode(object, enabled != 0) : 0;
 }
@@ -149,14 +150,14 @@ int host_sdl_gl_set_attribute(int attribute, int value)
 
 uint32_t host_sdl_gl_create_context(uint32_t window)
 {
-	SDL_Window *object = handle_get(window, _handle_window);
+	SDL_Window *object = host_sdl_handle_get(window, _handle_window);
 
-	return object ? handle_new(_handle_context, SDL_GL_CreateContext(object)) : 0;
+	return object ? host_sdl_handle_new(_handle_context, SDL_GL_CreateContext(object)) : 0;
 }
 
 int host_sdl_gl_make_current(uint32_t window, uint32_t context)
 {
-	return SDL_GL_MakeCurrent(handle_get(window, _handle_window), handle_get(context, _handle_context));
+	return SDL_GL_MakeCurrent(host_sdl_handle_get(window, _handle_window), host_sdl_handle_get(context, _handle_context));
 }
 
 int host_sdl_gl_set_swap_interval(int interval)
@@ -166,7 +167,7 @@ int host_sdl_gl_set_swap_interval(int interval)
 
 int host_sdl_gl_swap_window(uint32_t window)
 {
-	SDL_Window *object = handle_get(window, _handle_window);
+	SDL_Window *object = host_sdl_handle_get(window, _handle_window);
 
 	return object ? SDL_GL_SwapWindow(object) : 0;
 }
@@ -209,38 +210,38 @@ uint32_t host_sdl_open_gamepad(uint32_t id)
 	if (gamepad)
 		host_logf(HOST_LOG_INFO, "gamepad %u: %s (type %d, %04x:%04x)", (unsigned)id, SDL_GetGamepadName(gamepad),
 			(int)SDL_GetGamepadType(gamepad), SDL_GetGamepadVendor(gamepad), SDL_GetGamepadProduct(gamepad));
-	return handle_new(_handle_gamepad, gamepad);
+	return host_sdl_handle_new(_handle_gamepad, gamepad);
 }
 
 uint32_t host_sdl_gamepad_from_id(uint32_t id)
 {
-	return handle_new(_handle_gamepad, SDL_GetGamepadFromID((SDL_JoystickID)id));
+	return host_sdl_handle_new(_handle_gamepad, SDL_GetGamepadFromID((SDL_JoystickID)id));
 }
 
 int host_sdl_gamepad_axis(uint32_t gamepad, int axis)
 {
-	SDL_Gamepad *object = handle_get(gamepad, _handle_gamepad);
+	SDL_Gamepad *object = host_sdl_handle_get(gamepad, _handle_gamepad);
 
 	return object ? SDL_GetGamepadAxis(object, (SDL_GamepadAxis)axis) : 0;
 }
 
 int host_sdl_gamepad_button(uint32_t gamepad, int button)
 {
-	SDL_Gamepad *object = handle_get(gamepad, _handle_gamepad);
+	SDL_Gamepad *object = host_sdl_handle_get(gamepad, _handle_gamepad);
 
 	return object ? SDL_GetGamepadButton(object, (SDL_GamepadButton)button) : 0;
 }
 
 int host_sdl_gamepad_type(uint32_t gamepad)
 {
-	SDL_Gamepad *object = handle_get(gamepad, _handle_gamepad);
+	SDL_Gamepad *object = host_sdl_handle_get(gamepad, _handle_gamepad);
 
 	return object ? SDL_GetGamepadType(object) : SDL_GAMEPAD_TYPE_UNKNOWN;
 }
 
 int host_sdl_rumble_gamepad(uint32_t gamepad, uint32_t low, uint32_t high, uint32_t milliseconds)
 {
-	SDL_Gamepad *object = handle_get(gamepad, _handle_gamepad);
+	SDL_Gamepad *object = host_sdl_handle_get(gamepad, _handle_gamepad);
 
 	return object ? SDL_RumbleGamepad(object, (Uint16)low, (Uint16)high, milliseconds) : 0;
 }
@@ -355,7 +356,7 @@ uint32_t host_sdl_open_audio_stream(uint32_t device, const void *spec, uint32_t 
 		return 0;
 	}
 	/* the device starts paused, so no callback can run before this */
-	binding->handle = handle_new(_handle_audio, stream);
+	binding->handle = host_sdl_handle_new(_handle_audio, stream);
 	if (callback && host_native_thread_create(audio_thread, binding, 256 * 1024) != 0)
 		host_fatal("cannot start the audio thread");
 	return binding->handle;
@@ -363,7 +364,7 @@ uint32_t host_sdl_open_audio_stream(uint32_t device, const void *spec, uint32_t 
 
 int host_sdl_put_audio_stream_data(uint32_t stream, const void *data, int length)
 {
-	SDL_AudioStream *object = handle_get(stream, _handle_audio);
+	SDL_AudioStream *object = host_sdl_handle_get(stream, _handle_audio);
 
 	if (!object)
 		return 0;
@@ -374,7 +375,7 @@ int host_sdl_put_audio_stream_data(uint32_t stream, const void *data, int length
 
 int host_sdl_resume_audio_stream_device(uint32_t stream)
 {
-	SDL_AudioStream *object = handle_get(stream, _handle_audio);
+	SDL_AudioStream *object = host_sdl_handle_get(stream, _handle_audio);
 
 	return object ? SDL_ResumeAudioStreamDevice(object) : 0;
 }
@@ -396,7 +397,17 @@ void host_sdl_get_clipboard_text(char *buffer, uint32_t size)
 
 int host_sdl_show_toast(const char *message, int duration, int gravity, int x, int y)
 {
+#ifdef __ANDROID__
 	return SDL_ShowAndroidToast(message, duration, gravity, x, y) ? 1 : 0;
+#else
+	/* (the desktop guest shows none: Linux arm64, port/linux/arm64) */
+	(void)message;
+	(void)duration;
+	(void)gravity;
+	(void)x;
+	(void)y;
+	return 0;
+#endif
 }
 
 /* ---------- a message for the player (a host of another network version) */

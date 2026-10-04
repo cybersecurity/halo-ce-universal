@@ -1,0 +1,34 @@
+# Host functions the Linux arm64 guest imports beyond the Android app's
+# (port/android/host_imports.list): declared in guest_desktop.c, defined in
+# host_desktop.c. tools/android_imports.py generates the stubs.
+host_sdl_get_base_path
+host_sdl_ticks_ns
+host_sdl_pump_events
+host_sdl_push_event
+host_sdl_get_window_flags
+host_sdl_set_window_fullscreen
+host_sdl_set_window_fullscreen_mode
+host_sdl_get_window_size
+host_sdl_set_window_size
+host_sdl_destroy_window
+host_sdl_warp_mouse_in_window
+host_sdl_get_display_for_window
+host_sdl_get_primary_display
+host_sdl_get_display_mode
+host_sdl_create_renderer
+host_sdl_destroy_renderer
+host_sdl_set_render_vsync
+host_sdl_set_render_draw_color
+host_sdl_set_render_scale
+host_sdl_render_clear
+host_sdl_render_fill_rect
+host_sdl_render_debug_text
+host_sdl_render_present
+host_sdl_show_message_box
+host_sdl_open_file_dialog
+host_update_download
+host_update_executable_path
+host_update_replace_file
+host_update_delete_file
+host_update_make_directory
+host_update_launch

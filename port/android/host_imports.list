@@ -45,7 +45,7 @@ host_sdl_put_audio_stream_data
 host_sdl_resume_audio_stream_device
 host_gl_get_string
 host_gl_has_extension
-host_gl_read_buffer_word
+host_gl_read_buffer
 host_gl_buffer_write
 host_gl_fence_frame
 host_gl_wait_frame

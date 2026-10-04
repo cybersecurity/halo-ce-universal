@@ -171,9 +171,7 @@ the Xbox:
 - Black bars and fades cover all of the screen, and so do the menus' dims
   and backgrounds (the pause menu's dim, dialogs, the menus' gradient).
 
-The changes are in `#ifdef HALO_ANDROID` in `rasterizer_xbox.c`, `render.c`,
-`ui_widget.c`, `cinematics.c`, `main.c` and
-`rasterizer_xbox_screen_effect.c`.
+All the ports draw this way.
 
 ## How the port operates
 
@@ -276,7 +274,8 @@ floating-point contraction, as on x86.
 
 The x86 inline assembly is replaced by C (refer to
 [port/linux/README.md](../linux/README.md#game-source-changes)).
-These changes are in `#ifdef HALO_ANDROID`:
+These changes are in `#ifdef HALO_ARM64_GUEST`, which the Linux arm64 build
+shares:
 
 - Seven `#pragma bss_seg(".bss")` lines are removed. The Darwin target does
   not accept them.

@@ -11,7 +11,8 @@ The exceptions are
 - structures whose ILP32 layout differs from the kernel's: timespec and
   timeval (the guest's time_t is 32-bit, as in the MSVC runtime), iovec;
 - memory mappings, which must stay below 4 GB (host_memory.c);
-- the standard output and error streams, which go to logcat;
+- the standard output and error streams, which go to logcat (on Android;
+  on Linux arm64, port/linux/arm64, they are the process's);
 - process exit, and calls that have no meaning for the guest (signal
   handlers, which the host owns).
 */
@@ -33,7 +34,9 @@ The exceptions are
 #include <time.h>
 #include <unistd.h>
 
+#ifdef __ANDROID__
 #include <android/log.h>
+#endif
 
 /* the guest's structures */
 struct guest_timespec
@@ -78,6 +81,7 @@ static long result_of(long value)
 
 /* ---------- standard output and error */
 
+#ifdef __ANDROID__
 struct log_stream
 {
 	char line[1024];
@@ -109,6 +113,7 @@ static void log_bytes(int fd, const char *bytes, size_t size)
 	}
 	pthread_mutex_unlock(&log_lock);
 }
+#endif
 
 static long guest_writev(int fd, uint64_t vector, int count, int64_t offset, int positional)
 {
@@ -123,6 +128,7 @@ static long guest_writev(int fd, uint64_t vector, int count, int64_t offset, int
 		host_vector[index].iov_base = GUEST(void *, guest_vector[index].base);
 		host_vector[index].iov_len = guest_vector[index].length;
 	}
+#ifdef __ANDROID__
 	if (fd == 1 || fd == 2)
 	{
 		long total = 0;
@@ -134,6 +140,7 @@ static long guest_writev(int fd, uint64_t vector, int count, int64_t offset, int
 		}
 		return total;
 	}
+#endif
 	if (positional)
 		return result_of(pwritev(fd, host_vector, count, offset));
 	return result_of(writev(fd, host_vector, count));
@@ -188,11 +195,13 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	switch (number)
 	{
 	case SYS_write:
+#ifdef __ANDROID__
 		if (a == 1 || a == 2)
 		{
 			log_bytes((int)a, GUEST(const char *, b), (size_t)(uint32_t)c);
 			return (uint32_t)c;
 		}
+#endif
 		return result_of(write((int)a, GUEST(const void *, b), (size_t)(uint32_t)c));
 	case SYS_writev:
 		return guest_writev((int)a, (uint64_t)b, (int)c, 0, 0);
