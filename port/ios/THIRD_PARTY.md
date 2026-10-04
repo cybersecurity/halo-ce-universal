@@ -15,7 +15,7 @@ Other vendored components retain their original notices in the source tree.
 
 Halo, Master Chief, game artwork, and original game assets belong to their
 respective rights holders. The project license does not grant rights to those
-materials. The icon is original geometric artwork; see [ICON.md](ICON.md).
+materials. The icon is original abstract ringworld artwork; see [ICON.md](ICON.md).
 Apple builds omit the embedded replacement HUD, title and font assets and
 render the artwork from the user-provided disc image. No game maps, disc images, Microsoft signing material, or
 Xbox SDK are distributed in the app. This is an unofficial community port,

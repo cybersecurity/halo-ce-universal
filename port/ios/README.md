@@ -9,7 +9,7 @@ The Home Screen name is **Halo: CE**. The portable ILP32 runtime lives in
 `port/runtime`; UIKit, Darwin, touch, audio, and the native loader live here.
 The existing Android, Linux, Windows and web build targets are retained.
 
-The icon is original geometric artwork; see [icon notes](ICON.md). Apple builds
+The icon is original abstract ringworld artwork; see [icon notes](ICON.md). Apple builds
 exclude the bundled replacement HUD/title/font assets and require a user-owned
 disc image. See [distribution status](../apple/DISTRIBUTION.md).
 
@@ -83,7 +83,7 @@ The cache validator accepts these exact Xbox v5 cache builds on iOS:
 ### Import on the device
 
 1. Sign/install the IPA with your own account, then open **Halo: CE**.
-2. Tap **Choose Halo XISO** and select your `.iso` or `.xiso` in Files (On My
+2. Tap **Choose Halo ISO** and select your `.iso` or `.xiso` in Files (On My
    iPhone/iPad, iCloud Drive, or another Files provider). Compressed ZIP/7z
    archives and PC/MCC disc images are not supported.
 3. The app copies the image into a private generation, verifies the copy with

@@ -54,7 +54,7 @@ static int import_progress(void *context, const char *file, uint64_t done, uint6
     UIView *content=[UIView new];content.translatesAutoresizingMaskIntoConstraints=NO;[scroll addSubview:content];
     UIStackView *stack=[UIStackView new];stack.axis=UILayoutConstraintAxisVertical;stack.spacing=14;
     stack.alignment=UIStackViewAlignmentCenter;stack.translatesAutoresizingMaskIntoConstraints=NO;[content addSubview:stack];
-    UIImageView *icon=[[UIImageView alloc] initWithImage:[UIImage imageNamed:@"AppIcon60x60"]];
+    UIImageView *icon=[[UIImageView alloc] initWithImage:[UIImage imageNamed:@"RingArtwork"]];
     icon.contentMode=UIViewContentModeScaleAspectFill;icon.clipsToBounds=YES;icon.layer.cornerRadius=16;
     [icon.widthAnchor constraintEqualToConstant:72].active=YES;[icon.heightAnchor constraintEqualToConstant:72].active=YES;
     [stack addArrangedSubview:icon];
@@ -65,8 +65,8 @@ static int import_progress(void *context, const char *file, uint64_t done, uint6
     body.numberOfLines=0;body.textAlignment=NSTextAlignmentCenter;body.textColor=UIColor.secondaryLabelColor;[stack addArrangedSubview:body];
     self.chooseButton=[UIButton buttonWithType:UIButtonTypeSystem];
     UIButtonConfiguration *style=UIButtonConfiguration.filledButtonConfiguration;
-    style.title=@"Choose Halo XISO";style.baseBackgroundColor=[UIColor colorWithRed:0.36 green:0.65 blue:0.31 alpha:1];
-    style.baseForegroundColor=UIColor.blackColor;style.cornerStyle=UIButtonConfigurationCornerStyleLarge;
+    style.title=@"Choose Halo ISO";style.baseBackgroundColor=UIColor.systemBlueColor;
+    style.baseForegroundColor=UIColor.whiteColor;style.cornerStyle=UIButtonConfigurationCornerStyleLarge;
     style.contentInsets=NSDirectionalEdgeInsetsMake(14,24,14,24);self.chooseButton.configuration=style;
     self.chooseButton.accessibilityIdentifier=@"chooseXISO";
     [self.chooseButton addTarget:self action:@selector(chooseImage) forControlEvents:UIControlEventTouchUpInside];[stack addArrangedSubview:self.chooseButton];

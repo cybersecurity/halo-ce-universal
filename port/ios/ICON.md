@@ -1,11 +1,15 @@
-# Community-port icon
+# Abstract ringworld icon
 
-The current icon is an original geometric mint chevron on a dark background.
-Generate its asset-catalog PNGs with:
+Original artwork generated with the imagegen skill from the user's ringworld
+sketch on 2026-10-03: a blue waterway broad in the foreground, narrowing up the
+inner surface of an immense ring, framed by dark mountain silhouettes.
+No game screenshot, character, or franchise lettering was used as input.
+
+The master is `port/apple/RingArtwork.png`. Generate iOS icon sizes with:
 
 ```
 swift tools/apple_icon.swift port/ios/Assets.xcassets/AppIcon.appiconset
 ```
 
-It contains no Halo character, screenshot, logo or image-derived artwork.
-The former imported Master Chief icon is no longer used in app builds.
+The `RingArtwork` image set displays this artwork on the import screen and iOS launch screen. The
+macOS `Community.icns` contains resized versions of the same artwork.

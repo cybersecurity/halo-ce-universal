@@ -74,3 +74,6 @@ target_link_libraries(HaloCE PRIVATE "-framework IOSurface")
 
 target_sources(HaloCE PRIVATE "${ROOT}/port/apple/DISTRIBUTION.md")
 set_source_files_properties("${ROOT}/port/apple/DISTRIBUTION.md" PROPERTIES MACOSX_PACKAGE_LOCATION Resources/Licenses)
+
+target_sources(HaloCE PRIVATE LaunchScreen.storyboard)
+set_source_files_properties(LaunchScreen.storyboard PROPERTIES MACOSX_PACKAGE_LOCATION Resources)

@@ -43,8 +43,8 @@
 	<true/>
 	<key>UIFileSharingEnabled</key>
 	<true/>
-	<key>UILaunchScreen</key>
-	<dict/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
 	<key>UIRequiresFullScreen</key>
 	<true/>
 	<key>UISupportedInterfaceOrientations</key>

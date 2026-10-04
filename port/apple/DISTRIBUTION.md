@@ -8,7 +8,7 @@ legal opinion or permission to distribute the reconstructed game code.
 
 Apple builds embed the compiled native runtime and reconstructed game code,
 SDL, ANGLE, bundled room-transport JavaScript, open-source dependency notices,
-and an original geometric icon. They do not embed a user's disc image, maps,
+and an original abstract ringworld icon. They do not embed a user's disc image, maps,
 saves, or the repository's replacement HUD/title/font assets. In-game images,
 audio and fonts are loaded from the user's imported disc image/map cache.
 

@@ -27,7 +27,7 @@ static int progress(void *context,const char *file,uint64_t done,uint64_t total)
 void host_ios_prepare_assets(const char *path){
  NSString *root=[NSString stringWithUTF8String:path];
  while(!halo_game_store_current(root)) {
-  NSAlert *intro=[NSAlert new];intro.messageText=@"Choose your game image";intro.informativeText=@"Choose your own original Xbox Halo: Combat Evolved ISO or XISO. A verified copy and extracted maps will be stored privately on this Mac. No game image is included.";[intro addButtonWithTitle:@"Choose image…"];[intro addButtonWithTitle:@"Quit"];
+  NSAlert *intro=[NSAlert new];intro.messageText=@"Choose your game image";intro.informativeText=@"Choose your own original Xbox Halo: Combat Evolved ISO or XISO. A verified copy and extracted maps will be stored privately on this Mac. No game image is included.";[intro addButtonWithTitle:@"Choose Halo ISO"];[intro addButtonWithTitle:@"Quit"];intro.icon=[NSImage imageNamed:NSImageNameApplicationIcon];intro.buttons.firstObject.bezelColor=NSColor.systemBlueColor;intro.buttons.firstObject.contentTintColor=NSColor.whiteColor;
   [NSApp activateIgnoringOtherApps:YES];if([intro runModal]!=NSAlertFirstButtonReturn)exit(0);
   NSOpenPanel *picker=[NSOpenPanel openPanel];picker.canChooseDirectories=NO;picker.allowsMultipleSelection=NO;
   if([picker runModal]!=NSModalResponseOK)continue;
