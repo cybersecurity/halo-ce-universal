@@ -12,6 +12,9 @@ it exists, so that the player's edits and comments stay.
 
 #include "platform.h"
 #include "port_config.h"
+#ifdef HALO_GAME_BROWSER
+#include "browser.h"
+#endif
 #include "tomlc17.h"
 
 #include <SDL3/SDL.h>
@@ -250,6 +253,13 @@ static const struct config_setting config_settings[] =
 		"HALO_NET_STUN", _environment_value, _platform_all,
 		"Public STUN servers that tell this machine its internet address;\n"
 		"comma-separated host:port." },
+#ifdef HALO_GAME_BROWSER
+	{ "network.browser_url", _config_string, "\"" BROWSER_DEFAULT_URL "\"", "HALO_NET_BROWSER", _environment_value,
+		_platform_all,
+		"A game list server (configure.py --game-browser) whose games the server\n"
+		"browser shows too, beside the public games' listings: its list is read\n"
+		"(a plain GET of /v1/games.txt) while the browser is open; empty for none." },
+#endif
 	{ "discord.application_id", _config_string, "\"1553978809840050229\"", "HALO_DISCORD_APPLICATION",
 		_environment_value, _platform_desktop,
 		"The Discord application internet play invites go through while the\n"

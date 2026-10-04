@@ -7,6 +7,7 @@
     "msvc_crt.c",
     "msvc_wide.c",
     "posix_update.c",
+    "posix_browser.c",
     "posix_upnp.c"
   ],
   "libraries": [

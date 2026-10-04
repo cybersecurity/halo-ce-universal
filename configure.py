@@ -41,6 +41,14 @@ parser.add_argument(
     "optimised as one module, the fastest code and the slowest links), thin (parallel and incremental) or off",
 )
 parser.add_argument(
+    "--game-browser",
+    action=argparse.BooleanOptionalAction,
+    default=True,
+    help="native ports (Linux, Windows, Android): the server browser's second source, the game list of "
+    "network.browser_url (halo.milenko.org; HALO_GAME_BROWSER; port/linux/src/browser.c); on unless "
+    "--no-game-browser",
+)
+parser.add_argument(
     "--portable",
     action="store_true",
     help="x86 builds (Linux, Windows): code for any x86-64 processor (SSE2) rather than for this "
@@ -87,6 +95,7 @@ sln = SimpleNamespace(
     port_pgo_profile=args.pgo_profile,
     android_ndk=args.android_ndk,
     android_guest_cc=args.android_guest_cc,
+    game_browser=args.game_browser,
 )
 
 

@@ -5196,6 +5196,13 @@ static void widget_instance_render_text_box(
 			color_alpha = color.alpha;
 		}
 	}
+	/* port: a colour the PC menus give this text box (the lobby's players
+	by team: menu_functions.c) */
+	{
+		extern boolean pc_menu_text_color(struct widget_instance const *widget, real_rgb_color *rgb);
+
+		pc_menu_text_color(widget, &color.rgb);
+	}
 	color.alpha = alpha_modifier * color_alpha;
 	if (TEST_FLAG(definition->text_box_flags, _text_box_flashing_text_bit))
 	{

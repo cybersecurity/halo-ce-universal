@@ -85,8 +85,9 @@ def main() -> int:
     # XisoExtractor.java) follow extract-xiso, whose license asks binaries
     # to carry its notice
     shutil.copy2(ROOT / "port/third_party/extract-xiso/LICENSE.TXT", dist / "extract-xiso-LICENSE.txt")
-    if args.platform == "linux":
-        # the self-updater's TLS (port/third_party/mbedtls), whose Apache
+    if args.platform in ("linux", "android"):
+        # the self-updater's TLS (port/third_party/mbedtls) on Linux, and the
+        # game list's (configure.py --game-browser) on both, whose Apache
         # license asks the same
         shutil.copy2(ROOT / "port/third_party/mbedtls/LICENSE", dist / "mbedtls-LICENSE.txt")
     # internet play's UPnP (port/third_party/miniupnpc), in every build,

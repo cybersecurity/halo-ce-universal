@@ -221,6 +221,7 @@ the setting for one start of the game. It has priority over the file.
 | `network.allow_upnp` | `true` | `HALO_NET_ALLOW_UPNP` | `true`: internet play can ask the router to forward its port (UPnP). `false`: the game does not ask. Refer to "Internet play". |
 | `network.public_lobby` | `true` | `HALO_NET_PUBLIC_LOBBY` | `true`: the server browser. Public games are listed, and Join Game > Server Browser shows them. `false`: no games are listed or shown. Refer to "Server browser". |
 | `network.host_public` | `true` | `HALO_NET_HOST_PUBLIC` | `true`: a new game of Create Game > Internet starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in Server Setup changes it for each game. Refer to "Server browser". |
+| `network.browser_url` | `"https://halo.milenko.org"` | `HALO_NET_BROWSER` | A game list server whose games the server browser also shows. Empty: none. Refer to "Server browser". |
 | `network.signalling_brokers` | three public brokers | `HALO_NET_BROKERS` | The public MQTT brokers (`host:port`, with commas between them) that let the machines of an invite find each other, and that carry the listings of the server browser. |
 | `network.stun_servers` | Google and Cloudflare | `HALO_NET_STUN` | The public STUN servers (`host:port`, with commas between them) that give the internet address of a machine. |
 | `discord.application_id` | the application of the project | `HALO_DISCORD_APPLICATION` | The Discord application for invites. Empty: no Discord. |
@@ -451,6 +452,22 @@ players must use the same broker to see each other's games. The game uses
 MQTT 5 if the broker has it, else MQTT 3.1.1. A broker that does not keep
 retained messages, or does not let clients subscribe with wildcards, carries
 only invites, not listings.
+
+The server browser also shows the games of a game list server,
+`network.browser_url` (`https://halo.milenko.org` by default, a community
+list that lists the games of any build that hosts them; its API is at
+`https://halo.milenko.org/api`):
+
+- While the server browser is open, the game reads the list with an HTTPS
+  GET of `/v1/games.txt` (at most every 5 seconds). The request does not
+  send player data or keys.
+- The game shows only games of its network version, and not its own game.
+  A game that is also listed on the brokers shows once, with its listing.
+- To join a game of the list, the game joins its invite, as for a link.
+- A game on a Halo PC (Custom Edition) map shows PC after the map. This
+  build cannot play these maps, so it does not join these games.
+- `network.browser_url = ""` turns the game list off. `configure.py
+  --no-game-browser` builds the game without it (`port/linux/src/browser.c`).
 
 ### Security
 

@@ -25,7 +25,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .linux_build import (LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_MATH_DIR, XDK_INCLUDE,
+from .linux_build import (LINUX_PROFILE, MBEDTLS_DIR, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_MATH_DIR, XDK_INCLUDE,
+                          game_browser_defines,
                           compile_launcher, game_defines_and_includes, game_sources, miniupnpc_sources,
                           musl_math_sources, pgo_mode, pgo_profile,
                           profile_use_flags, xdk_headers)
@@ -389,7 +390,8 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     game_cflags = " ".join([
         guest_abi, guest_code, " ".join(game_flags), profile_flags,
         f"-include {prefix_header}", f"-include {semantics_header}",
-        f"-I{LINUX_DIR}/include", game_defines_and_includes(config), *libc_includes, f"-idirafter {XDK_INCLUDE}",
+        f"-I{LINUX_DIR}/include", game_defines_and_includes(config), *game_browser_defines(sln), *libc_includes,
+        f"-idirafter {XDK_INCLUDE}",
     ])
     for source in game_sources(config):
         cflags = game_cflags
@@ -406,7 +408,8 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         f"-I{LINUX_DIR}/src", f"-I{LINUX_DIR}/include", f"-I{PORT_DIR}/guest/runtime",
         f"-I{PORT_DIR}/include", f"-I{TOML_DIR}", f"-I{EXPAT_DIR}", f"-I{KCP_DIR}", f"-I{MONOCYPHER_DIR}",
         "-Isource -Isource/cseries",
-        f"-I{SDL_DIR}/include", f"-I{gl_include}", *libc_includes, f"-idirafter {XDK_INCLUDE}",
+        f"-I{SDL_DIR}/include", f"-I{gl_include}", *game_browser_defines(sln), *libc_includes,
+        f"-idirafter {XDK_INCLUDE}",
     ])
     guest_host_only = {"memory_watch.c"}  # replaced by guest_memory_watch.c
     for source in sorted((LINUX_DIR / "src").glob("*.c")):
@@ -525,6 +528,15 @@ def generate_android_build(n: Writer, sln: Any) -> None:
                               else source.name + ".o")
         n.build(outputs=obj, rule="android_host_cc", inputs=source,
                 variables={"cflags": miniupnpc_cflags + (" -w" if source.name != "posix_upnp.c" else "")})
+        host_objects.append(obj)
+    # the game list's requests (posix_browser.c, with port/third_party/mbedtls
+    # for HTTPS), as the other posix_*.c in the host
+    mbedtls_cflags = " ".join([host_cflags, f"-I{MBEDTLS_DIR / 'include'}", f"-I{MBEDTLS_DIR / 'library'}"])
+    for source in [LINUX_DIR / "src" / "posix_browser.c", *sorted((MBEDTLS_DIR / "library").glob("*.c"))]:
+        obj = host_obj_dir / ("mbedtls_" + source.name + ".o" if source.parent.parent == MBEDTLS_DIR
+                              else source.name + ".o")
+        n.build(outputs=obj, rule="android_host_cc", inputs=source,
+                variables={"cflags": mbedtls_cflags + (" -w" if source.name != "posix_browser.c" else "")})
         host_objects.append(obj)
     table_obj = host_obj_dir / "host_import_table.c.o"
     n.build(outputs=table_obj, rule="android_host_cc", inputs=host_table_c, variables={"cflags": host_cflags})

@@ -168,4 +168,14 @@ or -1 if the connection closed */
 int posix_discord_read(int handle, void *buffer, int length);
 void posix_discord_close(int handle);
 
+/* the game list server's one HTTP request to url (http:// or https://), with
+body as the body of a POST when it is not NULL (of content_type, or form
+fields when that is NULL), else a GET; the response's body, NUL terminated
+and cut to response_size - 1 bytes, in response. Returns the HTTP status,
+or 0 with the reason in error when there was no answer. Blocks for up to
+about ten seconds: call it from a thread of its own (browser.c).
+posix_browser.c; on Windows, win32_browser.c */
+int posix_browser_request(const char *url, const char *body, const char *content_type, char *response,
+	int response_size, char *error, int error_size);
+
 #endif

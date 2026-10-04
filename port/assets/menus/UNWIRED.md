@@ -14,10 +14,6 @@ do (save a setting, join a game) does not happen; the screens open and close as 
 | `direct ip connect init` | 1 | PC function |
 | `direct ip connect update` | 1 | PC function |
 | `direct ip edit field` | 4 | PC function |
-| `gamespy screen update` | 1 | PC function |
-| `gamespy select button` | 8 | PC function |
-| `gamespy select header` | 22 | PC function |
-| `gamespy select item` | 49 | PC function |
 | `gamespy update filter settings` | 2 | PC function |
 | `gt edit list update` | 1 | PC function |
 | `gt select list update` | 1 | PC function |
@@ -33,4 +29,4 @@ do (save a setting, join a game) does not happen; the screens open and close as 
 | `ss edit server name` | 2 | PC function |
 | `ss start game` | 2 | PC function |
 
-Wired: `campaign menu continue`, `campaign menu init`, `controls back handler`, `controls begin binding`, `controls screen change set`, `controls screen defaults`, `controls screen init`, `controls update menu`, `difficulty item select`, `direct ip connect go`, `emit custom activation event`, `gamespy back handler`, `gamespy dismiss error`, `gamespy dismiss filters`, `gamespy screen dispose`, `gamespy screen init`, `load game list update`, `load game menu activated`, `load game menu delete finish`, `load game menu delete request`, `load game menu dispose`, `load game menu init`, `main menu quit game`, `mouse emit accept event`, `mouse emit back event`, `mouse emit x event`, `mp type set mode`, `profile manager select`, `profile set edit begin`, `single prev cl item activated`, `solo map list update`.
+Wired: `campaign menu continue`, `campaign menu init`, `controls back handler`, `controls begin binding`, `controls screen change set`, `controls screen defaults`, `controls screen init`, `controls update menu`, `difficulty item select`, `direct ip connect go`, `emit custom activation event`, `gamespy back handler`, `gamespy dismiss error`, `gamespy dismiss filters`, `gamespy screen dispose`, `gamespy screen init`, `gamespy screen update`, `gamespy select button`, `gamespy select header`, `gamespy select item`, `load game list update`, `load game menu activated`, `load game menu delete finish`, `load game menu delete request`, `load game menu dispose`, `load game menu init`, `main menu quit game`, `mouse emit accept event`, `mouse emit back event`, `mouse emit x event`, `mp type set mode`, `profile manager select`, `profile set edit begin`, `single prev cl item activated`, `solo map list update`.
