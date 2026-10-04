@@ -522,7 +522,8 @@ static void updater_clean_up(void)
 {
 	static const char *const names[] =
 	{
-		"halo.old", "halo.exe.old", "SDL3.dll.old", "extract-xiso-LICENSE.txt.old", "mbedtls-LICENSE.txt.old",
+		"halo.old", "halo.exe.old", "SDL3.dll.old", "libSDL3.so.0.old", "extract-xiso-LICENSE.txt.old",
+		"mbedtls-LICENSE.txt.old",
 	};
 	char path[1200];
 	size_t index;

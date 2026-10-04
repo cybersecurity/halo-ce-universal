@@ -10,9 +10,9 @@ runs its main() on a thread of its own with its stack in guest memory
 (host_thread.c). The main thread waits; the game ends the process.
 
 The guest is the Linux desktop build of the game, so it finds the game data,
-the saves and config.toml as the x86 build does (port/linux/README.md): the
-environment it gets is this process's (the HALO_ settings, HOME and the XDG
-folders), and /proc/self/exe is this executable.
+the saves and config.toml as the x86 build does (port/linux/README.md): it
+gets the part of this process's environment that it reads (the HALO_
+settings, HOME, the XDG folders), and /proc/self/exe is this executable.
 */
 
 #include "host.h"
@@ -114,11 +114,15 @@ static void environment_add(struct environment *environment, const char *entry)
 		environment->entries[environment->count++] = strdup(entry);
 }
 
-/* what the game reads: its settings (HALO_...), and where the saves go
-(port/linux/src/xbox_files.c); the display and sound are the host's */
+/* what the game reads: its settings (HALO_...), where the saves go
+(port/linux/src/xbox_files.c) and where Discord's socket is (posix_net.c);
+the display and sound are the host's. TZ is game_main's. */
 static int environment_passes(const char *entry)
 {
-	static const char *const prefixes[] = { "HALO_", "HOME=", "XDG_", "USER=", "LANG=", "LC_", "TZ=" };
+	static const char *const prefixes[] =
+	{
+		"HALO_", "HOME=", "XDG_", "USER=", "LANG=", "LC_", "TMPDIR=", "TMP=", "TEMP=",
+	};
 	size_t index;
 
 	for (index = 0; index < sizeof(prefixes) / sizeof(prefixes[0]); index++)
@@ -219,7 +223,7 @@ static void *game_main(void *unused)
 	(void)unused;
 	for (entry = environ; *entry; entry++)
 	{
-		if (environment_passes(*entry) && strncmp(*entry, "TZ=", 3))
+		if (environment_passes(*entry))
 			environment_add(&environment, *entry);
 	}
 	time_zone(zone, sizeof(zone));

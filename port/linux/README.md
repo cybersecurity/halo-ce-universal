@@ -607,8 +607,9 @@ for example). The release builds of GitHub Actions use glibc 2.35 or later.
 
 ### How it operates
 
-64-bit ARM processors cannot execute 32-bit ARM code on Linux, as on
-Android. Thus this build operates as the Android port does: the game is
+Recent 64-bit ARM processors (the Steam Frame's, for example) cannot
+execute 32-bit ARM code, and few distributions have 32-bit ARM libraries
+(SDL3, Mesa). Thus this build operates as the Android port does: the game is
 ILP32 AArch64 code, a guest image in a 64-bit process. Refer to "How the
 port operates" in [port/android/README.md](../android/README.md#how-the-port-operates).
 
@@ -618,8 +619,9 @@ port operates" in [port/android/README.md](../android/README.md#how-the-port-ope
   and `HALO_GLES`, not `HALO_ANDROID`.
 - The host is the Android host (`port/android/host`) as a Linux executable.
   `arm64/host_main.c` replaces its `host_main.c`. The executable contains
-  the guest image (`arm64/guest_image.S`). The guest gets the environment
-  of the process, so the `HALO_` settings operate.
+  the guest image (`arm64/guest_image.S`). The guest gets the variables of
+  the environment that it reads (the `HALO_` settings, `HOME`, the XDG
+  folders), so the `HALO_` settings operate.
 - The desktop code paths use more of SDL than the Android app:
   `arm64/guest_desktop.c` and `arm64/host_desktop.c` supply it, and
   `arm64/host_imports.list` lists their imports. The guest does SDL's

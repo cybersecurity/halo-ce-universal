@@ -1,8 +1,8 @@
 """Ninja rules for the 64-bit ARM Linux build (``ninja linux_arm64``).
 
-The game's data needs 32-bit pointers, and 64-bit ARM processors have no
-32-bit mode on Linux any more than on Android. So this build runs the game as
-the Android port does (port/android/README.md, "How the port operates"): the
+The game's data needs 32-bit pointers, recent 64-bit ARM processors have no
+32-bit mode, and few distributions have 32-bit ARM libraries. So this build
+runs the game as the Android port does (port/android/README.md, "How the port operates"): the
 guest image is the same ILP32 AArch64 code (tools/android_build.py,
 generate_guest_image), with the Linux desktop's code paths instead of the
 app's, and the host is a Linux executable instead of an app's library:

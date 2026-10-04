@@ -1,9 +1,8 @@
 name: Build
 
 # Debug and release builds of the native ports (Linux, Linux arm64, Windows,
-# Android) for
-# every pushed commit, uploaded as artifacts. tools/ci_build.py does each
-# build; see it for the options.
+# Android) for every pushed commit, uploaded as artifacts. tools/ci_build.py
+# does each build; see it for the options.
 #
 # Kept cheap:
 # - one job per platform builds both configurations, so its set-up (tools,

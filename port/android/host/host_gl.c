@@ -61,11 +61,10 @@ int host_gl_has_extension(const char *name)
 	return 0;
 }
 
-/* one 32-bit word of a buffer object (the visibility test counters of
-d3d8_gl.c); ES has no glGetBufferSubData, and the mapping it offers
-instead is a host pointer */
-/* (through GL_COPY_READ_BUFFER, which the renderer binds only for its
-copies, and leaves unbound) */
+/* copies size bytes of a buffer object (the snapshots of the visibility
+tests' counters, d3d8_gl.c); ES has no glGetBufferSubData, and the mapping
+it offers instead is a host pointer. Binds GL_COPY_READ_BUFFER, which the
+renderer uses only for its copies, and leaves it unbound. */
 void host_gl_read_buffer(uint32_t buffer, uint32_t offset, uint32_t size, void *data)
 {
 	const void *mapping;

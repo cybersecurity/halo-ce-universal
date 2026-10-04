@@ -6,8 +6,8 @@
     python tools/ci_build.py android release
     python tools/ci_build.py linux_arm64 release   (on a 64-bit ARM computer)
 
-Builds are portable (any x86-64 processor), so they run on other
-computers. Debug builds skip link-time and profile-guided optimisation,
+Builds are portable (any x86-64 processor; any ARMv8.0 one for
+linux_arm64 and android), so they run on other computers. Debug builds skip link-time and profile-guided optimisation,
 which only make the build slower; release builds use both, as a local
 release build does (profile-guided optimisation needs clang 22 or later,
 and is skipped with an older one). CI_COMPILER_LAUNCHER (ccache, say) is

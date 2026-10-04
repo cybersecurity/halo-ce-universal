@@ -214,10 +214,9 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix:
     """The guest image (build/halo_guest.elf) and the host's import table, for
     the builds that run the game as ILP32 AArch64 code: Android, and Linux
     arm64 (tools/linux_arm64_build.py). The caller sets ${prefix}_guest_cc to
-    guest_cc;
-    gl_headers holds the OpenGL ES headers (GLES2, GLES3, KHR), and ar, ld and
-    builtins are the archiver, the AArch64 linker and the compiler's runtime
-    library; abi_flags are the guest's code generation and platform defines.
+    guest_cc; gl_headers holds the OpenGL ES headers (GLES2, GLES3, KHR), and
+    ar, ld and builtins are the archiver, the AArch64 linker and the
+    compiler's runtime library; abi_flags are the guest's code generation and platform defines.
     extra_runtime are more guest runtime sources, and extra_imports more
     lists of the host functions they import; updater_cflags are the desktop
     self-updater's defines (port/linux/src/updater.c), for a guest that has

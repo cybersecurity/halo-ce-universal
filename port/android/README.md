@@ -249,7 +249,11 @@ functions of OpenGL ES 3.2 if they are available:
   changes the indices.
 - On OpenGL ES 3.1 and later, the visibility tests (lens flares) count
   samples with an atomic counter, as the NV2A did. OpenGL ES 3.0 tells only
-  if a sample is visible.
+  if a sample is visible. The GPU copies the counters at the end of each
+  frame, and the CPU reads the copy two frames later, when the frame's fence
+  has passed: a result is the latest count the GPU has finished, as with
+  the query buffer of desktop OpenGL. A read of the counters themselves
+  waits for the GPU, which halved the frame rate on Turnip (Zink).
 
 ### Calling conventions
 
