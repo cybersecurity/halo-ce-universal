@@ -245,3 +245,13 @@ cases above are still unverified. Keep the PR in draft until those checks pass.
   recording off, and include program/source associations. A real menu run
   exported a valid report with 11 programs / 13 sources, all references
   resolved, and a timing event while first-use GPU recording was false.
+- The signed sandboxed 0.1.5 app launched with its private image store,
+  populated its shader cache, opened Settings through the application menu,
+  and exited 0 through Quit. Native menu audio remained active through an
+  8.24-second tracking session. Mac and iOS device builds and runtime/cache
+  probes passed; this update was not installed on an iPhone.
+- Apple accepted the app from `1235f980` (submission
+  `47e2d143-3182-4e31-aa4b-43bdd1e69ff3`); its ticket was stapled and Gatekeeper
+  accepted it as Notarized Developer ID. Sent `HaloCE-0.1.5-AppleSilicon.zip`
+  to the user's MacBook via Taildrop. The visual mission bugs above remain
+  open pending a reproducible scene/checkpoint or clip.
