@@ -13,9 +13,17 @@ only after readback SHA-256 verification and map validation. See
 [distribution notes](../apple/DISTRIBUTION.md) for storage paths, packaging,
 and unresolved legal clearance.
 
-The Debug menu contains MetalFX upscaling, shader-stall recording, clearing
-recorded events, and AirDrop export. MetalFX and recording settings persist.
+Choose **Settings…** from the application menu (⌘,) to open a separate
+settings window with MetalFX upscaling, shader-stall recording, clearing
+recorded events, and AirDrop export. iOS continues to present its settings
+as a modal when the phone is shaken. MetalFX and recording settings persist.
 Shader capture intentionally synchronizes the GPU and can reduce performance.
+
+Native menu tracking pauses the frame loop. An event-tracking timer services
+sound streaming (including DirectSound completions) on the guest main thread
+while inside the event pump, allowing queued music to refill without calling game callbacks
+from the audio worker. `HALO_MAC_TEST_MENU_AUDIO=1` opens a native test menu
+for eight seconds and traces PCM output once per second.
 
 Package the app with:
 

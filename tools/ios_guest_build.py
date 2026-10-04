@@ -258,7 +258,7 @@ def generate_ios_guest_build(n: Writer, sln: Any) -> None:
         description="IOS IMPORTS",
     )
     n.build(outputs=[imports_s, host_table_c], rule="guest_imports",
-            inputs=[host_imports_list, posix_imports, gl_imports],
+            inputs=[host_imports_list, Path("port/ios/host_imports.list"), posix_imports, gl_imports],
             implicit=[Path("tools/guest_imports.py")])
 
     generated_headers = [*xdk_headers(), alltypes, syscall_h, version_h, gl_stamp,

@@ -138,7 +138,14 @@ bool SDL_PollEvent(SDL_Event *event)
 {
 	SDL_Event scratch;
 
-	return host_sdl_poll_event(event ? event : &scratch) != 0;
+#ifdef HALO_IOS
+    /* AppKit menus suspend the frame loop. Service sound streaming
+       on that same thread while its event dispatch is suspended. */
+    extern void sound_idle_for_native_menu(void);
+    return host_apple_poll_event(event ? event : &scratch, (unsigned int)(uintptr_t)sound_idle_for_native_menu) != 0;
+#else
+    return host_sdl_poll_event(event ? event : &scratch) != 0;
+#endif
 }
 
 /* ---------- gamepads */

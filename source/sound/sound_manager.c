@@ -3663,6 +3663,17 @@ void sound_idle(
 	return;
 }
 
+#ifdef HALO_IOS
+/* AppKit tracking can hold the event pump before sound initialization or
+   during loading. Only enter the streaming service when it is ready. */
+void sound_idle_for_native_menu(void)
+{
+    if (sound_manager_globals.initialized && sound_manager_globals.enabled &&
+        !sound_manager_globals.idling)
+        sound_idle();
+}
+#endif
+
 static void refresh_listener(
 	void)
 {

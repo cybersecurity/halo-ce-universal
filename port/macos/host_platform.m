@@ -9,7 +9,7 @@ static NSWindow *gameWindow;
 void *host_macos_game_window(void) {return (__bridge void *)gameWindow;}
 void host_ios_touch_attach(SDL_Window *window) {
  gameWindow=(__bridge NSWindow *)SDL_GetPointerProperty(SDL_GetWindowProperties(window),SDL_PROP_WINDOW_COCOA_WINDOW_POINTER,NULL);
- [gameWindow makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];halo_debug_present();
+ [gameWindow makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];halo_debug_install_menu();
 }
 void host_ios_touch_reset(void) {}
 void host_ios_touch_focus(void) {}
@@ -47,3 +47,41 @@ void host_ios_prepare_assets(const char *path){
   if(!ok){NSAlert *alert=[NSAlert new];alert.messageText=@"Import did not finish";alert.informativeText=failure?:@"Try choosing the image again.";[alert runModal];}
  }
 }
+
+/* AppKit enters NSEventTrackingRunLoopMode inside SDL_PollEvent for native
+   menus/window tracking. A timer services sound_idle there, completing packets
+   and advancing streaming state so callbacks can refill the music stream.
+   It is armed only around the event pump, on the guest's arena stack and
+   thread, never during game sound
+   updates or on the SDL mixing worker. No rendering or input is reentered. */
+static uint32_t audioService;
+static NSTimer *audioServiceTimer;
+static BOOL menuTestScheduled;
+void host_macos_audio_event_begin(uint32_t callback) {
+    audioService=callback;
+    if(!menuTestScheduled && getenv("HALO_MAC_TEST_MENU_AUDIO")) {
+        menuTestScheduled=YES;
+        NSTimer *test=[NSTimer timerWithTimeInterval:25 repeats:NO block:^(NSTimer *timer){
+            (void)timer;
+            NSMenu *menu=[[NSMenu alloc]initWithTitle:@"Audio regression test"];
+            [menu addItemWithTitle:@"Keep this menu open for eight seconds" action:NULL keyEquivalent:@""];
+            [gameWindow makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];
+            CFAbsoluteTime started=CFAbsoluteTimeGetCurrent();
+            host_logf(HOST_LOG_INFO,"Menu audio test: begin eight seconds of native menu tracking");
+            NSTimer *close=[NSTimer timerWithTimeInterval:8 repeats:NO block:^(NSTimer *t){(void)t;[menu cancelTracking];}];
+            [NSRunLoop.mainRunLoop addTimer:close forMode:NSEventTrackingRunLoopMode];
+            [menu popUpMenuPositioningItem:nil atLocation:NSMakePoint(30,30) inView:gameWindow.contentView];
+            host_logf(HOST_LOG_INFO,"Menu audio test: native menu closed after %.2f seconds",CFAbsoluteTimeGetCurrent()-started);
+            halo_debug_present();
+        }];
+        [NSRunLoop.mainRunLoop addTimer:test forMode:NSDefaultRunLoopMode];
+    }
+    if(!audioServiceTimer) {
+        audioServiceTimer=[NSTimer timerWithTimeInterval:0.01 repeats:YES block:^(NSTimer *timer){
+            (void)timer;
+            if(audioService)host_call_guest(audioService,0,0,0,0);
+        }];
+        [NSRunLoop.mainRunLoop addTimer:audioServiceTimer forMode:NSEventTrackingRunLoopMode];
+    }
+}
+void host_macos_audio_event_end(void) {audioService=0;}

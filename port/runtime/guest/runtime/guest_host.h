@@ -68,6 +68,7 @@ int host_sdl_gl_make_current(unsigned int window, unsigned int context);
 int host_sdl_gl_set_swap_interval(int interval);
 int host_sdl_gl_swap_window(unsigned int window);
 int host_sdl_poll_event(void *event);
+int host_apple_poll_event(void *event, unsigned int audio_service);
 int host_sdl_set_clipboard_text(const char *text);
 void host_sdl_get_clipboard_text(char *buffer, unsigned int size);
 int host_sdl_get_gamepads(unsigned int *ids, int capacity);

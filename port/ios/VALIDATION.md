@@ -192,3 +192,18 @@ cases above are still unverified. Keep the PR in draft until those checks pass.
   stapled and validated. Gatekeeper accepted the final DMG and the app mounted
   from it as `Notarized Developer ID`. The final package was also checked for
   accidental game/private data. Actual AirDrop delivery remains unverified.
+
+## Settings and menu audio update (0.1.4 / 8)
+
+- macOS Settings is a reusable separate window under the application menu
+  (⌘,); iOS retains its shake-presented modal, now titled Settings.
+- Reproduced music starvation in a real eight-second native menu tracking
+  session: servicing DirectSound completions alone drained to zero PCM.
+  Servicing the guarded sound streaming update on the guest main thread kept
+  PCM active throughout two subsequent eight-second menu sessions and after
+  closing. The SDL worker never invokes the game's completion callbacks.
+- Fixed black generated icon assets by replacing offscreen AppKit drawing
+  with CoreGraphics resizing. Visually inspected the regenerated ring icon;
+  both Mac ICNS and iOS catalog now use the correct bitmap.
+- Native ABI, memory, audio callback/deadlock, display sizing, 16 XISO cases
+  and room bridge tests pass. Both physical-device and Mac release builds pass.

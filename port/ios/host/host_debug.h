@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 void halo_debug_present(void);
+void halo_debug_install_menu(void);
 void halo_debug_initialize(void);
 int halo_debug_is_presented(void);
 void halo_debug_use_program(uint32_t program);

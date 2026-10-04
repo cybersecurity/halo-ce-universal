@@ -130,7 +130,7 @@ static void exportReport(UIViewController *presenter) {
 @end
 @implementation HaloDebugController
 - (void)viewDidLoad {
-    [super viewDidLoad];self.title=@"Graphics debug";
+    [super viewDidLoad];self.title=@"Settings";
     self.navigationItem.rightBarButtonItem=[[UIBarButtonItem alloc]initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(done)];
 }
 - (void)done {[self dismissViewControllerAnimated:YES completion:^{debugController=nil;host_ios_touch_focus();}];}
@@ -195,24 +195,68 @@ void halo_debug_present(void) {
 
 #endif
 #if HALO_MACOS
-@interface HaloDebugActions : NSObject
+@interface HaloDebugActions : NSWindowController <NSWindowDelegate>
+@property NSButton *upscaleButton;
+@property NSButton *recordButton;
+@property NSTextField *eventCount;
 @end
 @implementation HaloDebugActions
--(void)upscale:(NSMenuItem *)item {BOOL on=!halo_metalfx_enabled();halo_metalfx_set_enabled(on);[NSUserDefaults.standardUserDefaults setBool:on forKey:@"HaloMetalFX"];item.state=halo_metalfx_enabled()?NSControlStateValueOn:NSControlStateValueOff;}
--(void)record:(NSMenuItem *)item {BOOL on=!atomic_load(&recording);atomic_store(&recording,on);[drawnPrograms removeAllObjects];[NSUserDefaults.standardUserDefaults setBool:on forKey:@"HaloRecordShaderStalls"];item.state=on?NSControlStateValueOn:NSControlStateValueOff;}
+- (instancetype)init {
+    NSWindow *window=[[NSWindow alloc]initWithContentRect:NSMakeRect(0,0,480,360)
+        styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable backing:NSBackingStoreBuffered defer:NO];
+    self=[super initWithWindow:window];
+    if(self) {
+        window.title=@"Settings";window.releasedWhenClosed=NO;window.delegate=self;
+        NSStackView *stack=[NSStackView new];stack.orientation=NSUserInterfaceLayoutOrientationVertical;
+        stack.alignment=NSLayoutAttributeLeading;stack.spacing=14;stack.translatesAutoresizingMaskIntoConstraints=NO;
+        [window.contentView addSubview:stack];
+        [NSLayoutConstraint activateConstraints:@[
+            [stack.leadingAnchor constraintEqualToAnchor:window.contentView.leadingAnchor constant:24],
+            [stack.trailingAnchor constraintEqualToAnchor:window.contentView.trailingAnchor constant:-24],
+            [stack.topAnchor constraintEqualToAnchor:window.contentView.topAnchor constant:24],
+            [stack.bottomAnchor constraintLessThanOrEqualToAnchor:window.contentView.bottomAnchor constant:-24]]];
+        [stack addArrangedSubview:[NSTextField labelWithString:@"Renderer: Metal (ANGLE)"]];
+        self.upscaleButton=[NSButton checkboxWithTitle:@"MetalFX spatial upscaling" target:self action:@selector(upscale:)];
+        [stack addArrangedSubview:self.upscaleButton];
+        self.recordButton=[NSButton checkboxWithTitle:@"Record shader stalls" target:self action:@selector(record:)];
+        [stack addArrangedSubview:self.recordButton];
+        NSTextField *note=[NSTextField wrappingLabelWithString:@"Shader recording adds GPU synchronization overhead. Disable it for normal play."];
+        [stack addArrangedSubview:note];[note.widthAnchor constraintEqualToAnchor:stack.widthAnchor].active=YES;
+        [stack addArrangedSubview:[NSButton buttonWithTitle:@"AirDrop shader report…" target:self action:@selector(share:)]];
+        [stack addArrangedSubview:[NSButton buttonWithTitle:@"Clear recorded events" target:self action:@selector(clear:)]];
+        self.eventCount=[NSTextField labelWithString:@""];[stack addArrangedSubview:self.eventCount];
+        [window center];
+    }
+    return self;
+}
+-(void)refresh {
+    self.upscaleButton.enabled=halo_metalfx_supported();self.upscaleButton.state=halo_metalfx_enabled();
+    self.recordButton.state=atomic_load(&recording);
+    self.eventCount.stringValue=[NSString stringWithFormat:@"%lu events; %lu dropped",(unsigned long)events.count,(unsigned long)dropped];
+}
+-(void)openSettings:(id)sender {
+    (void)sender;[self refresh];debugPresented=YES;[self showWindow:nil];[self.window makeKeyAndOrderFront:nil];
+    NSString *capture=NSProcessInfo.processInfo.environment[@"HALO_MAC_TEST_SETTINGS_IMAGE"];
+    if(capture.length) {
+        NSView *view=self.window.contentView;[view layoutSubtreeIfNeeded];
+        NSBitmapImageRep *bitmap=[view bitmapImageRepForCachingDisplayInRect:view.bounds];
+        [view cacheDisplayInRect:view.bounds toBitmapImageRep:bitmap];
+        [[bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}]writeToFile:capture atomically:YES];
+    }
+}
+-(void)windowWillClose:(NSNotification *)notification {(void)notification;debugPresented=NO;}
+-(void)upscale:(NSButton *)item {BOOL on=item.state==NSControlStateValueOn;halo_metalfx_set_enabled(on);[NSUserDefaults.standardUserDefaults setBool:on forKey:@"HaloMetalFX"];[self refresh];}
+-(void)record:(NSButton *)item {BOOL on=item.state==NSControlStateValueOn;atomic_store(&recording,on);[drawnPrograms removeAllObjects];[NSUserDefaults.standardUserDefaults setBool:on forKey:@"HaloRecordShaderStalls"];[self refresh];}
 -(void)share:(id)sender {(void)sender;exportReport(nil);}
--(void)clear:(id)sender {(void)sender;[events removeAllObjects];[drawnPrograms removeAllObjects];dropped=0;}
+-(void)clear:(id)sender {(void)sender;[events removeAllObjects];[drawnPrograms removeAllObjects];dropped=0;[self refresh];}
 @end
 static HaloDebugActions *actions;
-void halo_debug_present(void) {
+void halo_debug_install_menu(void) {
     if(actions)return;prepare();actions=[HaloDebugActions new];
-    if(!NSApp.mainMenu)NSApp.mainMenu=[NSMenu new];
-    NSMenuItem *heading=[[NSMenuItem alloc]initWithTitle:@"Debug" action:NULL keyEquivalent:@""];
-    NSMenu *menu=[[NSMenu alloc]initWithTitle:@"Debug"];menu.autoenablesItems=NO;
-    [menu addItemWithTitle:@"Renderer: Metal (ANGLE)" action:NULL keyEquivalent:@""];
-    NSArray *titles=@[@"MetalFX spatial upscaling",@"Record shader stalls",@"AirDrop shader report…",@"Clear recorded events"];
-    SEL selectors[]={@selector(upscale:),@selector(record:),@selector(share:),@selector(clear:)};
-    for(int i=0;i<4;i++){NSMenuItem *item=[menu addItemWithTitle:titles[i] action:selectors[i] keyEquivalent:@""];item.target=actions;if(i==0){item.enabled=halo_metalfx_supported();item.state=halo_metalfx_enabled();}if(i==1)item.state=atomic_load(&recording);}
-    heading.submenu=menu;[NSApp.mainMenu addItem:heading];
+    NSMenu *menu=NSApp.mainMenu.itemArray.firstObject.submenu;
+    if(!menu)return;
+    NSMenuItem *item=[[NSMenuItem alloc]initWithTitle:@"Settings…" action:@selector(openSettings:) keyEquivalent:@","];
+    item.target=actions;[menu insertItem:item atIndex:MIN(2,menu.numberOfItems)];
 }
+void halo_debug_present(void) {halo_debug_install_menu();[actions openSettings:nil];}
 #endif

@@ -210,6 +210,22 @@ int host_sdl_poll_event(void *event)
 	return 1;
 }
 
+int host_apple_poll_event(void *event, unsigned int audio_service)
+{
+#if HALO_MACOS
+    extern void host_macos_audio_event_begin(uint32_t callback);
+    extern void host_macos_audio_event_end(void);
+    host_macos_audio_event_begin(audio_service);
+#else
+    (void)audio_service;
+#endif
+    int result = host_sdl_poll_event(event);
+#if HALO_MACOS
+    host_macos_audio_event_end();
+#endif
+    return result;
+}
+
 /* ---------- gamepads */
 
 int host_sdl_get_gamepads(uint32_t *ids, int capacity)
@@ -323,13 +339,21 @@ static void SDLCALL audio_callback(void *userdata, SDL_AudioStream *stream, int 
 		pthread_cond_wait(&binding->done, &binding->lock);
 	if (binding->length && !SDL_PutAudioStreamData(stream, binding->samples, binding->length))
 		host_logf(HOST_LOG_ERROR, "cannot submit audio: %s", SDL_GetError());
-	if (!binding->logged_output && binding->format == SDL_AUDIO_F32)
+	#if HALO_MACOS
+    /* Opt-in liveness trace for the real AppKit menu-tracking regression. */
+    static Uint64 last_trace;
+    int trace = SDL_getenv("HALO_MAC_TEST_MENU_AUDIO") && SDL_GetTicks()-last_trace >= 1000;
+    if(trace)last_trace=SDL_GetTicks();
+#else
+    int trace = 0;
+#endif
+    if ((!binding->logged_output || trace) && binding->format == SDL_AUDIO_F32)
 	{
 		const float *samples = (const float *)binding->samples;
 		float peak = 0.0f;
 		for (int i = 0; i < binding->length / (int)sizeof(float); ++i)
 			peak = SDL_max(peak, SDL_fabsf(samples[i]));
-		if (peak > 0.0001f)
+		if (peak > 0.0001f || trace)
 		{
 			host_logf(HOST_LOG_INFO, "audio output active: %d PCM bytes, peak %.4f", binding->length, peak);
 			binding->logged_output = 1;
