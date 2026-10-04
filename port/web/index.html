@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Halo CE Web</title>
+<style>
+	:root {
+		--bg: #0e1116;
+		--panel: #171b22;
+		--text: #e6e8eb;
+		--muted: #8b939e;
+		--accent: #7fb069;
+		--border: #2a303a;
+		--danger: #d9665b;
+	}
+	* { box-sizing: border-box; }
+	body {
+		margin: 0;
+		background: var(--bg);
+		color: var(--text);
+		font: 15px/1.5 system-ui, sans-serif;
+	}
+	main { max-width: 720px; margin: 0 auto; padding: 40px 16px; }
+	h1 { font-size: 22px; margin: 0 0 4px; }
+	.sub { color: var(--muted); margin: 0 0 28px; }
+	section {
+		background: var(--panel);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 20px;
+		margin-bottom: 16px;
+	}
+	h2 { font-size: 15px; margin: 0 0 8px; }
+	p { margin: 0 0 12px; color: var(--muted); }
+	label.button, button {
+		display: inline-block;
+		background: var(--accent);
+		color: #10140e;
+		border: 0;
+		border-radius: 6px;
+		padding: 8px 14px;
+		font: inherit;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+	button.danger { background: transparent; color: var(--danger); border: 1px solid var(--border); }
+	input[type=file] { display: none; }
+	input:disabled + span { opacity: 0.5; }
+	progress { width: 100%; height: 8px; accent-color: var(--accent); }
+	#progress-label { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+	#stored-maps { font-family: ui-monospace, monospace; font-size: 13px; color: var(--text); overflow-wrap: anywhere; }
+	pre#log {
+		margin: 0;
+		max-height: 260px;
+		overflow: auto;
+		font: 12px/1.5 ui-monospace, monospace;
+		color: var(--muted);
+		white-space: pre-wrap;
+	}
+	pre#log:empty::before { content: "Nothing yet."; }
+	.row { display: flex; gap: 8px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<main>
+	<h1>Halo: Combat Evolved (web)</h1>
+	<p class="sub">Your game data never leaves this browser.</p>
+
+	<section id="pick">
+		<h2>1. Import your disc image</h2>
+		<p>Choose your Halo: Combat Evolved PAL disc image (<code>.iso</code>, build 01.01.14.2342). It is read and checked here, and its files are stored in this browser's private storage.</p>
+		<label class="button"><input type="file" id="iso" accept=".iso,.xiso"><span>Choose disc image…</span></label>
+		<div id="progress-row" hidden>
+			<p></p>
+			<progress id="progress" max="1" value="0"></progress>
+			<div id="progress-label"></div>
+		</div>
+	</section>
+
+	<section id="stored" hidden>
+		<h2>Game data imported</h2>
+		<p id="stored-summary"></p>
+		<p id="stored-maps"></p>
+		<div class="row">
+			<button class="secondary" id="replace">Import a different image</button>
+			<button class="danger" id="forget">Delete imported data</button>
+		</div>
+	</section>
+
+	<section>
+		<h2>2. Play</h2>
+		<p>The WebAssembly build of the game is not ready yet (see WEB_PORT_PLAN.md). Once it is, it will start here from the imported data.</p>
+	</section>
+
+	<section>
+		<h2>Log</h2>
+		<pre id="log"></pre>
+	</section>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
