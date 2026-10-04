@@ -19,7 +19,12 @@ void *host_gl_resolve(const char *name)
 	void *function = NULL;
 
 	if (!library)
+#ifdef __ANDROID__
 		library = dlopen("libGLESv3.so", RTLD_NOW | RTLD_GLOBAL);
+#else
+		/* Linux arm64 (port/linux/arm64): ES 3 is in libGLESv2 */
+		library = dlopen("libGLESv2.so.2", RTLD_NOW | RTLD_GLOBAL);
+#endif
 	if (library)
 		function = dlsym(library, name);
 	if (!function)
@@ -56,25 +61,26 @@ int host_gl_has_extension(const char *name)
 	return 0;
 }
 
-/* one 32-bit word of a buffer object (the visibility test counters of
-d3d8_gl.c); ES has no glGetBufferSubData, and the mapping it offers
-instead is a host pointer */
-uint32_t host_gl_read_buffer_word(uint32_t buffer, uint32_t offset)
+/* copies size bytes of a buffer object (the snapshots of the visibility
+tests' counters, d3d8_gl.c); ES has no glGetBufferSubData, and the mapping
+it offers instead is a host pointer. Binds GL_COPY_READ_BUFFER, which the
+renderer uses only for its copies, and leaves it unbound. */
+void host_gl_read_buffer(uint32_t buffer, uint32_t offset, uint32_t size, void *data)
 {
-	uint32_t value = 0;
-	GLint previous = 0;
 	const void *mapping;
 
-	glGetIntegerv(GL_ATOMIC_COUNTER_BUFFER_BINDING, &previous);
-	glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, buffer);
-	mapping = glMapBufferRange(GL_ATOMIC_COUNTER_BUFFER, offset, sizeof(value), GL_MAP_READ_BIT);
+	glBindBuffer(GL_COPY_READ_BUFFER, buffer);
+	mapping = glMapBufferRange(GL_COPY_READ_BUFFER, offset, size, GL_MAP_READ_BIT);
 	if (mapping)
 	{
-		memcpy(&value, mapping, sizeof(value));
-		glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);
+		memcpy(data, mapping, size);
+		glUnmapBuffer(GL_COPY_READ_BUFFER);
 	}
-	glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, (GLuint)previous);
-	return value;
+	else
+	{
+		memset(data, 0, size);
+	}
+	glBindBuffer(GL_COPY_READ_BUFFER, 0);
 }
 
 /* The renderer streams each frame's vertices and indices into the next of

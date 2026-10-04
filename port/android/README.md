@@ -171,9 +171,7 @@ the Xbox:
 - Black bars and fades cover all of the screen, and so do the menus' dims
   and backgrounds (the pause menu's dim, dialogs, the menus' gradient).
 
-The changes are in `#ifdef HALO_ANDROID` in `rasterizer_xbox.c`, `render.c`,
-`ui_widget.c`, `cinematics.c`, `main.c` and
-`rasterizer_xbox_screen_effect.c`.
+All the ports draw this way.
 
 ## How the port operates
 
@@ -251,7 +249,11 @@ functions of OpenGL ES 3.2 if they are available:
   changes the indices.
 - On OpenGL ES 3.1 and later, the visibility tests (lens flares) count
   samples with an atomic counter, as the NV2A did. OpenGL ES 3.0 tells only
-  if a sample is visible.
+  if a sample is visible. The GPU copies the counters at the end of each
+  frame, and the CPU reads the copy two frames later, when the frame's fence
+  has passed: a result is the latest count the GPU has finished, as with
+  the query buffer of desktop OpenGL. A read of the counters themselves
+  waits for the GPU, which halved the frame rate on Turnip (Zink).
 
 ### Calling conventions
 
@@ -276,7 +278,8 @@ floating-point contraction, as on x86.
 
 The x86 inline assembly is replaced by C (refer to
 [port/linux/README.md](../linux/README.md#game-source-changes)).
-These changes are in `#ifdef HALO_ANDROID`:
+These changes are in `#ifdef HALO_ARM64_GUEST`, which the Linux arm64 build
+shares:
 
 - Seven `#pragma bss_seg(".bss")` lines are removed. The Darwin target does
   not accept them.

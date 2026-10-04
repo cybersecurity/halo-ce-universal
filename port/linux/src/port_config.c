@@ -389,7 +389,7 @@ static void config_path(char *path, size_t size)
 /* the whole file, NUL terminated, or NULL; free() it */
 static char *config_read_file(const char *path, size_t *size)
 {
-#ifdef HALO_ANDROID
+#ifdef HALO_ARM64_GUEST
 	FILE *file = fopen(path, "rb");
 	char *text = NULL;
 	long length;
@@ -432,7 +432,7 @@ static char *config_read_file(const char *path, size_t *size)
 
 static int config_write_file(const char *path, const char *text)
 {
-#ifdef HALO_ANDROID
+#ifdef HALO_ARM64_GUEST
 	FILE *file = fopen(path, "wb");
 	int written;
 

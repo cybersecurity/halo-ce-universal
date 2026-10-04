@@ -91,6 +91,26 @@ void *host_resolve_import(const char *name);
 
 /* ---------- SDL / GL (host_sdl.c, host_gl.c) */
 
+/* SDL objects are 64-bit pointers, which the guest cannot hold: it gets
+small handles into a table instead (host_sdl.c; port/linux/arm64's
+host_desktop.c uses it too) */
+enum host_sdl_handle_type
+{
+	_handle_free,
+	_handle_window,
+	_handle_context,
+	_handle_gamepad,
+	_handle_audio,
+	_handle_renderer,
+};
+
+/* the object's handle (the same one again for an object that has one), or
+0 for NULL or a full table */
+uint32_t host_sdl_handle_new(int type, void *object);
+/* the object of a handle of that type, or NULL */
+void *host_sdl_handle_get(uint32_t handle, int type);
+void host_sdl_handle_free(uint32_t handle);
+
 void *host_gl_resolve(const char *name);
 
 #endif

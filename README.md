@@ -20,6 +20,7 @@ builds of the latest release:
 | Platform | Release | Debug |
 | --- | --- | --- |
 | Linux | [halo-linux-release.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-linux-release.zip) | [halo-linux-debug.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-linux-debug.zip) |
+| Linux arm64 | [halo-linux-arm64-release.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-linux-arm64-release.zip) | [halo-linux-arm64-debug.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-linux-arm64-debug.zip) |
 | Windows | [halo-windows-release.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-windows-release.zip) | [halo-windows-debug.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-windows-debug.zip) |
 | Android | [halo-android-release.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-android-release.zip) | [halo-android-debug.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-android-debug.zip) |
 
@@ -31,7 +32,7 @@ The game updates itself. At start-up it looks for a newer release, and asks
 if you want to install it. Refer to "Updates" in
 [port/linux/README.md](port/linux/README.md#updates).
 
-Each build of the `main` branch that passes on all three platforms is a new
+Each build of the `main` branch that passes on all the platforms is a new
 release. The [Releases](https://github.com/cybersecurity/halo-ce-universal/releases)
 page keeps the last five releases. If the latest build has a problem, get
 an older build from that page.
@@ -59,6 +60,7 @@ Each platform has its own instructions:
 | Platform | Instructions |
 | --- | --- |
 | Linux (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/linux/README.md](port/linux/README.md) |
+| Linux arm64 (arm64 executable, OpenGL ES 3, SDL3) | [port/linux/README.md](port/linux/README.md#64-bit-arm) |
 | Windows (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/windows/README.md](port/windows/README.md) |
 | Android (arm64 app, OpenGL ES 3, SDL3) | [port/android/README.md](port/android/README.md) |
 
@@ -70,7 +72,8 @@ functions. These are almost the same on all platforms.
 The game can play system link games on a local network and on the internet:
 
 - A system link game can have up to 128 players on up to 128 machines.
-- Linux, Windows and Android machines can play in the same game.
+- Linux (x86 and arm64), Windows and Android machines can play in the same
+  game.
 - An invite link lets a machine join a game on the internet. No server of
   this project is necessary.
 - The netcode is new. Each machine moves its own player at once,
@@ -93,6 +96,7 @@ To build the game:
 | Target | Result |
 | --- | --- |
 | `ninja linux` | `build/linux/halo` |
+| `ninja linux_arm64` (on 64-bit ARM Linux) | `build/linux_arm64/halo` and `libSDL3.so.0` |
 | `ninja windows` (on Windows) | `build/windows/halo.exe` and `SDL3.dll` |
 | `ninja android_apk` | `port/android/app/build/outputs/apk/debug/app-debug.apk` |
 

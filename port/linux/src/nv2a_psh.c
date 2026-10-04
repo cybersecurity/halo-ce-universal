@@ -314,7 +314,7 @@ static void dot_input(struct xgpu_text *text, const DWORD *state, int stage)
 	}
 }
 
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 /* ES samplers have no LOD bias: pass D3DTSS_MIPMAPLODBIAS to the lookup */
 #define SAMPLE_BIAS ", texture_lod_bias[%d]"
 #define SHADER_VERSION \
@@ -334,21 +334,21 @@ static void sample(struct xgpu_text *text, const struct nv2a_pixel_shader_key *k
 	{
 	case _xgpu_sampler_3d:
 		xgpu_text_append(text, "texture(tex%d, (%s).xyz" SAMPLE_BIAS ")", stage, coordinates
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 			, stage
 #endif
 			);
 		break;
 	case _xgpu_sampler_cube:
 		xgpu_text_append(text, "texture(tex%d, (%s).xyz" SAMPLE_BIAS ")", stage, coordinates
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 			, stage
 #endif
 			);
 		break;
 	default:
 		xgpu_text_append(text, "texture(tex%d, (%s).xy * texture_scale[%d].xy" SAMPLE_BIAS ")", stage, coordinates, stage
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 			, stage
 #endif
 			);
@@ -530,7 +530,7 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 	if (combiner_count > 8)
 		combiner_count = 8;
 
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 	xgpu_text_append(&text, "#version %s\n", xgpu_capabilities.shading_language);
 	if (key->count_samples)
 	{
@@ -655,7 +655,7 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		xgpu_text_append(&text, "\tresult = vec4(t0.rgb, 1.0);\n");
 	if (config_boolean("debug.gpu_debug_flat"))
 		xgpu_text_append(&text, "\tresult = xD0.a > 0.0 ? vec4(xD0.rgb, 1.0) : vec4(1.0, 0.0, 1.0, 1.0);\n");
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 	if (key->count_samples)
 		xgpu_text_append(&text, "\tatomicCounterIncrement(visible_samples);\n");
 #endif

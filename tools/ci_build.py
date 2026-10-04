@@ -4,9 +4,10 @@
 
     python tools/ci_build.py linux debug
     python tools/ci_build.py android release
+    python tools/ci_build.py linux_arm64 release   (on a 64-bit ARM computer)
 
-Builds are portable (any x86-64 processor), so they run on other
-computers. Debug builds skip link-time and profile-guided optimisation,
+Builds are portable (any x86-64 processor; any ARMv8.0 one for
+linux_arm64 and android), so they run on other computers. Debug builds skip link-time and profile-guided optimisation,
 which only make the build slower; release builds use both, as a local
 release build does (profile-guided optimisation needs clang 22 or later,
 and is skipped with an older one). CI_COMPILER_LAUNCHER (ccache, say) is
@@ -27,6 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # what each port's build leaves, and what goes into dist/
 OUTPUTS = {
     "linux": ["build/linux/halo"],
+    "linux_arm64": ["build/linux_arm64/halo", "build/linux_arm64/libSDL3.so.0"],
     "windows": ["build/windows/halo.exe", "build/windows/SDL3.dll"],
     "android": [],  # the APK, below
 }
@@ -74,7 +76,8 @@ def main() -> int:
         run(["ninja", args.platform])
         outputs = OUTPUTS[args.platform]
 
-    dist = ROOT / "dist" / f"halo-{args.platform}-{args.config}"
+    # (halo-linux-arm64-release, the name the self-updater asks for)
+    dist = ROOT / "dist" / f"halo-{args.platform.replace('_', '-')}-{args.config}"
     if dist.exists():
         shutil.rmtree(dist)
     dist.mkdir(parents=True)
@@ -85,7 +88,7 @@ def main() -> int:
     # XisoExtractor.java) follow extract-xiso, whose license asks binaries
     # to carry its notice
     shutil.copy2(ROOT / "port/third_party/extract-xiso/LICENSE.TXT", dist / "extract-xiso-LICENSE.txt")
-    if args.platform == "linux":
+    if args.platform in ("linux", "linux_arm64"):
         # the self-updater's TLS (port/third_party/mbedtls), whose Apache
         # license asks the same
         shutil.copy2(ROOT / "port/third_party/mbedtls/LICENSE", dist / "mbedtls-LICENSE.txt")

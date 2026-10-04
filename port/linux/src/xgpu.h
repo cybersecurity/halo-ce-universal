@@ -13,7 +13,7 @@ device itself (d3d8_gl.c).
 #include "platform.h"
 #include "gl.h"
 
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 /* OpenGL ES features that are optional (d3d8_gl.c gl_initialize) */
 struct xgpu_capabilities
 {
@@ -33,7 +33,7 @@ extern struct xgpu_capabilities xgpu_capabilities;
 
 /* port/android/guest/runtime/guest_host.h */
 int host_gl_has_extension(const char *name);
-unsigned int host_gl_read_buffer_word(unsigned int buffer, unsigned int offset);
+void host_gl_read_buffer(unsigned int buffer, unsigned int offset, unsigned int size, void *data);
 void host_gl_buffer_write(unsigned int target, unsigned int offset, unsigned int size, const void *data);
 void host_gl_fence_frame(unsigned int slot);
 void host_gl_wait_frame(unsigned int slot);
@@ -110,7 +110,7 @@ struct nv2a_pixel_shader_key
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
 
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 /* ES samplers have no LOD bias of their own */
 #define XGPU_PIXEL_UNIFORMS_ES "uniform vec4 texture_lod_bias;\n"
 #else
