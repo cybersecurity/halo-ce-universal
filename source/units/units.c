@@ -692,6 +692,11 @@ symbols in this file:
 #include "sound/game_sound.h"
 #include "vehicles.h"
 
+/* port: the control and animation impulses the host's actors give their
+units go to the clients' copies (port/linux/game/network_actors.c) */
+void network_actors_note_control(long unit_index, struct unit_control_data const *control_data);
+void network_actors_note_impulse(long unit_index, short animation_impulse, real_vector2d const *alignment_vector);
+
 /* ---------- constants */
 
 enum
@@ -8437,6 +8442,8 @@ boolean unit_start_animation_impulse(
 				{
 					unit_align_facing(unit_index, alignment_vector);
 				}
+				if (unit->unit.player_index == NONE)
+					network_actors_note_impulse(unit_index, animation_impulse, alignment_vector);
 
 				result = TRUE;
 			}
@@ -10933,6 +10940,9 @@ void unit_control(
 	struct unit_control_data const *control_data)
 {
 	struct unit_datum *unit = unit_get(unit_index);
+
+	if (unit->unit.player_index == NONE)
+		network_actors_note_control(unit_index, control_data);
 
 	match_assert(
 		"c:\\halo\\SOURCE\\units\\units.c",

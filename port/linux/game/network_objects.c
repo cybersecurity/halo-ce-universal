@@ -1016,6 +1016,21 @@ static short distributed_host_object_period(
 		nearest < FAR_OBJECT_DISTANCE * FAR_OBJECT_DISTANCE ? 3 : MAXIMUM_OBJECT_PERIOD_TICKS;
 }
 
+/* ... for other units sent by a machine's index (network_actors.c) */
+short network_objects_send_period(
+	long machine_index,
+	real_point3d const *position)
+{
+	short machine_number;
+
+	for (machine_number = 0; machine_number < objects_host_viewers.count; machine_number++)
+	{
+		if (objects_host_viewers.indices[machine_number] == machine_index)
+			return distributed_host_object_period(machine_number, position);
+	}
+	return 1;
+}
+
 /* the kinds of states sent this tick */
 enum
 {

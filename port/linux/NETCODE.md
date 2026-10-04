@@ -21,6 +21,13 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   vehicle it drives) from its local input at once. Remote players are
   driven by the inputs the host relays every tick, the latest one held
   until a newer arrives.
+- **Actors driven.** Only the host runs the AI. Each tick it sends its
+  clients the control its actors gave their units (how they move, where
+  they face, aim and look, their trigger and buttons, their animation
+  impulses) with the units' state, those near a client's players every
+  tick and others less often; a client drives each unit with the latest
+  it has, as it drives a remote player's, until it hears nothing of it for
+  two seconds (`port/linux/game/network_actors.c`).
 - **Host authoritative.** The host alone decides damage, deaths, spawns,
   pickups, scores and the game's objects; clients do not decide them but
   apply what the host sends.
