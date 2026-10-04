@@ -2776,8 +2776,14 @@ static void poll_invite_file(void)
 	if (!elapsed(checked_time, 1000))
 		return;
 	checked_time = p2p_now();
+#ifdef HALO_MACOS
+	/* App instances can share maps while retaining independent save folders. */
+	snprintf(path, sizeof(path), "%s/join_link.txt", platform_save_root());
+	snprintf(taken, sizeof(taken), "%s/join_link.taken", platform_save_root());
+#else
 	snprintf(path, sizeof(path), "%s/join_link.txt", platform_data_root());
 	snprintf(taken, sizeof(taken), "%s/join_link.taken", platform_data_root());
+#endif
 	/* (taken first: a link the launcher writes while this reads is left for
 	the next look, not removed unread) */
 	if (rename(path, taken) != 0)

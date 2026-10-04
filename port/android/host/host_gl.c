@@ -15,6 +15,12 @@ already have host types by then. Only strings need copying back.
 
 void *host_gl_resolve(const char *name)
 {
+#ifdef HALO_MACOS
+	/* Darwin packs stack arguments differently from the guest's Linux ABI. */
+	extern void *host_gl_bridge(const char *name);
+	void *function = host_gl_bridge(name);
+	return function ? function : (void *)eglGetProcAddress(name);
+#else
 	static void *library;
 	void *function = NULL;
 
@@ -25,6 +31,7 @@ void *host_gl_resolve(const char *name)
 	if (!function)
 		function = (void *)eglGetProcAddress(name);
 	return function;
+#endif
 }
 
 void host_gl_get_string(uint32_t name, int index, char *buffer, uint32_t size)
@@ -124,7 +131,11 @@ because host_gl_wait_frame releases the ring slot first. */
 void host_gl_buffer_write(uint32_t target, uint32_t offset, uint32_t size, const void *data)
 {
 	void *mapping = glMapBufferRange(target, offset, size,
-		GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+		GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT
+#ifdef HALO_MACOS
+		| GL_MAP_INVALIDATE_RANGE_BIT
+#endif
+	);
 
 	if (!mapping)
 	{

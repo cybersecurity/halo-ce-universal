@@ -52,3 +52,5 @@ host_gl_wait_frame
 host_android_path
 
 host_errno
+host_sdl_window_size
+host_sdl_warp_mouse

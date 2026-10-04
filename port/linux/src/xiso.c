@@ -60,7 +60,20 @@ includes software developed by in <in@fishtank.com>.
 /* (the desktop ports only: the Android app imports the game data itself) */
 #ifndef HALO_ANDROID
 
+#ifdef HALO_MACOS
+/* The Mac importer runs in the native host, outside the guest's XDK ABI. */
+#include <stdarg.h>
+#include <stdio.h>
+static void platform_log(const char *format, ...) {
+    va_list arguments;
+    va_start(arguments, format);
+    vfprintf(stderr, format, arguments);
+    va_end(arguments);
+    fputc('\n', stderr);
+}
+#else
 #include "platform.h"
+#endif
 #include "posix.h"
 #include "xiso.h"
 

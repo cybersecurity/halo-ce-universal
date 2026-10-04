@@ -1,9 +1,9 @@
-# Halo: Combat Evolved for Linux, Windows and Android
+# Halo: Combat Evolved for Linux, Windows, Android and macOS
 
 [![Join our Discord](https://invidget.switchblade.xyz/9gqcHyr5km)](https://discord.gg/9gqcHyr5km)
 
 This project is a port of the Halo: Combat Evolved decompilation to Linux,
-Windows and Android. The decompilation is of the Xbox build 2342
+Windows, Android and Apple Silicon macOS. The decompilation is of the Xbox build 2342
 (`cachebeta.exe`, SHA-256
 `4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`).
 
@@ -22,12 +22,17 @@ builds of the latest release:
 | Linux | [halo-linux-release.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-linux-release.zip) | [halo-linux-debug.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-linux-debug.zip) |
 | Windows | [halo-windows-release.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-windows-release.zip) | [halo-windows-debug.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-windows-debug.zip) |
 | Android | [halo-android-release.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-android-release.zip) | [halo-android-debug.zip](https://github.com/cybersecurity/halo-ce-universal/releases/latest/download/halo-android-debug.zip) |
+| macOS (Apple Silicon) | [Mac app and DMG builds](../../actions/workflows/macos-dmg.yml) | [Build locally](port/macos/README.md#build) |
+
+For Mac, open a successful **macOS build and package** workflow run and download its DMG
+artifact, then drag the app to Applications. The app asks for your own game data
+on first launch. Automated artifacts are ad-hoc signed and are not notarized.
 
 Use the release build to play. The debug build stops at the first failed
 assertion and writes it to the log. Use the debug build to find and report
 problems.
 
-The game updates itself. At start-up it looks for a newer release, and asks
+On Linux, Windows and Android, the game updates itself. At start-up it looks for a newer release, and asks
 if you want to install it. Refer to "Updates" in
 [port/linux/README.md](port/linux/README.md#updates).
 
@@ -51,6 +56,9 @@ so players of the two versions can play together.
 On Linux and Windows, the game puts `maps/` next to the executable. On
 Android, copy the disc image to the phone first. The app puts `maps/` in its
 data folder. Refer to [port/android/README.md](port/android/README.md).
+On Mac, the native chooser can import a disc image or select an extracted game
+folder. Imported data and saves stay in Application Support, outside the app.
+See [the Mac instructions](port/macos/README.md#install-and-game-data).
 
 ## Platforms
 
@@ -61,6 +69,7 @@ Each platform has its own instructions:
 | Linux (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/linux/README.md](port/linux/README.md) |
 | Windows (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/windows/README.md](port/windows/README.md) |
 | Android (arm64 app, OpenGL ES 3, SDL3) | [port/android/README.md](port/android/README.md) |
+| macOS (Apple Silicon app, ANGLE/Metal, SDL3) | [port/macos/README.md](port/macos/README.md) |
 
 The Linux README also gives the controls, the settings and the multiplayer
 functions. These are almost the same on all platforms.
@@ -95,6 +104,7 @@ To build the game:
 | `ninja linux` | `build/linux/halo` |
 | `ninja windows` (on Windows) | `build/windows/halo.exe` and `SDL3.dll` |
 | `ninja android_apk` | `port/android/app/build/outputs/apk/debug/app-debug.apk` |
+| `python3 tools/macos_build.py` (after [Mac setup](port/macos/README.md#build)) | `build/macos/Halo CE Universal.app` |
 
 If you enter `ninja` without a target, ninja builds the game for the
 computer that you use.

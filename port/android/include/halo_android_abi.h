@@ -35,7 +35,12 @@ keeps its heaps low in the address space and fills it upwards */
 #define HALO_GUEST_WINDOW_SIZE 0x08000000u
 
 #define HALO_GUEST_MAGIC 0x4f4c4148u /* 'HALO' */
+#ifdef HALO_MACOS
+/* Darwin rebases guest pointers; Android hosts must reject this image. */
+#define HALO_GUEST_ABI_VERSION 0x10001
+#else
 #define HALO_GUEST_ABI_VERSION 1
+#endif
 
 /* at HALO_GUEST_IMAGE_BASE */
 struct halo_guest_header

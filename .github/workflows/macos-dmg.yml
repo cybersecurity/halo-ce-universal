@@ -1,0 +1,53 @@
+name: macOS build and package
+
+on:
+  push:
+    paths-ignore: ['**.md']
+  pull_request:
+    paths: ['source/**', 'port/**', 'tools/**', 'configure.py', '.github/workflows/macos-dmg.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      HALO_MACOS_LLVM_BIN: /opt/homebrew/opt/llvm@22/bin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Public toolchain
+        run: |
+          test "$(uname -m)" = arm64
+          brew install llvm@22 lld@22 sdl3 ninja
+          printf '%s\n' /opt/homebrew/opt/lld@22/bin >> "$GITHUB_PATH"
+          python3 tools/macos_setup.py
+      - name: Build app
+        run: >-
+          python3 tools/macos_build.py --repository "$GITHUB_REPOSITORY"
+          --build-number "$GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT"
+      - name: Create and verify ad-hoc DMG
+        run: |
+          python3 tools/macos_release.py local-dmg --output dist/macos/Halo-CE-Universal-macos-arm64.dmg
+          hdiutil verify dist/macos/Halo-CE-Universal-macos-arm64.dmg
+          dmg_mount="$(mktemp -d "$RUNNER_TEMP/halo-dmg.XXXXXX")"
+          hdiutil attach dist/macos/Halo-CE-Universal-macos-arm64.dmg -mountpoint "$dmg_mount" -nobrowse -readonly
+          trap 'hdiutil detach "$dmg_mount"' EXIT
+          codesign --verify --deep --strict "$dmg_mount/Halo CE Universal.app"
+          lipo "$dmg_mount/Halo CE Universal.app/Contents/MacOS/halo" -verify_arch arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-macos-arm64-dmg
+          path: dist/macos/Halo-CE-Universal-macos-arm64.dmg
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14

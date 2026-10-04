@@ -1,0 +1,64 @@
+{
+  "llvm_major": 22,
+  "angle": {
+    "url": "https://github.com/EdgeFirstAI/angle-package/releases/download/v2.1.28252/angle-xcframeworks-v2.1.28252.zip",
+    "sha256": "59e4b1f68956c92441cde4dca0e9eb1a835bbccd107cefdd1d3d3d60e27410be"
+  },
+  "headers": [
+    {
+      "path": "EGL/egl.h",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/EGL-Registry/db3425b8246136faccb5e2782b5694960bd6edf1/api/EGL/egl.h",
+      "sha256": "a7c24c828bf2e1a4dfe6511b4f4812b948a285eb54787074015896976d4da076"
+    },
+    {
+      "path": "EGL/eglext.h",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/EGL-Registry/db3425b8246136faccb5e2782b5694960bd6edf1/api/EGL/eglext.h",
+      "sha256": "a5f574a0074001400c6c50232235ee00e9a67b2168bfd1c364ba0f6f52e5a75c"
+    },
+    {
+      "path": "EGL/eglplatform.h",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/EGL-Registry/db3425b8246136faccb5e2782b5694960bd6edf1/api/EGL/eglplatform.h",
+      "sha256": "25b5391655effcf363a38fa00c3154f356a3eab3d35dc067847875513cf1e441"
+    },
+    {
+      "path": "GLES2/gl2.h",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry/1cdd228e34966dd6b95bd203e9f84faba0f371a1/api/GLES2/gl2.h",
+      "sha256": "ba5e8e1755642efeb2d0f34b4cfe261cdbf6471e7763a40c7de10dff4c3c4921"
+    },
+    {
+      "path": "GLES2/gl2ext.h",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry/1cdd228e34966dd6b95bd203e9f84faba0f371a1/api/GLES2/gl2ext.h",
+      "sha256": "9afc725e9dda7c8b476e7337e75b22fa660ed462c169e203ec28c10e62f91f4c"
+    },
+    {
+      "path": "GLES2/gl2platform.h",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry/1cdd228e34966dd6b95bd203e9f84faba0f371a1/api/GLES2/gl2platform.h",
+      "sha256": "f5da0747540a50be5f44aad264aae45bdf157a192c40f17487dd9a2f99c71b6c"
+    },
+    {
+      "path": "GLES3/gl3.h",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry/1cdd228e34966dd6b95bd203e9f84faba0f371a1/api/GLES3/gl3.h",
+      "sha256": "a0e4880142bd059bd4d7446f257920b5020b8bbb0a86eb0149cbd1ea2fcf8cb0"
+    },
+    {
+      "path": "GLES3/gl31.h",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry/1cdd228e34966dd6b95bd203e9f84faba0f371a1/api/GLES3/gl31.h",
+      "sha256": "bb17bfde4aeba912d3686a0cc68ac04710ddacbcc5df7354994927747357daf3"
+    },
+    {
+      "path": "GLES3/gl32.h",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry/1cdd228e34966dd6b95bd203e9f84faba0f371a1/api/GLES3/gl32.h",
+      "sha256": "f203257863a7de3fce851efa61490907171db82082381d05f86f5d9bd39e8e17"
+    },
+    {
+      "path": "GLES3/gl3platform.h",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry/1cdd228e34966dd6b95bd203e9f84faba0f371a1/api/GLES3/gl3platform.h",
+      "sha256": "a9e060dae5a2b11c5a889b679692b7089a10a7e03ebfbb6cf28217f6e322fb08"
+    },
+    {
+      "path": "KHR/khrplatform.h",
+      "url": "https://raw.githubusercontent.com/KhronosGroup/EGL-Registry/db3425b8246136faccb5e2782b5694960bd6edf1/api/KHR/khrplatform.h",
+      "sha256": "7b1e01aaa7ad8f6fc34b5c7bdf79ebf5189bb09e2c4d2e79fc5d350623d11e83"
+    }
+  ]
+}

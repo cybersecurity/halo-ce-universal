@@ -27,6 +27,9 @@ with the host ABI.
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#ifdef HALO_MACOS
+#include <crt_externs.h>
+#endif
 
 #include "posix.h"
 
@@ -562,7 +565,12 @@ posix_ulong posix_resolve_ipv4(const char *host)
 
 int posix_command_line_argument(int index, char *buffer, posix_ulong size)
 {
-#ifdef __ANDROID__
+#ifdef HALO_MACOS
+	if (index < 0 || index >= *_NSGetArgc() || !size)
+		return 0;
+	snprintf(buffer, size, "%s", (*_NSGetArgv())[index]);
+	return 1;
+#elif defined(__ANDROID__)
 	(void)index;
 	(void)buffer;
 	(void)size;
@@ -658,7 +666,7 @@ int posix_user_secret(unsigned char *secret, int size)
 #endif
 }
 
-#ifndef __ANDROID__
+#if !defined(__ANDROID__) && !defined(HALO_MACOS)
 /* runs a program with its arguments and waits for it; its exit status, or -1 */
 static int run_program(char *const arguments[])
 {
@@ -676,10 +684,15 @@ static int run_program(char *const arguments[])
 
 int posix_register_url_scheme(const char *scheme, const char *description)
 {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(HALO_MACOS)
 	(void)scheme;
 	(void)description;
+	/* Apple app bundles declare their handler in CFBundleURLTypes. */
+#ifdef HALO_MACOS
+	return 1;
+#else
 	return 0;
+#endif
 #else
 	/* a desktop entry declaring the executable as the scheme's handler, and
 	the scheme's default application set to it (as xdg-open reads it) */
@@ -738,9 +751,12 @@ int posix_register_url_scheme(const char *scheme, const char *description)
 
 /* ---------- Discord's local socket */
 
+/* macOS supplies its native Unix socket implementation in host_discord.c;
+the Winsock adapter's connect wrapper expects guest sockaddr layouts. */
+#ifndef HALO_MACOS
 int posix_discord_connect(void)
 {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(HALO_MACOS)
 	return -1;
 #else
 	/* where Discord (and its Flatpak and Snap packages) put discord-ipc-N */
@@ -807,6 +823,7 @@ int posix_discord_connect(void)
 	return -1;
 #endif
 }
+#endif
 
 int posix_discord_write(int handle, const void *buffer, int length)
 {

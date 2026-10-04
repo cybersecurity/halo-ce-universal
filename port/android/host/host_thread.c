@@ -58,7 +58,11 @@ static int on_guest_stack(void)
 {
 	uint64_t sp = (uint64_t)__builtin_frame_address(0);
 
+#ifdef HALO_MACOS
+	return (sp & ~UINT64_C(0xffffffff)) == HALO_MACOS_BIAS;
+#else
 	return sp < 0x100000000ULL;
+#endif
 }
 
 /* ---------- calling into the guest */
@@ -70,13 +74,13 @@ uint32_t host_call_guest(uint32_t function, uint32_t a, uint32_t b, uint32_t c, 
 	if (!on_guest_stack())
 		host_fatal("guest code called on a thread without a guest stack");
 	if (!guest_tp)
-		((guest_function)(uintptr_t)host_image.header->thread_attach)(0, 0, 0, 0);
-	return ((guest_function)(uintptr_t)function)(a, b, c, d);
+		((guest_function)guest_code_pointer(host_image.header->thread_attach))(0, 0, 0, 0);
+	return ((guest_function)guest_code_pointer(function))(a, b, c, d);
 }
 
 void host_run_guest_main(uint32_t boot)
 {
-	((void (*)(uint32_t))(uintptr_t)host_image.header->start)(boot);
+	((void (*)(uint32_t))guest_code_pointer(host_image.header->start))(boot);
 	host_fatal("the guest returned from __guest_start");
 }
 

@@ -87,6 +87,10 @@ int config_write(char const *name, char const *value);
 int config_default(char const *name, char *text, unsigned int size);
 char const *config_string(char const *name);
 void platform_display_apply(void);
+#ifdef HALO_MACOS
+char const *platform_display_mode_name(void);
+int platform_display_mode_save(char const *value);
+#endif
 void platform_binding_capture_begin(void);
 int platform_binding_capture_poll(int *input);
 void halo_input_name(int input, char *name, unsigned int size);
@@ -300,6 +304,13 @@ static boolean setting_text(char const *name, char *text, unsigned int size, boo
 
 	if (strncmp(name, "profile.", 8))
 	{
+#ifdef HALO_MACOS
+		if (!default_value && !strcmp(name, "display.mode"))
+		{
+			snprintf(text, size, "%s", platform_display_mode_name());
+			return TRUE;
+		}
+#endif
 		if (!(default_value ? config_default(name, text, size) : config_text(name, text, size)))
 			return FALSE;
 		/* (display.mode empty: display.fullscreen's, as the window has it:
@@ -338,6 +349,10 @@ static boolean setting_write(char const *name, char const *value)
 {
 	short index;
 
+#ifdef HALO_MACOS
+	if (!strcmp(name, "display.mode"))
+		return platform_display_mode_save(value);
+#endif
 	if (strncmp(name, "profile.", 8))
 		return config_write(name, value);
 	for (index = 0; index < NUMBEROF(profile_settings); index++)

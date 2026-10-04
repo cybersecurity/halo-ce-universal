@@ -94,6 +94,10 @@ struct nv2a_pixel_shader_key
 	/* D3DTSS_COLORSIGN: channels (bit 0 alpha ... bit 3 blue, as
 	D3DTSIGN_*) that hold signed data in an unsigned texture format */
 	unsigned char color_sign[4];
+	/* GLES without texture_border_clamp: non-mipmapped 2D textures only.
+	Bit 0/1 select U/V; filtering bit 0/1 selects linear min/magnification. */
+	unsigned char border_axes[4];
+	unsigned char border_filter[4];
 	/* D3DCMP_* function for the alpha test, or 0 when disabled */
 	unsigned long alpha_test_function;
 	unsigned char fog_enable;
@@ -130,6 +134,7 @@ C0/C1 of each stage and the final combiner, and texture constants */
 	"uniform vec4 bump_matrix[4];\n" \
 	"uniform vec4 bump_luminance[4];\n" \
 	"uniform vec4 texture_scale[4];\n" \
+	"uniform vec4 texture_border_color[4];\n" \
 	XGPU_PIXEL_UNIFORMS_ES
 
 /* ---------- textures */

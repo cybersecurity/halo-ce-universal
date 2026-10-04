@@ -201,28 +201,48 @@ def android_configure_inputs() -> List[Path]:
 
 
 def generate_android_build(n: Writer, sln: Any) -> None:
+    macos = getattr(sln, "macos", False)
+    build_root = Path("build/macos") if macos else BUILD
     config_path = LINUX_DIR / "port.json"
     if not config_path.is_file() or not (PORT_DIR / "host").is_dir():
         return
+    guest_only = getattr(sln, "android_guest_only", False)
     ndk = Path(sln.android_ndk) if getattr(sln, "android_ndk", None) else _find_ndk()
-    if not ndk or not ndk.is_dir():
+    if guest_only:
+        llvm_bin = getattr(sln, "android_guest_llvm_bin", None)
+        gl_headers = getattr(sln, "android_guest_gl_include", None)
+        if not llvm_bin or not gl_headers:
+            raise ValueError("--android-guest-only requires --android-guest-llvm-bin and --android-guest-gl-include")
+        ndk_bin = Path(llvm_bin).resolve()
+        sysroot_include = Path(gl_headers).resolve()
+        required = [ndk_bin / "llvm-ar", ndk_bin / "ld.lld", sysroot_include / "GLES3/gl32.h",
+                    sysroot_include / "GLES2/gl2ext.h", sysroot_include / "KHR/khrplatform.h"]
+        for path in required:
+            if not path.is_file():
+                raise ValueError(f"ARM guest build input is missing: {path}")
+        host_cc = None
+    elif not ndk or not ndk.is_dir():
         n.comment("Android build: no NDK found (set ANDROID_NDK_HOME or pass --android-ndk)")
         return
+    else:
+        host_tag = "darwin-x86_64" if sys.platform == "darwin" else "linux-x86_64"
+        toolchain = ndk / "toolchains" / "llvm" / "prebuilt" / host_tag
+        sysroot_include = toolchain / "sysroot" / "usr" / "include"
+        ndk_bin = toolchain / "bin"
+        host_cc = ndk_bin / f"aarch64-linux-android{ANDROID_API}-clang"
     try:
         fetch_third_party()
     except (subprocess.CalledProcessError, OSError) as error:
+        if guest_only:
+            raise
         print(f"Android build disabled: cannot fetch musl/SDL3 ({error})", file=sys.stderr)
         return
     import json
     config: Dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))
 
-    toolchain = ndk / "toolchains" / "llvm" / "prebuilt" / "linux-x86_64"
-    sysroot_include = toolchain / "sysroot" / "usr" / "include"
-    host_cc = toolchain / "bin" / f"aarch64-linux-android{ANDROID_API}-clang"
-    ndk_bin = toolchain / "bin"
     guest_cc = getattr(sln, "android_guest_cc", None) or "clang"
 
-    guest_dir = BUILD / "guest"
+    guest_dir = build_root / "guest"
     obj_dir = guest_dir / "obj"
     gen_dir = guest_dir / "gen"
     libc_include = guest_dir / "libc_include"
@@ -232,17 +252,18 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     semantics_header = Path("build/linux/halo_msvc_semantics.h")
     platform_semantics_header = Path("build/linux/platform_msvc_semantics.h")
     prefix_header = LINUX_DIR / "include" / "halo_linux_prefix.h"
-    image = BUILD / "halo_guest.elf"
-    sdl_build = BUILD / "sdl3-build"
+    image = build_root / "halo_guest.elf"
+    sdl_build = build_root / "sdl3-build"
     libsdl = sdl_build / "libSDL3.so"
-    jni_dir = BUILD / "jniLibs" / "arm64-v8a"
+    jni_dir = build_root / "jniLibs" / "arm64-v8a"
     libmain = jni_dir / "libmain.so"
-    assets_dir = BUILD / "assets"
+    assets_dir = build_root / "assets"
     python = "$python"
 
     n.comment("Android build (ninja android); see port/android/README.md")
     n.variable("android_guest_cc", guest_cc)
-    n.variable("android_host_cc", str(host_cc))
+    if host_cc:
+        n.variable("android_host_cc", str(host_cc))
     n.variable("android_ndk_bin", str(ndk_bin))
 
     # ---------- generated headers and sources
@@ -303,15 +324,18 @@ def generate_android_build(n: Writer, sln: Any) -> None:
             implicit=[Path("tools/android_posix_stubs.py"), LINUX_DIR / "src" / "posix.h"])
 
     imports_s = gen_dir / "imports.s"
-    host_table_c = BUILD / "host" / "host_import_table.c"
+    host_table_c = build_root / "host" / "host_import_table.c"
     host_imports_list = PORT_DIR / "host_imports.list"
+    import_lists = [host_imports_list, posix_imports, gl_imports]
+    if macos:
+        import_lists.append(Path("port/macos/host_imports.list"))
     n.rule(
         name="android_imports",
         command=f"{python} tools/android_imports.py --host-table {host_table_c} {imports_s} $in",
         description="ANDROID IMPORTS",
     )
     n.build(outputs=[imports_s, host_table_c], rule="android_imports",
-            inputs=[host_imports_list, posix_imports, gl_imports],
+            inputs=import_lists,
             implicit=[Path("tools/android_imports.py")])
 
     generated_headers = [*xdk_headers(), alltypes, syscall_h, version_h, gl_stamp,
@@ -341,6 +365,14 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     guest_abi = " ".join(GUEST_ABI_FLAGS + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False) else []))
     guest_code = " ".join(GUEST_CODE_FLAGS)
     tool_implicit = [Path("tools/android_asm_convert.py"), *generated_headers]
+    if macos:
+        n.rule(name="macos_rebase_plugin", command=f"{python} tools/macos_build.py --plugin-only",
+               description="MACOS COMPILER PASS")
+        plugin = build_root / "guest_rebase.dylib"
+        n.build(outputs=plugin, rule="macos_rebase_plugin",
+                inputs=[Path("port/macos/compiler/guest_rebase.cpp")],
+                implicit=[Path("tools/macos_build.py")])
+        tool_implicit.extend([Path("tools/macos_guest_cc.py"), plugin])
     # profile-guided optimisation with the Linux build's profile (committed,
     # or trained by the Linux build with --pgo=train): the game and platform
     # code are the same, and functions that differ simply go without
@@ -351,8 +383,8 @@ def generate_android_build(n: Writer, sln: Any) -> None:
 
     def guest_object(source: Path, cflags: str, prefix: str = "") -> Path:
         obj = obj_dir / prefix / Path(str(source).lstrip("/")).with_suffix(".o")
-        if str(source).startswith(str(BUILD)):
-            obj = obj_dir / prefix / source.relative_to(BUILD).with_suffix(".o")
+        if str(source).startswith(str(build_root)):
+            obj = obj_dir / prefix / source.relative_to(build_root).with_suffix(".o")
         n.build(outputs=obj, rule="android_guest_cc", inputs=source, implicit=tool_implicit,
                 variables={"cflags": cflags})
         return obj
@@ -464,16 +496,23 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     # ---------- the guest image
 
     linker_script = PORT_DIR / "guest" / "guest.ld"
+    builtins = getattr(sln, "android_guest_builtins", None) if guest_only else None
+    compiler_runtime = (_quote(builtins) if builtins else "") if guest_only else "$$($android_host_cc -print-libgcc-file-name)"
     n.rule(
         name="android_guest_link",
         command=(f"$android_ndk_bin/ld.lld -m aarch64linux -static -nostdlib -T {linker_script} "
                  f"-Map $out.map -o $out @$out.rsp {libguestc} "
-                 "$$($android_host_cc -print-libgcc-file-name)"),
+                 f"{compiler_runtime}"),
         description="ANDROID LINK $out",
         rspfile="$out.rsp",
         rspfile_content="$in_newline",
     )
-    n.build(outputs=image, rule="android_guest_link", inputs=objects, implicit=[libguestc, linker_script])
+    n.build(outputs=image, rule="android_guest_link", inputs=objects,
+            implicit=[libguestc, linker_script] + ([builtins] if builtins else []))
+    n.build(outputs="macos_guest" if macos else "android_guest", rule="phony", inputs=image)
+    if guest_only:
+        n.newline()
+        return
 
     # ---------- SDL3
 
@@ -485,7 +524,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
                  f"-DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF "
                  # 16 KB pages (Android 15 and later), as the host library
                  f"-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384 "
-                 f"> {BUILD}/sdl3-configure.log && ninja -C {sdl_build} > {BUILD}/sdl3-build.log"),
+                 f"> {build_root}/sdl3-configure.log && ninja -C {sdl_build} > {build_root}/sdl3-build.log"),
         description="ANDROID SDL3",
         pool="console",
     )
@@ -494,7 +533,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     # ---------- the host library
 
     host_objects: List[Path] = []
-    host_obj_dir = BUILD / "host" / "obj"
+    host_obj_dir = build_root / "host" / "obj"
     n.rule(
         name="android_host_cc",
         command="$android_host_cc -MMD -MF $out.d $cflags -c $in -o $out",

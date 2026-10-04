@@ -641,12 +641,33 @@ VOID WINAPI Sleep(DWORD milliseconds)
 
 /* ---------- time */
 
+#ifdef HALO_MACOS
+/* The game keeps some clocks in signed 32-bit milliseconds. Count from app
+ * startup so a Mac up longer than 24.8 days cannot immediately time out peers.
+ * A ten-second origin matches the game's nonzero "already started" clock. */
+static unsigned long long platform_clock_nanoseconds(void)
+{
+	static unsigned long long start;
+	struct timespec now;
+	unsigned long long value, expected = 0;
+
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	value = (unsigned long long)now.tv_sec * 1000000000ULL + (unsigned long long)now.tv_nsec;
+	__atomic_compare_exchange_n(&start, &expected, value - 10000000000ULL, 0, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+	return value - __atomic_load_n(&start, __ATOMIC_RELAXED);
+}
+#endif
+
 DWORD WINAPI GetTickCount(void)
 {
+#ifdef HALO_MACOS
+	return (DWORD)(platform_clock_nanoseconds() / 1000000ULL);
+#else
 	struct timespec now;
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	return (DWORD)((unsigned long long)now.tv_sec * 1000ULL + (unsigned long long)now.tv_nsec / 1000000ULL);
+#endif
 }
 
 /* The Xbox performance counter runs at the 733 MHz CPU clock. Report a
@@ -656,11 +677,15 @@ arithmetic in the game stays in range, fine enough for frame timing. */
 
 BOOL WINAPI QueryPerformanceCounter(LARGE_INTEGER *count)
 {
+#ifdef HALO_MACOS
+	count->QuadPart = (LONGLONG)(platform_clock_nanoseconds() / (1000000000ULL / PLATFORM_PERFORMANCE_FREQUENCY));
+#else
 	struct timespec now;
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	count->QuadPart = (LONGLONG)((unsigned long long)now.tv_sec * PLATFORM_PERFORMANCE_FREQUENCY +
 		(unsigned long long)now.tv_nsec / (1000000000ULL / PLATFORM_PERFORMANCE_FREQUENCY));
+#endif
 	return TRUE;
 }
 

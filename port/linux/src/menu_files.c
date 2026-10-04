@@ -23,6 +23,9 @@ high-res HUD's are (hud_hires.c).
 #include "platform.h"
 #include "port_config.h"
 #include "xgpu.h"
+#ifdef HALO_MACOS
+#include "posix.h"
+#endif
 
 #include "expat.h"
 
@@ -121,6 +124,52 @@ static unsigned char *file_read(const char *path, unsigned long *size)
 #endif
 }
 
+#ifdef HALO_MACOS
+/* SDL_GlobDirectory returns host-owned pointer arrays. Use the existing
+ILP32-safe directory bridge for the same two desktop patterns instead. */
+static void files_gather_directory(const char *relative, int depth)
+{
+	char directory_path[1200], name[1024];
+	void *directory;
+	int length = snprintf(directory_path, sizeof(directory_path), "%s/%s", folder, relative);
+
+	if (length < 0 || length >= (int)sizeof(directory_path))
+		return;
+	directory = posix_directory_open(directory_path);
+	while (directory && posix_directory_next(directory, name, sizeof(name)))
+	{
+		char relative_path[1200], path[1200];
+		struct posix_file_information information;
+		unsigned long size = 0;
+		unsigned char *data;
+		size_t name_length = strlen(name);
+
+		length = snprintf(relative_path, sizeof(relative_path), "%s%s%s", relative, *relative ? "/" : "", name);
+		if (length < 0 || length >= (int)sizeof(relative_path))
+			continue;
+		length = snprintf(path, sizeof(path), "%s/%s", folder, relative_path);
+		if (length < 0 || length >= (int)sizeof(path) || posix_stat(path, &information) != 0)
+			continue;
+		if (information.flags & _posix_file_is_directory)
+		{
+			if (!depth)
+				files_gather_directory(relative_path, depth + 1);
+			continue;
+		}
+		if (name_length < 4 || strcmp(name + name_length - 4, ".xml") || file_find(relative_path) >= 0)
+			continue;
+		data = file_read(path, &size);
+		if (data)
+		{
+			platform_log("menus: adding %s", path);
+			file_add(relative_path, data, size, 1);
+		}
+	}
+	if (directory)
+		posix_directory_close(directory);
+}
+#endif
+
 /* the embedded files, then those of the menus folder: one of the same name
 replaces an embedded one, and (on the desktop, where the folder can be
 listed) another .xml file is added */
@@ -149,7 +198,9 @@ static void files_gather(void)
 			file_add(embedded->path, (const unsigned char *)embedded->data, embedded->size, 0);
 		}
 	}
-#ifndef HALO_ANDROID
+#ifdef HALO_MACOS
+	files_gather_directory("", 0);
+#elif !defined(HALO_ANDROID)
 	{
 		/* (the folder's own and its folders': SDL's * does not cross a /) */
 		static const char *const patterns[] = { "*.xml", "*/*.xml" };
@@ -355,7 +406,7 @@ static int for_this_platform(struct reader *reader, const XML_Char **attributes)
 				reader_error(reader, "platform=\"%s\" is not \"desktop\" or \"android\"", platform);
 				return 1;
 			}
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(HALO_MACOS)
 			return !strcmp(platform, "android");
 #else
 			return !strcmp(platform, "desktop");

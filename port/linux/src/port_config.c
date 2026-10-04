@@ -351,7 +351,9 @@ static const struct config_setting config_settings[] =
 
 #define NUMBER_OF_CONFIG_SETTINGS (sizeof(config_settings) / sizeof(config_settings[0]))
 
-#ifdef HALO_ANDROID
+#if defined(HALO_MACOS)
+#define CONFIG_PLATFORM _platform_desktop
+#elif defined(HALO_ANDROID)
 #define CONFIG_PLATFORM _platform_android
 #else
 #define CONFIG_PLATFORM _platform_desktop
@@ -373,7 +375,12 @@ static pthread_mutex_t config_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void config_path(char *path, size_t size)
 {
-#ifdef HALO_ANDROID
+#ifdef HALO_MACOS
+	/* The app bundle is read-only; keep preferences with the user's saves. */
+	const char *root = getenv("HALO_SAVE_ROOT");
+
+	snprintf(path, size, "%s/config.toml", root && *root ? root : ".");
+#elif defined(HALO_ANDROID)
 	/* the data folder, which the app names (port/android/host/host_main.c) */
 	const char *root = getenv("HALO_DATA_ROOT");
 
@@ -917,6 +924,7 @@ int config_write(const char *name, const char *value)
 	long index = config_setting_index(name);
 	char section[64], key[64], wanted[80], current[64] = "", line_text[600], path[1024];
 	struct config_text out = { 0 };
+	struct config_value candidate = { 0 };
 	size_t size = 0;
 	char *text;
 	const char *line;
@@ -927,20 +935,26 @@ int config_write(const char *name, const char *value)
 	/* (the file read first, as the other settings are) */
 	config_value(name, config_settings[index].type);
 	pthread_mutex_lock(&config_lock);
-	config_set_from_text(&config_values[index], config_settings[index].type, value);
+	/* Readers keep the previous value until the file has accepted this one. */
+	config_set_from_text(&candidate, config_settings[index].type, value);
+	if (config_settings[index].type == _config_string && !candidate.string)
+	{
+		pthread_mutex_unlock(&config_lock);
+		return 0;
+	}
 	snprintf(section, sizeof(section), "%.*s", (int)(dot - name), name);
 	snprintf(key, sizeof(key), "%s", dot + 1);
 	switch (config_settings[index].type)
 	{
 	case _config_boolean:
-		snprintf(line_text, sizeof(line_text), "%s = %s\n", key, config_values[index].boolean ? "true" : "false");
+		snprintf(line_text, sizeof(line_text), "%s = %s\n", key, candidate.boolean ? "true" : "false");
 		break;
 	case _config_integer:
-		snprintf(line_text, sizeof(line_text), "%s = %ld\n", key, config_values[index].integer);
+		snprintf(line_text, sizeof(line_text), "%s = %ld\n", key, candidate.integer);
 		break;
 	case _config_real:
 		/* (with its point: TOML reads 1 as an integer) */
-		snprintf(line_text, sizeof(line_text), "%s = %.15g", key, config_values[index].real);
+		snprintf(line_text, sizeof(line_text), "%s = %.15g", key, candidate.real);
 		if (!strpbrk(line_text + strlen(key) + 3, ".en"))
 			strcat(line_text, ".0");
 		strcat(line_text, "\n");
@@ -950,7 +964,7 @@ int config_write(const char *name, const char *value)
 		char *end = line_text + snprintf(line_text, sizeof(line_text), "%s = \"", key);
 		const char *character;
 
-		for (character = config_values[index].string; *character; character++)
+		for (character = candidate.string; *character; character++)
 		{
 			if (*character == '"' || *character == '\\')
 				*end++ = '\\';
@@ -1010,7 +1024,16 @@ int config_write(const char *name, const char *value)
 		config_append(&out, line_text);
 	}
 	succeeded = out.buffer && config_write_file(path, out.buffer);
-	config_change_count++;
+	if (succeeded)
+	{
+		/* Keep previously returned strings alive, as config_set_from_text does. */
+		config_values[index] = candidate;
+		config_change_count++;
+	}
+	else
+	{
+		free(candidate.string);
+	}
 	pthread_mutex_unlock(&config_lock);
 	free(out.buffer);
 	free(text);

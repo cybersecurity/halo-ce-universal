@@ -83,10 +83,12 @@ static void *handle_get(uint32_t handle, int type)
 
 /* ---------- general */
 
+#ifndef HALO_MACOS
 int host_sdl_init(uint32_t flags)
 {
 	return SDL_Init((SDL_InitFlags)flags);
 }
+#endif
 
 int host_sdl_set_hint(const char *name, const char *value)
 {
@@ -120,10 +122,12 @@ int64_t host_sdl_thread_id(void)
 
 /* ---------- video */
 
+#ifndef HALO_MACOS
 uint32_t host_sdl_create_window(const char *title, int width, int height, int64_t flags)
 {
 	return handle_new(_handle_window, SDL_CreateWindow(title, width, height, (SDL_WindowFlags)flags));
 }
+#endif
 
 void host_sdl_window_size_in_pixels(uint32_t window, int *width, int *height)
 {
@@ -135,13 +139,29 @@ void host_sdl_window_size_in_pixels(uint32_t window, int *width, int *height)
 		SDL_GetWindowSizeInPixels(object, width, height);
 }
 
+#ifndef HALO_MACOS
 int host_sdl_set_relative_mouse(uint32_t window, int enabled)
 {
 	SDL_Window *object = handle_get(window, _handle_window);
 
 	return object ? SDL_SetWindowRelativeMouseMode(object, enabled != 0) : 0;
 }
+#endif
 
+void host_sdl_window_size(uint32_t window, int *width, int *height)
+{
+	SDL_Window *object = handle_get(window, _handle_window);
+	*width = *height = 0;
+	if (object) SDL_GetWindowSize(object, width, height);
+}
+
+void host_sdl_warp_mouse(uint32_t window, float x, float y)
+{
+	SDL_Window *object = handle_get(window, _handle_window);
+	if (object) SDL_WarpMouseInWindow(object, x, y);
+}
+
+#ifndef HALO_MACOS
 int host_sdl_gl_set_attribute(int attribute, int value)
 {
 	return SDL_GL_SetAttribute((SDL_GLAttr)attribute, value);
@@ -170,9 +190,11 @@ int host_sdl_gl_swap_window(uint32_t window)
 
 	return object ? SDL_GL_SwapWindow(object) : 0;
 }
+#endif
 
 /* ---------- events */
 
+#ifndef HALO_MACOS
 int host_sdl_poll_event(void *event)
 {
 	SDL_Event host_event;
@@ -184,6 +206,7 @@ int host_sdl_poll_event(void *event)
 	memcpy(event, &host_event, sizeof(host_event));
 	return 1;
 }
+#endif
 
 /* ---------- gamepads */
 
@@ -342,6 +365,8 @@ uint32_t host_sdl_open_audio_stream(uint32_t device, const void *spec, uint32_t 
 	struct audio_binding *binding = SDL_calloc(1, sizeof(*binding));
 	SDL_AudioStream *stream;
 
+	if (!binding)
+		return 0;
 	binding->callback = callback;
 	binding->userdata = userdata;
 	pthread_mutex_init(&binding->lock, NULL);
@@ -394,14 +419,18 @@ void host_sdl_get_clipboard_text(char *buffer, uint32_t size)
 	SDL_free(text);
 }
 
+#ifndef HALO_MACOS
 int host_sdl_show_toast(const char *message, int duration, int gravity, int x, int y)
 {
 	return SDL_ShowAndroidToast(message, duration, gravity, x, y) ? 1 : 0;
 }
+#endif
 
 /* ---------- a message for the player (a host of another network version) */
 
+#ifndef HALO_MACOS
 int host_sdl_show_simple_message_box(uint32_t flags, const char *title, const char *message)
 {
 	return SDL_ShowSimpleMessageBox((SDL_MessageBoxFlags)flags, title, message, NULL) ? 1 : 0;
 }
+#endif

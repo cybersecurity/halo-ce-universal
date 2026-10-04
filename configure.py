@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # root build script: writes build.ninja for the native ports (Linux, Windows,
-# Android)
+# Android, macOS)
 
 import argparse
 import io
@@ -73,6 +73,11 @@ parser.add_argument(
     type=str,
     help="clang with the arm64_32 target for the Android guest (default: clang)",
 )
+parser.add_argument("--macos", action="store_true", help="generate the rebased Apple Silicon guest target")
+parser.add_argument("--android-guest-only", action="store_true", help="build the portable ARM image without an Android host")
+parser.add_argument("--android-guest-llvm-bin", type=Path, help="directory containing llvm-ar and ld.lld")
+parser.add_argument("--android-guest-gl-include", type=Path, help="directory containing Khronos GLES headers")
+parser.add_argument("--android-guest-builtins", type=Path, help="optional AArch64 compiler builtins archive")
 args = parser.parse_args()
 
 # the settings the builds read
@@ -86,7 +91,12 @@ sln = SimpleNamespace(
     port_pgo=args.pgo,
     port_pgo_profile=args.pgo_profile,
     android_ndk=args.android_ndk,
-    android_guest_cc=args.android_guest_cc,
+    android_guest_cc="tools/macos_guest_cc.py" if args.macos else args.android_guest_cc,
+    android_guest_only=args.android_guest_only or args.macos,
+    android_guest_llvm_bin=args.android_guest_llvm_bin,
+    android_guest_gl_include=args.android_guest_gl_include,
+    android_guest_builtins=args.android_guest_builtins,
+    macos=args.macos,
 )
 
 
@@ -135,7 +145,7 @@ n.newline()
 
 # the build for this computer, where it could be generated (the Windows
 # build is left out when SDL cannot be fetched, for instance)
-default = "windows" if is_windows() else "linux"
+default = "macos_guest" if args.macos else "windows" if is_windows() else "linux"
 if f"\nbuild {default}: " in out.getvalue():
     n.comment("Default rule: the build for this computer")
     n.default(default)

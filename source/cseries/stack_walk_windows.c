@@ -318,6 +318,11 @@ void stack_walk_with_context(
 	unsigned long levels_dumped;
 	long frame_number;
 
+#ifdef HALO_MACOS
+	/* The ILP32 chain crosses into native Darwin frames. The Xbox walker
+	cannot validate those 64-bit addresses; preserve the original error. */
+	return;
+#endif
 	if (context_pointer)
 	{
 		initialize_stack_walk(context_pointer);

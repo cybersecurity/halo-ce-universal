@@ -1,0 +1,4 @@
+# Mac desktop display controls; the Android import table remains unchanged.
+host_sdl_display_mode
+host_sdl_apply_display
+host_sdl_request_quit

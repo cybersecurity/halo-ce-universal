@@ -59,7 +59,15 @@ long long host_sdl_ticks(void);
 long long host_sdl_thread_id(void);
 unsigned int host_sdl_create_window(const char *title, int width, int height, long long flags);
 void host_sdl_window_size_in_pixels(unsigned int window, int *width, int *height);
+void host_sdl_window_size(unsigned int window, int *width, int *height);
+void host_sdl_warp_mouse(unsigned int window, float x, float y);
 int host_sdl_set_relative_mouse(unsigned int window, int enabled);
+#ifdef HALO_MACOS
+/* Native display actions and the PC menu share the guest's display.mode. */
+int host_sdl_display_mode(void);
+int host_sdl_apply_display(int mode, int width, int height);
+void host_sdl_request_quit(void);
+#endif
 int host_sdl_gl_set_attribute(int attribute, int value);
 unsigned int host_sdl_gl_create_context(unsigned int window);
 int host_sdl_gl_make_current(unsigned int window, unsigned int context);

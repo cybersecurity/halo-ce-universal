@@ -63,6 +63,12 @@ def main():
         "#include <GLES3/gl32.h>",
         "#include <GLES2/gl2ext.h>",
         "#include <string.h>",
+        "/* Integer-valued pointers bypass the Mac guest's typed-pointer rebase pass. */",
+        "#ifdef HALO_MACOS",
+        "#define HOST_POINTER(p) ((p) ? (0x10000000000ull | (unsigned int)(p)) : 0ull)",
+        "#else",
+        "#define HOST_POINTER(p) ((unsigned long long)(unsigned int)(p))",
+        "#endif",
         "",
         "void host_gl_get_string(unsigned int name, int index, char *buffer, unsigned int size);",
         "",
@@ -107,7 +113,7 @@ def main():
                 "\tif (count > 16)",
                 "\t\tcount = 16;",
                 "\tfor (index = 0; index < count; index++)",
-                "\t\twide[index] = (unsigned long long)(unsigned int)strings[index];",
+                "\t\twide[index] = HOST_POINTER(strings[index]);",
                 "\thostgl_glShaderSource(shader, count, wide, lengths);",
                 "}",
                 "",
@@ -135,7 +141,7 @@ def main():
             if is_pointer:
                 if on_stack:
                     host_params.append("unsigned long long")
-                    call_args.append(f"(unsigned long long)(unsigned int){arg}")
+                    call_args.append(f"HOST_POINTER({arg})")
                 else:
                     host_params.append(ptype)
                     call_args.append(arg)

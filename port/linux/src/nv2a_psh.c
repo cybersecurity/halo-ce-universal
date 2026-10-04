@@ -328,8 +328,44 @@ static void dot_input(struct xgpu_text *text, const DWORD *state, int stage)
 #define SHADER_VERSION "#version 450 core\n"
 #endif
 
+/* A clamp-to-edge sample already has the correct interior/edge texel value.
+For a single level, blending it with the border by the footprint's coverage
+exactly restores clamp-to-border, including the half-texel linear fringe.
+Only unsupported GLES border samplers receive this helper (d3d8_gl.c). */
+static void border_sample_function(struct xgpu_text *text, const struct nv2a_pixel_shader_key *key, int stage)
+{
+	unsigned char axes = key->border_axes[stage];
+	unsigned char filtering = key->border_filter[stage];
+
+	if (!axes)
+		return;
+	xgpu_text_append(text,
+		"vec4 sample_border%d(vec2 uv)\n{\n"
+		"\tvec4 value = texture(tex%d, uv, texture_lod_bias[%d]);\n"
+		"\tvec2 size = vec2(textureSize(tex%d, 0));\n", stage, stage, stage, stage);
+	if (filtering == 1 || filtering == 2)
+	{
+		xgpu_text_append(text,
+			"\tvec2 dx = dFdx(uv) * size, dy = dFdy(uv) * size;\n"
+			"\tbool minifying = max(dot(dx, dx), dot(dy, dy)) * exp2(2.0 * texture_lod_bias[%d]) > 1.0;\n"
+			"\tbool linear_filter = %sminifying;\n", stage, filtering == 1 ? "" : "!");
+	}
+	else
+		xgpu_text_append(text, "\tbool linear_filter = %s;\n", filtering == 3 ? "true" : "false");
+	xgpu_text_append(text,
+		"\tvec2 coverage = linear_filter ? clamp(vec2(0.5) + min(uv, vec2(1.0) - uv) * size, 0.0, 1.0)\n"
+		"\t\t: step(vec2(0.0), uv) * (vec2(1.0) - step(vec2(1.0), uv));\n"
+		"\treturn mix(texture_border_color[%d], value, %s);\n}\n", stage,
+		axes == 3 ? "coverage.x * coverage.y" : axes == 1 ? "coverage.x" : "coverage.y");
+}
+
 static void sample(struct xgpu_text *text, const struct nv2a_pixel_shader_key *key, int stage, const char *coordinates)
 {
+	if (key->border_axes[stage])
+	{
+		xgpu_text_append(text, "sample_border%d((%s).xy * texture_scale[%d].xy)", stage, coordinates, stage);
+		return;
+	}
 	switch (key->sampler_type[stage])
 	{
 	case _xgpu_sampler_3d:
@@ -556,6 +592,8 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		XGPU_PIXEL_UNIFORMS);
 	for (stage = 0; stage < 4; stage++)
 		xgpu_text_append(&text, "uniform %s tex%d;\n", sampler_declaration(key->sampler_type[stage]), stage);
+	for (stage = 0; stage < 4; stage++)
+		border_sample_function(&text, key, stage);
 	xgpu_text_append(&text,
 		"float signed_byte(float x)\n"
 		"{\n"
