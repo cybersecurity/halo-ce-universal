@@ -119,6 +119,10 @@ Gamepads) is the gamepads' only.
 Always: \` opens the developer console, F12 releases or captures the mouse,
 F11 changes between fullscreen and window.
 
+In a network game, T opens the chat to all players and Y to your team. Enter
+sends the message and escape closes the chat. A player can send one message
+every 10 seconds, of up to 62 characters.
+
 One movement of the mouse wheel changes the weapon one time. A second
 movement after a short pause changes it again.
 

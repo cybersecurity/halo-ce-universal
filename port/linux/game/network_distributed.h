@@ -65,6 +65,11 @@ enum
 	/* every player's ping as the host measures it, every two seconds, for
 	the scoreboard (unreliable) */
 	_distributed_message_pings,
+	/* a client's player's chat message, to the host (reliable: chat.c) */
+	_distributed_message_chat_request,
+	/* a chat message the host passes on, named, to every client or to those
+	of the team (reliable) */
+	_distributed_message_chat,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };

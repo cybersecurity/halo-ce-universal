@@ -54,6 +54,7 @@ machine (their datum identifiers need not be).
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "game/game.h"
+#include "game/game_engine.h"
 #include "game/game_globals.h"
 #include "game/players.h"
 #include "game/player_queues_new.h"
@@ -66,6 +67,7 @@ machine (their datum identifiers need not be).
 #include "units/biped_definitions.h"
 #include "units/bipeds.h"
 #include "network_distributed.h"
+#include "chat.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -131,6 +133,33 @@ struct distributed_client_identity
 	char discord_id[DISCORD_ID_SIZE];
 	char discord_name[DISCORD_NAME_SIZE];
 };
+
+/* a client's chat message (_distributed_message_chat_request): its text
+after this, ended */
+struct distributed_chat_request
+{
+	byte local_player_index;
+	byte team_only;
+};
+
+/* a chat message the host passes on (_distributed_message_chat): who said
+it, as the host has them, and its text after this, ended */
+struct distributed_chat
+{
+	wchar_t name[12];
+	byte team_index;
+	byte team_only;
+};
+
+/* (what goes on the wire, as it is on every machine) */
+typedef char distributed_chat_request_size_assert[sizeof(struct distributed_chat_request) == 2 ? 1 : -1];
+typedef char distributed_chat_size_assert[sizeof(struct distributed_chat) == 26 ? 1 : -1];
+
+/* a client machine's chat messages, as the host takes them: one in
+CHAT_COOLDOWN_MILLISECONDS (chat.h), less this for the network's delays
+(a client keeps to the whole of it, so that none of an honest one's are
+refused) */
+#define CHAT_COOLDOWN_SLACK_MILLISECONDS 1000
 
 enum
 {
@@ -3312,6 +3341,117 @@ void distributed_client_send_identity(
 		_distributed_to_host_reliably);
 }
 
+/* (the host) a player's chat message, named as the host has them: on its own
+players' HUD, and to every client, or (team_only, in a game with teams) to
+those with a player of the team */
+static void distributed_chat_pass_on(
+	long player_index,
+	boolean team_only,
+	char const *text)
+{
+	struct
+	{
+		struct distributed_message_header header;
+		struct distributed_chat chat;
+		char text[CHAT_MAXIMUM_TEXT_SIZE];
+	} message;
+	struct player_datum *player = player_index != NONE ? player_try_and_get(player_index) : NULL;
+	long length;
+	word size;
+
+	if (!player)
+		return;
+	if (!game_engine_has_teams())
+		team_only = FALSE;
+	length = csstrlen(text);
+	if (length > CHAT_MAXIMUM_TEXT_SIZE - 1)
+		length = CHAT_MAXIMUM_TEXT_SIZE - 1;
+	csmemset(&message, 0, sizeof(message));
+	csmemcpy(message.chat.name, player->name, sizeof(message.chat.name));
+	message.chat.team_index = (byte)player->team_index;
+	message.chat.team_only = team_only;
+	csmemcpy(message.text, text, length);
+	size = (word)(sizeof(message.header) + sizeof(message.chat) + length + 1);
+
+	chat_show(message.chat.name, message.chat.team_index, team_only, message.text);
+	if (!team_only)
+	{
+		distributed_send(&message, _distributed_message_chat, 0, size, _distributed_to_clients_reliably);
+	}
+	else
+	{
+		long machine_indices[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+		short machine_count = distributed_client_machines(machine_indices, HALO_PORT_MAXIMUM_NETWORK_MACHINES);
+		short index;
+
+		for (index = 0; index < machine_count; index++)
+		{
+			long *player_list = machine_get_player_list(machine_indices[index]);
+			short local_player_index;
+
+			for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+			{
+				struct player_datum *teammate = player_list[local_player_index] != NONE ?
+					player_try_and_get(player_list[local_player_index]) : NULL;
+
+				if (teammate && (byte)teammate->team_index == message.chat.team_index)
+				{
+					distributed_send_to_machine_reliably(machine_indices[index], &message,
+						_distributed_message_chat, 0, size);
+					break;
+				}
+			}
+		}
+	}
+}
+
+/* (the host) whether a client machine may say something now: one message
+in CHAT_COOLDOWN_MILLISECONDS (less the slack for the network) */
+static boolean distributed_chat_allowed(
+	long machine_index)
+{
+	static unsigned long sent_times[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+	unsigned long now = system_milliseconds();
+
+	if (sent_times[machine_index] &&
+		now - sent_times[machine_index] < CHAT_COOLDOWN_MILLISECONDS - CHAT_COOLDOWN_SLACK_MILLISECONDS)
+	{
+		return FALSE;
+	}
+	sent_times[machine_index] = now ? now : 1;
+	return TRUE;
+}
+
+void distributed_chat_send(
+	short local_player_index,
+	boolean team_only,
+	char const *text)
+{
+	if (game_connection() == _game_connection_network_server)
+	{
+		distributed_chat_pass_on(local_player_get_player_index(local_player_index), team_only, text);
+	}
+	else if (game_connection() == _game_connection_network_client)
+	{
+		struct
+		{
+			struct distributed_message_header header;
+			struct distributed_chat_request request;
+			char text[CHAT_MAXIMUM_TEXT_SIZE];
+		} message;
+		long length = csstrlen(text);
+
+		if (length > CHAT_MAXIMUM_TEXT_SIZE - 1)
+			length = CHAT_MAXIMUM_TEXT_SIZE - 1;
+		csmemset(&message, 0, sizeof(message));
+		message.request.local_player_index = (byte)local_player_index;
+		message.request.team_only = team_only;
+		csmemcpy(message.text, text, length);
+		distributed_send(&message, _distributed_message_chat_request, 0,
+			(word)(sizeof(message.header) + sizeof(message.request) + length + 1), _distributed_to_host_reliably);
+	}
+}
+
 /* (the host) a client machine's address as text: its real one, for an
 internet play peer's stand-in (p2p.c) */
 static void distributed_address_text(
@@ -3658,6 +3798,8 @@ void network_distributed_handle_message(
 	case _distributed_message_game_state:
 	case _distributed_message_objects_synchronized:
 	case _distributed_message_notice:
+	case _distributed_message_chat_request:
+	case _distributed_message_chat:
 	case _distributed_message_client_ready: entry_size = 0; break;
 	case _distributed_message_client_identity: entry_size = sizeof(struct distributed_client_identity); break;
 	case _distributed_message_damage_events:
@@ -3680,6 +3822,7 @@ void network_distributed_handle_message(
 	case _distributed_message_hit_reports:
 	case _distributed_message_vehicle_prediction:
 	case _distributed_message_player_inputs:
+	case _distributed_message_chat_request:
 		if (machine_index == NONE || game_connection() != _game_connection_network_server)
 			return;
 		break;
@@ -3794,6 +3937,51 @@ void network_distributed_handle_message(
 		error(_error_log, "the host: %s", text);
 		break;
 	}
+	case _distributed_message_chat_request:
+		/* a client's player's chat message: named by the host from the
+		machine's own players, whatever it sent, and passed on */
+		if (machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES &&
+			size >= sizeof(header) + sizeof(struct distributed_chat_request))
+		{
+			struct distributed_chat_request request;
+			char text[CHAT_MAXIMUM_TEXT_SIZE];
+			long length = size - sizeof(header) - sizeof(request);
+			long *player_list = machine_get_player_list(machine_index);
+
+			csmemcpy(&request, entries, sizeof(request));
+			if (length > CHAT_MAXIMUM_TEXT_SIZE - 1)
+				length = CHAT_MAXIMUM_TEXT_SIZE - 1;
+			csmemcpy(text, (byte const *)entries + sizeof(request), length);
+			text[length] = 0;
+			chat_text_clean(text, text, sizeof(text));
+			/* (and none with a link in it: chat_text_has_link) */
+			if (text[0] && !chat_text_has_link(text) && request.local_player_index < MAXIMUM_LOCAL_PLAYERS &&
+				player_list[request.local_player_index] != NONE &&
+				distributed_chat_allowed(machine_index))
+			{
+				distributed_chat_pass_on(player_list[request.local_player_index], request.team_only != 0, text);
+			}
+		}
+		break;
+	case _distributed_message_chat:
+		/* the host's: who said it and what, shown to this machine's players
+		it is for */
+		if (size >= sizeof(header) + sizeof(struct distributed_chat))
+		{
+			struct distributed_chat chat;
+			char text[CHAT_MAXIMUM_TEXT_SIZE];
+			long length = size - sizeof(header) - sizeof(chat);
+
+			csmemcpy(&chat, entries, sizeof(chat));
+			if (length > CHAT_MAXIMUM_TEXT_SIZE - 1)
+				length = CHAT_MAXIMUM_TEXT_SIZE - 1;
+			csmemcpy(text, (byte const *)entries + sizeof(chat), length);
+			text[length] = 0;
+			chat_text_clean(text, text, sizeof(text));
+			if (text[0])
+				chat_show(chat.name, chat.team_index, chat.team_only != 0, text);
+		}
+		break;
 	case _distributed_message_client_ready:
 	{
 		boolean loaded = distributed_machine_loaded(machine_index);

@@ -656,6 +656,7 @@ typedef char screenshot_and_framerate_globals_size_assert[
 	sizeof(struct _screenshot_and_framerate_globals) == 0x38B ? 1 : -1];
 
 void network_test_update(boolean main_menu_loaded, real seconds);
+boolean chat_update(void);
 
 /* ---------- prototypes */
 
@@ -3239,6 +3240,9 @@ void main_loop(
 			if (game_in_progress())
 			{
 				terminal_update();
+				/* after the line's keys are read, so that the key that opens
+				chat is not typed into it */
+				chat_update();
 
 				if (!console_update() || main_globals.connection!=_game_connection_local)
 				{

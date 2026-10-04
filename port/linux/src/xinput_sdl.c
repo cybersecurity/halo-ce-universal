@@ -54,6 +54,9 @@ drive the controller.
 
 /* main/console.c */
 extern unsigned char console_is_active(void);
+/* port/linux/game/chat.c */
+extern unsigned char chat_is_active(void);
+extern unsigned char chat_key_passes(int virtual_key);
 
 /* ---------- device tables */
 
@@ -298,16 +301,18 @@ static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GA
 
 /* the keys held when the game and the menus switch count as up until let go
 of: the escape that opens the pause menu does not also back out of it, nor
-the one that closes it pause the game again */
+the one that closes it pause the game again (and the same as chat opens and
+closes: the escape or enter that closes it does not play) */
 static void keys_held_over_switch(struct platform_input_state *input)
 {
 	static unsigned char held[SDL_SCANCODE_COUNT];
-	static int menus = -1;
+	static int mode = -1;
 	int scancode;
+	int current_mode = (input->menus != FALSE) | (chat_is_active() ? 2 : 0);
 
-	if (menus != (input->menus != FALSE))
+	if (mode != current_mode)
 	{
-		menus = input->menus != FALSE;
+		mode = current_mode;
 		memcpy(held, input->keys, sizeof(held));
 	}
 	for (scancode = 0; scancode < SDL_SCANCODE_COUNT; scancode++)
@@ -806,7 +811,7 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		wheel_update();
 		keyboard_actions_held = 0;
 		keys_held_over_switch(&input);
-		if (!console_is_active())
+		if (!console_is_active() && !chat_is_active())
 		{
 			if (input.menus)
 				keyboard_gamepad(&input, &state->Gamepad);
@@ -877,8 +882,9 @@ DWORD WINAPI XInputDebugGetKeystroke(PXINPUT_DEBUG_KEYSTROKE keystroke)
 
 		/* key ups always pass, so no key is left latched down; while typing,
 		escape does not (it cancels, as B: the game's own escape leaves the
-		menus, main.c) */
+		menus, main.c); chat's keys, and every key while it is open */
 		if (key_up || next.virtual_key == VK_OEM_3_BACKQUOTE || console_is_active() ||
+			chat_key_passes(next.virtual_key) ||
 			(text_typing && next.virtual_key != 0x1B /* escape */))
 		{
 			keystroke->VirtualKey = next.virtual_key;

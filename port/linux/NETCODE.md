@@ -93,7 +93,14 @@ is dead; version 8 is the first whose clients play by the host's rules
 (below), so a build without them joins no host of it; version 9 tells
 every machine of a player the host dropped for cheating, each client
 tells the host its Discord user, and a machine's join request carries its
-hardware id; version 10 sends every player's ping for the scoreboard.
+hardware id; version 10 sends every player's ping for the scoreboard;
+version 12 adds text chat (`port/linux/game/chat.c`): a client sends its
+player's message to the host, which names who said it from its own players,
+takes no more than one in ten seconds from a machine (with a second's slack
+for the network) and none with a link in it (`chat_text_has_link`:
+addresses, web sites' names and IP addresses, their dots written as "(.)",
+"[dot]" and the like too), and passes it on to every client, or to those
+with a player of the team for team chat.
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
