@@ -17,7 +17,8 @@ runs on SDL's audio thread; for every voice it resamples to the output rate
 	  direction in listener space, and the low frequency part of the I3DL2
 	  direct path, obstruction and occlusion levels.
 Doppler, the high frequency filters, cones and I3DL2 reverb are not
-modelled.
+modelled. A look-ahead limiter keeps the sum of the voices under full scale
+(limit).
 
 Packets the mixer has finished are completed from DirectSoundDoWork, which
 the game calls every frame, and from Flush, never from the audio thread:
@@ -400,29 +401,97 @@ static void mix_voice(struct sdl_stream *stream, float *output, unsigned long fr
 	stream->current_right = target_right;
 }
 
+/* ---------- limiter
+
+The game sets its mix bins' headroom to 0 (sound_dsound_xbox.c), so the voices
+sum at their full level, as on the Xbox, and a pile of loud ones goes over
+full scale. Clipping each sample, or bending it near full scale, distorts the
+sound: dialogue over gunfire crackled. Instead the whole mix is turned down
+for as long as it would go over, both channels alike. The output is delayed
+LIMITER_LOOKAHEAD - 1 frames (1.3 ms), so that the gain comes down smoothly
+before each peak: the smallest gain the frames ahead need, averaged over the
+last LIMITER_LOOKAHEAD frames, is never more than a peak needs when it plays.
+The gain comes back up over LIMITER_RELEASE_SECONDS. */
+
+#define LIMITER_CEILING 0.891f /* -1 dBFS */
+#define LIMITER_LOOKAHEAD 64
+#define LIMITER_RELEASE_SECONDS 0.1f
+
+static struct
+{
+	/* the frames the output is delayed by, and the gain each needs */
+	float delay[LIMITER_LOOKAHEAD][OUTPUT_CHANNELS];
+	float needed[LIMITER_LOOKAHEAD];
+	/* the gain held down to what the frames ahead need, coming back up */
+	float held;
+	/* its last LIMITER_LOOKAHEAD values, and their sum */
+	float history[LIMITER_LOOKAHEAD];
+	double history_sum;
+	unsigned long position;
+	BOOL initialized;
+} limiter;
+
+static void limit(float *output, unsigned long frames)
+{
+	float release = 1.0f - expf(-1.0f / (LIMITER_RELEASE_SECONDS * OUTPUT_RATE));
+	unsigned long frame, index, channel;
+
+	if (!limiter.initialized)
+	{
+		for (index = 0; index < LIMITER_LOOKAHEAD; index++)
+		{
+			limiter.needed[index] = 1.0f;
+			limiter.history[index] = 1.0f;
+		}
+		limiter.held = 1.0f;
+		limiter.history_sum = LIMITER_LOOKAHEAD;
+		limiter.initialized = TRUE;
+	}
+	for (frame = 0; frame < frames; frame++)
+	{
+		float *sample = output + frame * OUTPUT_CHANNELS;
+		unsigned long position = limiter.position;
+		unsigned long oldest = (position + 1) % LIMITER_LOOKAHEAD;
+		float peak = 0.0f, lowest, gain;
+
+		/* the new frame takes the slot of the oldest, which has played */
+		for (channel = 0; channel < OUTPUT_CHANNELS; channel++)
+		{
+			if (fabsf(sample[channel]) > peak)
+				peak = fabsf(sample[channel]);
+			limiter.delay[position][channel] = sample[channel];
+		}
+		limiter.needed[position] = peak > LIMITER_CEILING ? LIMITER_CEILING / peak : 1.0f;
+		lowest = limiter.needed[0];
+		for (index = 1; index < LIMITER_LOOKAHEAD; index++)
+		{
+			if (limiter.needed[index] < lowest)
+				lowest = limiter.needed[index];
+		}
+		if (lowest < limiter.held)
+			limiter.held = lowest;
+		else
+			limiter.held += (lowest - limiter.held) * release;
+		limiter.history_sum += limiter.held - limiter.history[position];
+		limiter.history[position] = limiter.held;
+		gain = (float)(limiter.history_sum / LIMITER_LOOKAHEAD);
+		/* the frame LIMITER_LOOKAHEAD - 1 frames old plays */
+		for (channel = 0; channel < OUTPUT_CHANNELS; channel++)
+			sample[channel] = limiter.delay[oldest][channel] * gain;
+		limiter.position = oldest;
+	}
+}
+
 static void mix(float *output, unsigned long frames)
 {
 	struct sdl_stream *stream;
-	unsigned long sample;
 
 	memset(output, 0, frames * OUTPUT_CHANNELS * sizeof(float));
 	pthread_mutex_lock(&mixer_lock);
 	for (stream = streams; stream; stream = stream->next)
 		mix_voice(stream, output, frames);
 	pthread_mutex_unlock(&mixer_lock);
-	/* soft limit rather than wrap or hard clip when many voices pile up */
-	for (sample = 0; sample < frames * OUTPUT_CHANNELS; sample++)
-	{
-		float value = output[sample];
-
-		if (value > 0.8f || value < -0.8f)
-		{
-			float sign = value < 0.0f ? -1.0f : 1.0f;
-			float excess = fabsf(value) - 0.8f;
-
-			output[sample] = sign * (0.8f + 0.2f * tanhf(excess / 0.2f));
-		}
-	}
+	limit(output, frames);
 }
 
 /* ---------- output */
