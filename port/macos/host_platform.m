@@ -10,6 +10,35 @@ void *host_macos_game_window(void) {return (__bridge void *)gameWindow;}
 void host_ios_touch_attach(SDL_Window *window) {
  gameWindow=(__bridge NSWindow *)SDL_GetPointerProperty(SDL_GetWindowProperties(window),SDL_PROP_WINDOW_COCOA_WINDOW_POINTER,NULL);
  [gameWindow makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];halo_debug_install_menu();
+ const char *quitTest=getenv("HALO_MAC_TEST_QUIT");
+ if(quitTest) {
+  NSString *mode=[NSString stringWithUTF8String:quitTest];
+  NSTimer *timer=[NSTimer timerWithTimeInterval:8 repeats:NO block:^(NSTimer *timer){
+   (void)timer;
+   halo_debug_test_export();
+   NSMenu *appMenu=NSApp.mainMenu.itemArray.firstObject.submenu;
+   host_logf(HOST_LOG_INFO,"Mac application test: %s, menu items %ld",NSStringFromClass(NSApp.class).UTF8String,(long)appMenu.numberOfItems);
+   if([mode isEqualToString:@"menu"]) {
+    BOOL settingsFound=NO;
+    for(NSMenuItem *item in appMenu.itemArray)if([item.keyEquivalent isEqualToString:@","]) {
+     [NSApp sendAction:item.action to:item.target from:item];
+     for(NSWindow *window in NSApp.windows)if([window.title isEqualToString:@"Settings"] && window.isVisible)settingsFound=YES;
+     break;
+    }
+    if(!settingsFound)host_fatal("Mac application test: Settings menu did not open its window");
+    host_logf(HOST_LOG_INFO,"Mac application test: Settings menu opens separate window");
+    for(NSMenuItem *item in appMenu.itemArray)if(item.action==@selector(terminate:)) {
+     host_logf(HOST_LOG_INFO,"Mac application test: Quit menu command (%s)",item.keyEquivalent.UTF8String);
+     [NSApp sendAction:item.action to:item.target from:item];return;
+    }
+    host_logf(HOST_LOG_ERROR,"Mac application test: no Quit menu item");
+   } else {
+    host_logf(HOST_LOG_INFO,"Mac application test: Dock terminate: path");
+    [NSApp terminate:nil];
+   }
+  }];
+  [NSRunLoop.mainRunLoop addTimer:timer forMode:NSDefaultRunLoopMode];
+ }
 }
 void host_ios_touch_reset(void) {}
 void host_ios_touch_focus(void) {}

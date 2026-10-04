@@ -61,7 +61,7 @@ void halo_debug_attach(uint32_t program,uint32_t shader) {
     if(!list){list=[NSMutableArray new];attachments[@(program)]=list;}
     NSString *key=shaderKeys[@(shader)];if(key && ![list containsObject:key])[list addObject:key];
 }
-double halo_debug_begin(void) {return atomic_load(&recording)?CACurrentMediaTime():0;}
+double halo_debug_begin(void) {return CACurrentMediaTime();}
 void halo_debug_end(uint32_t object,int program,double started) {
     if(!started)return;
     GLint ok=0;
@@ -103,9 +103,12 @@ static void exportReport(id presenter) {
 static void exportReport(UIViewController *presenter) {
 #endif
     prepare();struct utsname device;uname(&device);
-    NSDictionary *report=@{@"schema":@1,@"renderer":halo_graphics_metal()?@"Metal (ANGLE)":@"OpenGL ES (Apple)",@"gpu":glRenderer?:@"unknown",@"revision":@HALO_BUILD_REVISION,@"metalfx":@(halo_metalfx_enabled()!=0),@"device":[NSString stringWithUTF8String:device.machine],@"os":NSProcessInfo.processInfo.operatingSystemVersionString,
+    NSMutableDictionary *programs=[NSMutableDictionary new];
+    for(NSNumber *name in attachments)programs[name.stringValue]=[attachments[name] copy];
+    NSDictionary *report=@{@"schema":@2,@"renderer":halo_graphics_metal()?@"Metal (ANGLE)":@"OpenGL ES (Apple)",@"gpu":glRenderer?:@"unknown",@"revision":@HALO_BUILD_REVISION,@"metalfx":@(halo_metalfx_enabled()!=0),@"device":[NSString stringWithUTF8String:device.machine],@"os":NSProcessInfo.processInfo.operatingSystemVersionString,
         @"build":[NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleVersion"]?:@"unknown",@"threshold_ms":@2,
-        @"note":@"CPU compile/link completion timings and synchronized first-use draw waits. First-use waits include draw cost and may include deferred driver compilation; they are not isolated shader-compiler timings. Shader sources can guide warm-up updates.",
+        @"note":@"CPU compile/link completion timings are always recorded. Synchronized first-use draw waits are opt-in. First-use waits include draw cost and may include deferred driver compilation; they are not isolated shader-compiler timings. Shader sources can guide warm-up updates.",
+        @"first_use_gpu_recording":@(atomic_load(&recording)),@"programs":programs,
         @"dropped":@(dropped),@"events":[events copy],@"sources":[sources copy]};
     NSError *error=nil;NSData *data=[NSJSONSerialization dataWithJSONObject:report options:NSJSONWritingPrettyPrinted error:&error];
     NSURL *folder=[[NSFileManager.defaultManager URLsForDirectory:NSCachesDirectory inDomains:NSUserDomainMask].firstObject URLByAppendingPathComponent:@"ShaderReports" isDirectory:YES];
@@ -116,6 +119,11 @@ static void exportReport(UIViewController *presenter) {
     NSURL *file=[folder URLByAppendingPathComponent:[NSString stringWithFormat:@"halo-shaders-%.0f.json",NSDate.date.timeIntervalSince1970]];
 #if HALO_MACOS
     (void)presenter;
+    NSString *testExport=NSProcessInfo.processInfo.environment[@"HALO_MAC_TEST_SHADER_EXPORT"];
+    if(testExport.length) {
+        if(!data || ![data writeToFile:testExport options:NSDataWritingAtomic error:&error])host_fatal("Shader report export failed: %s",error.localizedDescription.UTF8String);
+        return;
+    }
     if(!data || ![data writeToURL:file options:NSDataWritingAtomic error:&error]){NSAlert *alert=[NSAlert new];alert.messageText=@"Export failed";alert.informativeText=error.localizedDescription;[alert runModal];return;}
     NSSharingService *share=[NSSharingService sharingServiceNamed:NSSharingServiceNameSendViaAirDrop];
     [share performWithItems:@[file]];
@@ -159,7 +167,7 @@ static void exportReport(UIViewController *presenter) {
         NSInteger action=path.row-(selectedMetal?2:1);
         if(action==0) {
             UISwitch *toggle=[UISwitch new];toggle.tag=1;toggle.on=atomic_load(&recording);
-            cell.textLabel.text=@"Record shader stalls";cell.detailTextLabel.text=@"Capture compile/link and first-use waits ≥ 2 ms. Adds GPU synchronization overhead.";
+            cell.textLabel.text=@"Record first-use GPU stalls";cell.detailTextLabel.text=@"Compile/link stalls are always recorded. This also times first draws and adds GPU synchronization overhead.";
             [toggle addTarget:self action:@selector(changed:) forControlEvents:UIControlEventValueChanged];cell.accessoryView=toggle;
         } else if(action==1){cell.textLabel.text=@"Share shader report…";cell.detailTextLabel.text=@"Choose AirDrop in the share sheet to send it to your Mac.";}
         else{cell.textLabel.text=@"Clear recorded events";cell.detailTextLabel.text=[NSString stringWithFormat:@"%lu events; %lu dropped",(unsigned long)events.count,(unsigned long)dropped];}
@@ -218,9 +226,9 @@ void halo_debug_present(void) {
         [stack addArrangedSubview:[NSTextField labelWithString:@"Renderer: Metal (ANGLE)"]];
         self.upscaleButton=[NSButton checkboxWithTitle:@"MetalFX spatial upscaling" target:self action:@selector(upscale:)];
         [stack addArrangedSubview:self.upscaleButton];
-        self.recordButton=[NSButton checkboxWithTitle:@"Record shader stalls" target:self action:@selector(record:)];
+        self.recordButton=[NSButton checkboxWithTitle:@"Record first-use GPU stalls" target:self action:@selector(record:)];
         [stack addArrangedSubview:self.recordButton];
-        NSTextField *note=[NSTextField wrappingLabelWithString:@"Shader recording adds GPU synchronization overhead. Disable it for normal play."];
+        NSTextField *note=[NSTextField wrappingLabelWithString:@"Compile/link stalls are recorded automatically. First-use GPU recording adds synchronization overhead; disable it for normal play."];
         [stack addArrangedSubview:note];[note.widthAnchor constraintEqualToAnchor:stack.widthAnchor].active=YES;
         [stack addArrangedSubview:[NSButton buttonWithTitle:@"AirDrop shader report…" target:self action:@selector(share:)]];
         [stack addArrangedSubview:[NSButton buttonWithTitle:@"Clear recorded events" target:self action:@selector(clear:)]];
@@ -255,8 +263,50 @@ void halo_debug_install_menu(void) {
     if(actions)return;prepare();actions=[HaloDebugActions new];
     NSMenu *menu=NSApp.mainMenu.itemArray.firstObject.submenu;
     if(!menu)return;
-    NSMenuItem *item=[[NSMenuItem alloc]initWithTitle:@"Settings…" action:@selector(openSettings:) keyEquivalent:@","];
-    item.target=actions;[menu insertItem:item atIndex:MIN(2,menu.numberOfItems)];
+    /* Reuse SDL's standard Preferences placeholder. AppKit reserves Cmd+,
+       for that item and strips it from duplicate Settings entries. */
+    NSMenuItem *item=nil;
+    for(NSMenuItem *candidate in menu.itemArray)if([candidate.keyEquivalent isEqualToString:@","]){item=candidate;break;}
+    if(!item){item=[[NSMenuItem alloc]initWithTitle:@"Settings…" action:NULL keyEquivalent:@","];[menu insertItem:item atIndex:MIN(2,menu.numberOfItems)];}
+    item.title=@"Settings…";item.action=@selector(openSettings:);item.target=actions;
 }
 void halo_debug_present(void) {halo_debug_install_menu();[actions openSettings:nil];}
 #endif
+
+/* Developer regression: compile every source in a received report using the
+   actual bundled driver. No game state, textures or buffers are changed. */
+void halo_debug_replay_shader_report(void) {
+#if HALO_MACOS
+    NSString *path=NSProcessInfo.processInfo.environment[@"HALO_MAC_TEST_SHADER_REPORT"];
+    if(!path.length)return;
+    NSData *data=[NSData dataWithContentsOfFile:path];
+    NSDictionary *report=data?[NSJSONSerialization JSONObjectWithData:data options:0 error:nil]:nil;
+    NSDictionary *entries=[report isKindOfClass:NSDictionary.class]?report[@"sources"]:nil;
+    if(![entries isKindOfClass:NSDictionary.class] || entries.count>4096)host_fatal("Invalid shader replay report");
+    __typeof__(&glCreateShader) create=halo_graphics_proc("glCreateShader");
+    __typeof__(&glShaderSource) source=halo_graphics_proc("glShaderSource");
+    __typeof__(&glCompileShader) compile=halo_graphics_proc("glCompileShader");
+    __typeof__(&glDeleteShader) destroy=halo_graphics_proc("glDeleteShader");
+    __typeof__(&glGetShaderInfoLog) getLog=halo_graphics_proc("glGetShaderInfoLog");
+    unsigned passed=0,failed=0;
+    for(NSString *key in entries) {
+        NSDictionary *entry=entries[key];
+        if(![entry isKindOfClass:NSDictionary.class])host_fatal("Invalid shader replay entry");
+        NSString *text=entry[@"source"],*kind=entry[@"type"];
+        if(![text isKindOfClass:NSString.class] || text.length>1024*1024 ||
+            (![kind isEqualToString:@"vertex"] && ![kind isEqualToString:@"fragment"]))host_fatal("Invalid shader replay entry");
+        GLuint shader=create([kind isEqualToString:@"vertex"]?GL_VERTEX_SHADER:GL_FRAGMENT_SHADER);
+        const char *utf8=text.UTF8String;source(shader,1,&utf8,NULL);compile(shader);
+        GLint ok=0;glGetShaderiv(shader,GL_COMPILE_STATUS,&ok);
+        if(ok)passed++;else {char log[4096];getLog(shader,sizeof(log),NULL,log);host_logf(HOST_LOG_ERROR,"Shader replay %s failed: %s",key.UTF8String,log);failed++;}
+        destroy(shader);
+    }
+    host_logf(HOST_LOG_INFO,"Shader replay: %u compiled, %u failed",passed,failed);
+#endif
+}
+
+void halo_debug_test_export(void) {
+#if HALO_MACOS
+    if(NSProcessInfo.processInfo.environment[@"HALO_MAC_TEST_SHADER_EXPORT"].length)exportReport(nil);
+#endif
+}

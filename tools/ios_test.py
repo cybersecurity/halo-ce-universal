@@ -45,3 +45,10 @@ run('xcrun', 'clang', '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror',
     'port/ios/network/room_bridge.c', 'port/web/src/web_net.c',
     'port/ios/tests/room_bridge_probe.c', '-o', BUILD/'room-bridge')
 run(BUILD/'room-bridge')
+
+# Private compiled-shader cache: bounds, cross-launch reload and concurrency.
+run('xcrun', 'clang', '-fobjc-arc', '-Wno-incompatible-pointer-types',
+    '-Ibuild/ios/gl_include', '-Iport/ios/host', '-Iport/runtime/include',
+    '-framework', 'Foundation', '-framework', 'Metal',
+    'port/ios/tests/shader_cache_probe.m', '-o', BUILD/'shader-cache-probe')
+run(BUILD/'shader-cache-probe')

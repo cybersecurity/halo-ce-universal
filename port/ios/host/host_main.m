@@ -49,8 +49,10 @@ int main(int argc,char **argv) {
     (void)argc;(void)argv;
     @autoreleasepool {
 #if HALO_MACOS
-        [NSApplication sharedApplication];
-        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+        /* SDL must create NSApplication itself. Pre-creating the base AppKit
+           class skips SDL's standard menus and its terminate: -> SDL_QUIT
+           bridge, leaving Dock Quit disconnected from the guest event loop. */
+        if(!SDL_Init(SDL_INIT_VIDEO))host_fatal("SDL video initialization: %s",SDL_GetError());
         NSString *documents=[NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory,NSUserDomainMask,YES).firstObject stringByAppendingPathComponent:NSBundle.mainBundle.bundleIdentifier];
         NSString *override=NSProcessInfo.processInfo.environment[@"HALO_MAC_TEST_DATA_ROOT"];
         if(override.length)documents=override;

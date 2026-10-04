@@ -17,3 +17,6 @@ void halo_metalfx_set_enabled(int enabled);
 int halo_metalfx_supported(void);
 int host_ios_metalfx_present(unsigned int texture,unsigned int width,unsigned int height,unsigned int output_width,unsigned int output_height);
 unsigned int host_ios_render_height(void);
+
+void halo_debug_replay_shader_report(void);
+void halo_debug_test_export(void);

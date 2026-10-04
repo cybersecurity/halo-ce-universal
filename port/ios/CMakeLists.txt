@@ -17,7 +17,7 @@ set(HALO_INFO_PLIST Info.plist)
 set(HALO_DEVICE_FAMILY "1,2")
 add_executable(HaloCE MACOSX_BUNDLE
     ${HALO_PLATFORM_SOURCES} "${ROOT}/port/runtime/xiso.c" "${ROOT}/port/apple/game_store.m"
-    host/host_main.m host/host_memory.c host/host_loader.c host/host_syscall.c host/host_gl.c host/host_debug.m host/host_metalfx.m host/host_graphics.m host/guest_call.S
+    host/host_main.m host/host_memory.c host/host_loader.c host/host_syscall.c host/host_gl.c host/host_debug.m host/host_metalfx.m host/host_graphics.m host/host_shader_cache.m host/guest_call.S
     host/host_thread.c host/host_sdl.c network/host_room.m network/room_bridge.c
     "${ROOT}/port/web/src/web_net.c"
     "${ROOT}/port/linux/src/posix_files.c" host/posix_net.c

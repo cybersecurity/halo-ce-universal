@@ -218,3 +218,30 @@ cases above are still unverified. Keep the PR in draft until those checks pass.
   Gatekeeper accepted it as Notarized Developer ID. Packaged the stapled app
   as `HaloCE-0.1.4-AppleSilicon.zip` and successfully sent it to the user's
   MacBook through Taildrop. No DMG is required for this local test release.
+
+## First-mission feedback / 0.1.5 (9)
+
+- User completed the first mission on Mac and reported compilation hitches,
+  two transparent surfaces (floor panel and escape-pod front), escape-pod
+  jitter in the ending cinematic, and nonfunctional Dock Quit.
+- The received report identified build 7 / `55bbbf7e`, ANGLE Metal on M4 Max,
+  158 sources, zero timing events and zero dropped events. Replaying all 158
+  shader sources with the bundled ANGLE driver on M6 compiled successfully.
+  This does not rule out link, texture, material, draw-state or geometry bugs
+  on the reported M4 Max. The two visual bugs are still unresolved; no
+  speculative rendering or animation patch has been applied.
+- Fixed AppKit creation order: initializing SDL video first installs
+  SDL3Application and its standard app menu. Before this, pre-creating
+  NSApplication skipped both menu setup and the terminate-to-quit bridge.
+  Reuses SDL’s Settings placeholder to avoid AppKit stealing Cmd+, from a
+  duplicate menu item. Real application-menu Quit and the Dock termination selector both produce
+  a guest quit event and exit 0. Settings is tested through the actual menu.
+- Added a bounded, GPU/OS/driver-scoped persistent ANGLE blob cache. A fresh
+  launch loaded a compiled blob from disk. Callback tests cover disk reload,
+  small/negative output buffer sizes, concurrent writes and 64 MiB eviction.
+  First-use Metal pipeline specialization can still hitch; no frame-time
+  performance claim is made from cache hits alone.
+- Schema 2 shader reports record compile/link stalls even with optional GPU
+  recording off, and include program/source associations. A real menu run
+  exported a valid report with 11 programs / 13 sources, all references
+  resolved, and a timing event while first-use GPU recording was false.

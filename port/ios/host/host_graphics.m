@@ -17,6 +17,8 @@
 #include <dlfcn.h>
 #include <string.h>
 #include "host_graphics.h"
+#include "host_shader_cache.h"
+#include "host_debug.h"
 #include "ios_host.h"
 
 static BOOL metal;
@@ -80,6 +82,7 @@ void *halo_graphics_create(SDL_Window *window) {
     EGLint attributes[]={EGL_PLATFORM_ANGLE_TYPE_ANGLE,EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE,EGL_NONE};
     display=getDisplay?getDisplay(EGL_PLATFORM_ANGLE_ANGLE,EGL_DEFAULT_DISPLAY,attributes):EGL_NO_DISPLAY;
     if(!display || !eglInitialize(display,NULL,NULL))host_fatal("Could not initialize ANGLE Metal: EGL %x",eglGetError());
+    halo_shader_cache_install(display,eglGetProcAddress);
     EGLint configAttributes[]={EGL_SURFACE_TYPE,EGL_WINDOW_BIT|EGL_PBUFFER_BIT,EGL_RENDERABLE_TYPE,EGL_OPENGL_ES3_BIT,EGL_RED_SIZE,8,EGL_GREEN_SIZE,8,EGL_BLUE_SIZE,8,EGL_ALPHA_SIZE,8,EGL_DEPTH_SIZE,0,EGL_STENCIL_SIZE,0,EGL_NONE};
     EGLint count=0;
     if(!eglChooseConfig(display,configAttributes,&config,1,&count) || !count)host_fatal("ANGLE Metal has no ES3 configuration");
@@ -91,6 +94,7 @@ void *halo_graphics_create(SDL_Window *window) {
     if(!context || !windowSurface || !halo_graphics_make_current())host_fatal("Could not create ANGLE Metal context: EGL %x",eglGetError());
     const GLubyte *(*getString)(GLenum)=halo_graphics_proc("glGetString");
     host_logf(HOST_LOG_INFO,"GPU: %s; %s",getString(GL_RENDERER),getString(GL_VERSION));
+    halo_debug_replay_shader_report();
     return context;
 }
 int halo_graphics_make_current(void) {return eglMakeCurrent(display,windowSurface,windowSurface,context);}
