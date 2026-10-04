@@ -213,3 +213,8 @@ cases above are still unverified. Keep the PR in draft until those checks pass.
   with 199 resolved imports, Metal rendering, active PCM output and touch
   controls. Existing saves were preserved. No controller was connected during
   this smoke test; the earlier iPhone 13 Pro controller evidence is unchanged.
+- The Mac app from `37ccd843` was accepted by Apple (submission
+  `a0576c71-190f-47fd-9982-698422a89e1a`). Its ticket was stapled and validated;
+  Gatekeeper accepted it as Notarized Developer ID. Packaged the stapled app
+  as `HaloCE-0.1.4-AppleSilicon.zip` and successfully sent it to the user's
+  MacBook through Taildrop. No DMG is required for this local test release.
