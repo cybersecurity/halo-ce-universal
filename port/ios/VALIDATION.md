@@ -264,3 +264,9 @@ cases above are still unverified. Keep the PR in draft until those checks pass.
   lookup on the built, correctly named bundle returns `Halo`; localized
   CFBundleName remains `Halo: Combat Evolved`. iOS CFBundleDisplayName is
   `Halo`. Bundle identifiers and the private data locations are unchanged.
+- Installed and launched on iPhone 15 Pro; CoreDevice lists `Halo`, 0.1.6
+  (10). Mac Settings/Quit smoke checks pass. Apple accepted the app from
+  `2e6febc6` (submission `1c361f6d-56c2-4aab-8dce-7628b6fc5232`); stapling
+  and Gatekeeper checks pass. After extracting the final ZIP, the raw bundle
+  name, full application name and short localized icon label still match.
+  Sent `Halo-0.1.6-AppleSilicon.zip` to the MacBook using Taildrop.
