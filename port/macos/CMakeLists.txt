@@ -78,3 +78,8 @@ set_source_files_properties("${ROOT}/port/apple/DISTRIBUTION.md" PROPERTIES MACO
 
 target_sources(HaloCE PRIVATE Community.icns)
 set_source_files_properties(Community.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+
+# Finder uses this localized label when the distributed bundle name matches
+# the full, unlocalized CFBundleDisplayName.
+target_sources(HaloCE PRIVATE en.lproj/InfoPlist.strings)
+set_source_files_properties(en.lproj/InfoPlist.strings PROPERTIES MACOSX_PACKAGE_LOCATION Resources)

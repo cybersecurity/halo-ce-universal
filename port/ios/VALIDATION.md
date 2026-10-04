@@ -255,3 +255,12 @@ cases above are still unverified. Keep the PR in draft until those checks pass.
   accepted it as Notarized Developer ID. Sent `HaloCE-0.1.5-AppleSilicon.zip`
   to the user's MacBook via Taildrop. The visual mission bugs above remain
   open pending a reproducible scene/checkpoint or clip.
+
+## Application naming / 0.1.6 (10)
+
+- Distributed Mac bundle: `Halo: Combat Evolved.app`. Menu heading and SDL
+  application metadata use the full title; localized InfoPlist strings give
+  Finder/Dock the short label `Halo`. The native Foundation display-name
+  lookup on the built, correctly named bundle returns `Halo`; localized
+  CFBundleName remains `Halo: Combat Evolved`. iOS CFBundleDisplayName is
+  `Halo`. Bundle identifiers and the private data locations are unchanged.

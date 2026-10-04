@@ -16,7 +16,7 @@ if __name__=='__main__':
  app=ROOT/'build/macos/app/Release/HaloCE.app';validate(app)
  args.output=args.output.resolve();args.output.parent.mkdir(parents=True,exist_ok=True)
  with tempfile.TemporaryDirectory(prefix='halo-dmg-') as temporary:
-  stage=Path(temporary);copy=stage/'Halo CE Community Port.app';run('ditto',app,copy)
+  stage=Path(temporary);copy=stage/'Halo: Combat Evolved.app';run('ditto',app,copy)
   # The ELF guest is embedded in signed Mach-O text, so no JIT entitlement is required.
   for framework in sorted((copy/'Contents/Frameworks').glob('*.framework')):
    run('codesign','--force','--options','runtime','--timestamp','--sign',args.identity,framework)
@@ -24,7 +24,7 @@ if __name__=='__main__':
   run('codesign','--verify','--deep','--strict',copy)
   (stage/'Applications').symlink_to('/Applications',target_is_directory=True)
   run('ditto',ROOT/'port/apple/DISTRIBUTION.md',stage/'Distribution notes.md')
-  run('hdiutil','create','-ov','-format','UDZO','-volname','Halo CE Community Port','-srcfolder',stage,args.output)
+  run('hdiutil','create','-ov','-format','UDZO','-volname','Halo Combat Evolved','-srcfolder',stage,args.output)
  run('codesign','--force','--timestamp','--sign',args.identity,args.output)
  digest=hashlib.sha256(args.output.read_bytes()).hexdigest();args.output.with_suffix('.dmg.sha256').write_text(f'{digest}  {args.output.name}\n')
  print(f'DMG: {args.output}\nSigned; not yet notarized.')

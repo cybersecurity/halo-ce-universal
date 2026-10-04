@@ -1,7 +1,10 @@
 # Native Apple Silicon Mac app
 
 Build with `python3 tools/macos_build.py` on an Apple Silicon Mac with Xcode,
-Homebrew LLVM and LLD. This shares the iOS signed ARM64 ILP32 guest, address
+Homebrew LLVM and LLD. The named output is
+`build/macos/Halo: Combat Evolved.app`. The application menu uses the full
+name, while the localized Finder/Dock icon label is **Halo**, matching iOS.
+This shares the iOS signed ARM64 ILP32 guest, address
 arena and ABI bridges, with an AppKit host, SDL keyboard/mouse/gamepads,
 ANGLE Metal rendering, and the same bundled PR #12 room transport. No touch
 overlay is created on macOS. OpenGL ES remains an iOS fallback; this Mac

@@ -49,6 +49,7 @@ int main(int argc,char **argv) {
     (void)argc;(void)argv;
     @autoreleasepool {
 #if HALO_MACOS
+        SDL_SetAppMetadata("Halo: Combat Evolved",[[NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] UTF8String],"org.haloce.macos");
         /* SDL must create NSApplication itself. Pre-creating the base AppKit
            class skips SDL's standard menus and its terminate: -> SDL_QUIT
            bridge, leaving Dock Quit disconnected from the guest event loop. */

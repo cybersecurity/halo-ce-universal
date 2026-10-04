@@ -1,0 +1,3 @@
+/* Keep the full application title while shortening the Finder/Dock label. */
+CFBundleName = "Halo: Combat Evolved";
+CFBundleDisplayName = "Halo";

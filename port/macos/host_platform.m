@@ -10,6 +10,8 @@ void *host_macos_game_window(void) {return (__bridge void *)gameWindow;}
 void host_ios_touch_attach(SDL_Window *window) {
  gameWindow=(__bridge NSWindow *)SDL_GetPointerProperty(SDL_GetWindowProperties(window),SDL_PROP_WINDOW_COCOA_WINDOW_POINTER,NULL);
  [gameWindow makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];halo_debug_install_menu();
+ NSApp.mainMenu.itemArray.firstObject.title=@"Halo: Combat Evolved";
+ NSApp.mainMenu.itemArray.firstObject.submenu.title=@"Halo: Combat Evolved";
  const char *quitTest=getenv("HALO_MAC_TEST_QUIT");
  if(quitTest) {
   NSString *mode=[NSString stringWithUTF8String:quitTest];
