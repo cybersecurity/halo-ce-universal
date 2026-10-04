@@ -12,6 +12,7 @@ so the audio callback is handed to a thread that has one.
 */
 
 #include "host.h"
+#include "touch_controls.h"
 
 #include <SDL3/SDL.h>
 #include <pthread.h>
@@ -36,6 +37,10 @@ struct handle
 
 static struct handle handles[HANDLE_COUNT];
 static pthread_mutex_t handle_lock = PTHREAD_MUTEX_INITIALIZER;
+
+/* the on-screen controls (touch_controls.c); made with the game's window */
+static TC_Context touch_controls;
+static bool touch_controls_ready;
 
 static uint32_t handle_new(int type, void *object)
 {
@@ -122,7 +127,11 @@ int64_t host_sdl_thread_id(void)
 
 uint32_t host_sdl_create_window(const char *title, int width, int height, int64_t flags)
 {
-	return handle_new(_handle_window, SDL_CreateWindow(title, width, height, (SDL_WindowFlags)flags));
+	SDL_Window *window = SDL_CreateWindow(title, width, height, (SDL_WindowFlags)flags);
+
+	if (window && !touch_controls_ready)
+		touch_controls_ready = TC_Init(&touch_controls, window, &TC_BackendVirtualGamepad, NULL);
+	return handle_new(_handle_window, window);
 }
 
 void host_sdl_window_size_in_pixels(uint32_t window, int *width, int *height)
@@ -168,6 +177,9 @@ int host_sdl_gl_swap_window(uint32_t window)
 {
 	SDL_Window *object = handle_get(window, _handle_window);
 
+	/* the touch controls go over the finished frame */
+	if (touch_controls_ready)
+		TC_Render(&touch_controls);
 	return object ? SDL_GL_SwapWindow(object) : 0;
 }
 
@@ -177,12 +189,39 @@ int host_sdl_poll_event(void *event)
 {
 	SDL_Event host_event;
 
-	if (!SDL_PollEvent(&host_event))
-		return 0;
-	/* the layouts agree except for the pointers of text, drop and user
-	events, which the guest does not read */
-	memcpy(event, &host_event, sizeof(host_event));
-	return 1;
+	while (SDL_PollEvent(&host_event))
+	{
+		/* a finger on the on-screen controls is not the guest's business */
+		if (touch_controls_ready && TC_HandleEvent(&touch_controls, &host_event))
+			continue;
+		/* the layouts agree except for the pointers of text, drop and user
+		events, which the guest does not read */
+		memcpy(event, &host_event, sizeof(host_event));
+		return 1;
+	}
+	if (touch_controls_ready)
+	{
+		float dx, dy;
+
+		/* the queue is empty: the controls' state is up to date before the
+		guest reads its gamepads */
+		TC_Update(&touch_controls);
+		/* the swipe on the right of the screen turns the view the way a
+		mouse does (xinput_sdl.c: direct aim, not a stick's speed); the
+		guest adds the motion of its SDL_EVENT_MOUSE_MOTION events up */
+		if (TC_TakeLookMotion(&touch_controls, &dx, &dy))
+		{
+			SDL_zero(host_event);
+			host_event.type = SDL_EVENT_MOUSE_MOTION;
+			host_event.motion.timestamp = SDL_GetTicksNS();
+			host_event.motion.which = SDL_TOUCH_MOUSEID;
+			host_event.motion.xrel = dx;
+			host_event.motion.yrel = dy;
+			memcpy(event, &host_event, sizeof(host_event));
+			return 1;
+		}
+	}
+	return 0;
 }
 
 /* ---------- gamepads */

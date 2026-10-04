@@ -1,0 +1,49 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build clang lld openjdk-17-jdk unzip wget
+
+    - name: Set up Android SDK & NDK
+      run: |
+        mkdir -p $HOME/Android/Sdk/cmdline-tools
+        cd $HOME/Android/Sdk/cmdline-tools
+        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
+        unzip tools.zip && mv cmdline-tools latest
+        export ANDROID_HOME=$HOME/Android/Sdk
+        echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+        echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+        
+        yes | sdkmanager --licenses
+        sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018"
+
+    - name: Configure and Build APK
+      run: |
+        python3 configure.py --release
+        ninja android_apk
+
+    - name: Upload APK as Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: halo-touch-apk
+        path: port/android/app/build/outputs/apk/debug/app-debug.apk
