@@ -308,8 +308,14 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         # 32-bit address space
         "-Wl,/LARGEADDRESSAWARE",
         "-Wl,/STACK:0x800000",
-        "-Wl,/SUBSYSTEM:CONSOLE",
     ]
+    if getattr(sln, "port_release", False):
+        # no console window (the port's log goes to halo.log instead,
+        # win32_posix.c): under Wine (Proton, gamescope) the console window
+        # can hide the game's window
+        base_ldflags += ["-Wl,/SUBSYSTEM:WINDOWS", "-Wl,/ENTRY:mainCRTStartup"]
+    else:
+        base_ldflags += ["-Wl,/SUBSYSTEM:CONSOLE"]
 
     def emit(obj_dir: Path, output: Path, extra_cflags: List[str], extra_ldflags: List[str],
              extra_objects: List[Path], implicit_inputs: List[Path]) -> None:
