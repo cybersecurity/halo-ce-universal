@@ -2186,6 +2186,10 @@ static GLuint mip_composite_get(const struct xgpu_texture_description *descripti
 
 static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale[4][4])
 {
+	/* Bind only after resolving every stage, since texture uploads can
+	overwrite the active unit's binding. */
+	GLenum gl_targets[D3DTSS_MAXSTAGES];
+	GLuint gl_textures[D3DTSS_MAXSTAGES];
 	int stage;
 
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
@@ -2197,7 +2201,8 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 		texture_scale[stage][2] = texture_scale[stage][3] = 1.0f;
 		if (!texture || !texture->Data || mode == 0 || mode == 0x04 || mode == 0x05 || mode == 0x11)
 		{
-			state_texture(stage, GL_TEXTURE_2D, 0);
+			gl_targets[stage] = GL_TEXTURE_2D;
+			gl_textures[stage] = 0;
 			key->sampler_type[stage] = mode == 0x11 ? _xgpu_sampler_2d : _xgpu_sampler_none;
 			continue;
 		}
@@ -2235,7 +2240,8 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 					texture_scale[stage][1] = 1.0f / (float)description.height;
 				}
 			}
-			state_texture(stage, gl_target, gl_texture);
+			gl_targets[stage] = gl_target;
+			gl_textures[stage] = gl_texture;
 			state_sampler(stage, device.samplers[stage]);
 			configure_sampler(stage, description.levels > 1, description.hires);
 			if (stage == 0)
@@ -2244,6 +2250,8 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 				gl_target == GL_TEXTURE_3D ? _xgpu_sampler_3d : _xgpu_sampler_2d;
 		}
 	}
+	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
+		state_texture(stage, gl_targets[stage], gl_textures[stage]);
 }
 
 static GLenum stencil_operation(DWORD operation)
