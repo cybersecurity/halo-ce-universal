@@ -207,3 +207,9 @@ cases above are still unverified. Keep the PR in draft until those checks pass.
   both Mac ICNS and iOS catalog now use the correct bitmap.
 - Native ABI, memory, audio callback/deadlock, display sizing, 16 XISO cases
   and room bridge tests pass. Both physical-device and Mac release builds pass.
+- At the user's updated request, installed 0.1.4 (8) on iPhone 15 Pro
+  (`iPhone16,1`, A17 Pro, iOS 27.0.1) and copied the verified private disc/map
+  generation into its app container. Normal launch reached the main menu,
+  with 199 resolved imports, Metal rendering, active PCM output and touch
+  controls. Existing saves were preserved. No controller was connected during
+  this smoke test; the earlier iPhone 13 Pro controller evidence is unchanged.
