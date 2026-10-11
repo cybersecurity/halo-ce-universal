@@ -637,3 +637,17 @@ The host logs to `debug.txt` when a player on another machine presses the
 action button where the host has nothing for them to pick up, with where it
 has them and the nearest item: a client that sees a pickup the host does
 not.
+
+## Co-op death notices
+
+Co-op has no competitive game engine to announce deaths. The host's
+`network_killfeed.c` formats real player deaths before the unit loses its
+player link, then sends the existing reliable red notice to everyone.
+Player/team kills name the killer. Other causes name the retail AI species,
+grenade, rocket or vehicle; falls, vehicle collisions and leaving the world
+are distinguished. Unknown custom tags get a neutral cause.
+
+The cache deduplicates full unit handles, resets per map and checkpoint
+revert, and ignores AI deaths, feigned deaths and no-statistics damage.
+This changes no damage, scores, respawning, saved structures, message
+formats or network version. Competitive announcements remain their mode's.

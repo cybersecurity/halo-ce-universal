@@ -73,6 +73,7 @@ machine (their datum identifiers need not be).
 #include "units/biped_definitions.h"
 #include "units/bipeds.h"
 #include "network_coop.h"
+#include "network_killfeed.h"
 #include "network_distributed.h"
 #include "network_voice.h"
 #include "profile_sections.h"
@@ -3364,6 +3365,7 @@ void network_distributed_new_game(
 	network_damage_new_game();
 	network_actors_new_game();
 	network_coop_new_game();
+	network_killfeed_reset();
 	network_votekick_new_game();
 }
 
