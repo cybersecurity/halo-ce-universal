@@ -1124,3 +1124,8 @@ each of the browser's frames, the cache thread starts at a function of
 `CreateThread`'s type, `debug.txt`'s lines go to the page's log) and the
 declarations given their definitions' types, which WebAssembly needs, are
 listed in "Game source changes" in [../web/README.md](../web/README.md).
+
+Co-op shows red death notices naming the victim and killer, including team
+kills, and retail causes such as Grunts, Combat Flood, plasma grenades,
+Wraith collisions, falling and leaving the world. The host sends one notice
+per real player death through the existing reliable notice channel.
