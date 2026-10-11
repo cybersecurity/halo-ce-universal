@@ -393,6 +393,19 @@ def test_system_link_bots_messages_are_the_games():
         assert len(data) - 4 == sizes[name], name
 
 
+# ---------- the wire format (tools/network_format.py)
+
+
+def test_network_format_is_the_recorded_one():
+    """what the machines send each other is what port/linux/network_format.txt
+    records for HALO_PORT_NETWORK_VERSION, and NETCODE.md says what that
+    version changed"""
+    from tools import network_format
+
+    problems = network_format.check()
+    assert not problems, "\n".join(problems)
+
+
 # ---------- the tag validator (port/linux/game/tag_validate.c)
 
 RETAIL_MAPS = Path("assets/maps")

@@ -184,10 +184,18 @@ lists a public game with a password with its invite's token sealed with the
 password's key (`p2p_lobby.c`), a listing of another layout; version 21
 sends each killing blow again reliably and an object come to rest three
 times (a client waits for a player's blow before its body dies without one),
-and switches co-op's BSP on the host's crossing alone; version 26 has each
-machine say its WebRTC in internet play's signalling (a native build's
-certificate, a browser's ICE credentials too), so that browsers play
-(port/linux/README.md, "Browsers").
+and switches co-op's BSP on the host's crossing alone; version 22 names a
+Custom Edition map `custom_maps\<name>`, which older clients cannot load or
+explain; version 23 keeps the blocks of a Custom Edition map that 22 cut to
+the Xbox tools' limits, so both place the same objects; version 24 sends the
+gametype's PC vehicle set; version 25 sends a unit's integrated light with
+its object state; version 26 has each machine say its WebRTC in internet
+play's signalling (a native build's certificate, a browser's ICE credentials
+too), so that browsers play (port/linux/README.md, "Browsers").
+
+`port/linux/network_format.txt` records the wire format of the current
+version (`tools/network_format.py`): `test_linux_port.py` fails when the
+sources' messages, kinds, bits or structs sent whole differ from it.
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
