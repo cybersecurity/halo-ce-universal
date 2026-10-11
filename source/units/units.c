@@ -8469,9 +8469,27 @@ boolean unit_add_weapon_to_inventory(
 				break;
 
 			case _unit_add_weapon_starting:
-				if (!TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit))
+				/* port: a second weapon, into the empty slot of a one-weapon
+				loadout, is the one in hand. While the trigger was down this
+				left the choice on the weapon already held, and the next
+				action put that choice back, so the new one stayed holstered. */
 				{
-					player_control_set_desired_weapon(unit_index, inventory_index);
+					boolean holding_another = FALSE;
+					short slot;
+
+					for (slot = 0; slot < MAXIMUM_WEAPONS_PER_UNIT; slot++)
+					{
+						if (slot != inventory_index &&
+							unit->unit.weapon_object_indices[slot] != NONE)
+						{
+							holding_another = TRUE;
+						}
+					}
+					if (holding_another ||
+						!TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit))
+					{
+						player_control_set_desired_weapon(unit_index, inventory_index);
+					}
 				}
 
 			case _unit_add_weapon_replace:
