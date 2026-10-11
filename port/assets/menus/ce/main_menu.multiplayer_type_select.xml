@@ -60,13 +60,13 @@
 		<child widget="main_menu/multiplayer_type_select/multiplayer_type_create_internet_item" y="243"/>
 		<child widget="main_menu/multiplayer_type_select/multiplayer_type_create_lan_item" y="276"/>
 		<child widget="main_menu/multiplayer_type_select/multiplayer_type_coop_item" y="309"/>
-		<child widget="main_menu/multiplayer_type_select/multiplayer_type_gametypes_item" y="375"/>
+		<child widget="main_menu/multiplayer_type_select/multiplayer_type_gametypes_item" y="342"/>
 		<child widget="main_menu/multiplayer_type_select/multiplayer_type_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/multiplayer_type_select_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
 		<on event="created" run="mp type menu initialize"/>
 		<child widget="main_menu/multiplayer_type_select/header_multiplayer"/>
 		<child widget="main_menu/multiplayer_type_select/multiplayer_type_select_list"/>
-		<child widget="main_menu/blueline" x="64" y="358"/>
+		<child widget="main_menu/blueline" x="64" y="375"/>
 	</widget>
 </menus>

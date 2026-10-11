@@ -85,14 +85,14 @@
 		<data input="mp prof vehicles update"/>
 		<on event="created" run="mp prof init vehicle options"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_vehicles_respawn" x="54" y="73"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_team" x="54" y="126"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_vehicle_presets" x="54" y="152"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_warthog" x="54" y="178"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_ghost" x="54" y="204"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_scorpion" x="54" y="229"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_rwarthog" x="54" y="255"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_banshee" x="54" y="281"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_cgturret" x="54" y="307"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_team" x="54" y="103"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_vehicle_presets" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_warthog" x="54" y="163"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_ghost" x="54" y="193"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_scorpion" x="54" y="223"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_rwarthog" x="54" y="253"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_banshee" x="54" y="283"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_cgturret" x="54" y="313"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/vehicle_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/vehicle_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
