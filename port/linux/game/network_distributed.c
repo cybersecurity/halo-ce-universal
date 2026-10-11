@@ -75,6 +75,7 @@ machine (their datum identifiers need not be).
 #include "network_coop.h"
 #include "network_distributed.h"
 #include "network_voice.h"
+#include "network_aim_assist.h"
 #include "profile_sections.h"
 
 #include <limits.h>
@@ -3364,6 +3365,7 @@ void network_distributed_new_game(
 	network_damage_new_game();
 	network_actors_new_game();
 	network_coop_new_game();
+	network_aim_assist_reset();
 	network_votekick_new_game();
 }
 
@@ -3971,6 +3973,11 @@ void network_distributed_handle_message(
 	word entry_size;
 
 	/* (voice chat's, in the lobby too: network_voice.c) */
+	if (network_aim_assist_handles_message(message, size))
+	{
+		network_aim_assist_handle_message(machine_index, message, size);
+		return;
+	}
 	if (network_voice_handles_message(message, size))
 	{
 		network_voice_handle_message(machine_index, message, size);
@@ -4246,6 +4253,7 @@ void network_distributed_handle_message(
 
 		/* (its count 1: the client asks again, having failed to make one of
 		the host's objects) */
+		network_aim_assist_send_policy(machine_index);
 		network_objects_client_asked(machine_index, header.count != 0);
 		/* (a machine new at its index, which may have joined the game in
 		progress: every player's statistics and the game type's state, after

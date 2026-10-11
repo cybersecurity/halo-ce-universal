@@ -119,6 +119,9 @@ enum
 	_distributed_message_voice_down = 81,
 	_distributed_message_voice_config = 82,
 
+	/* The host's mouse aim-assist policy, reliably on ready and on change. */
+	_distributed_message_aim_assist_policy = 83,
+
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
 

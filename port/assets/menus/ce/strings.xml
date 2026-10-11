@@ -589,6 +589,8 @@
 		<string text="Every time you cause your own death, there will be a \nfive-second wait before you can rejoin the game. "/>
 		<string text="You'll wait ten seconds after you cause your own \ndeath before you can return to the game."/>
 		<string text="When you suicide, you must wait fifteen seconds \nbefore you can respawn. This will give you an idea of \nwhat eternity is like."/>
+		<string text="Players keep their current mouse aim assist setting."/>
+		<string text="Disable mouse aim assist for mouse/keyboard players.\nController and touch aim assist are unchanged."/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/player_options_labels">
 		<string text="NUMBER OF LIVES:"/>
@@ -599,6 +601,7 @@
 		<string text="ODD MAN OUT:"/>
 		<string text="INVISIBLE PLAYERS:"/>
 		<string text="SUICIDE PENALTY:"/>
+		<string text="AIM ASSIST:"/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_invisible_players">
 		<string text="YES"/>
