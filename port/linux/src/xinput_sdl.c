@@ -41,6 +41,8 @@ drive the controller.
 #include "sdl_platform.h"
 #include "port_config.h"
 #include "touch_input.h"
+/* port/linux/game/network_aim_assist.c */
+extern unsigned char network_aim_assist_block_mouse(void);
 #include "halo_keyboard.h"
 
 #include <SDL3/SDL.h>
@@ -232,6 +234,22 @@ int halo_linux_touch_aiming(short gamepad_index)
 #endif
 }
 
+/* Port zero defaults to keyboard/mouse until the stick or touch aims.
+   Merely having a controller connected does not enable mouse magnetism. */
+static int mouse_is_aim_device(short gamepad_index)
+{
+    int aiming;
+    if (gamepad_index != 0) return FALSE;
+    pthread_mutex_lock(&mouse_lock);
+    aiming = stick_aimed_ms == 0 || mouse_aimed_ms >= stick_aimed_ms;
+#ifdef HALO_ANDROID
+    if (touch_aimed_ms != 0 && touch_aimed_ms >= mouse_aimed_ms &&
+        touch_aimed_ms >= stick_aimed_ms) aiming = FALSE;
+#endif
+    pthread_mutex_unlock(&mouse_lock);
+    return aiming;
+}
+
 /* whether the player on the gamepad aims with the mouse (it moved after the
 right stick last did) and input.mouse_aim_assist is off: then the view's
 magnetism leaves them be (player_control.c); the bullets' autoaim stays */
@@ -248,6 +266,8 @@ int halo_linux_mouse_aiming(short gamepad_index)
 		read_at = config_changes();
 		aim_assist = config_boolean("input.mouse_aim_assist");
 	}
+	if (network_aim_assist_block_mouse() && mouse_is_aim_device(gamepad_index))
+		return TRUE;
 	if (aim_assist)
 		return FALSE;
 	pthread_mutex_lock(&mouse_lock);

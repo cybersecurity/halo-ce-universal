@@ -285,6 +285,15 @@ A speed hack of less than a tenth is let be: the host's bounds on how far
 and how fast a client's player moves and fires hold it to the host's time
 anyway.
 
+The host's AIM ASSIST option in Player Options defaults to ALLOWED.
+BLOCK M+KB overrides optional mouse magnetism on every machine, including
+the host. Aiming with the controller or touch retains its existing behavior;
+the player's saved preference and the bullets' autoaim are unchanged.
+`network_aim_assist.c` sends the policy reliably on client ready and on
+change. Clients take it only from the host and default to blocked until it
+arrives. This adds distributed message 83; network version 27 requires
+matching builds so an older client cannot silently ignore the rule.
+
 ## Joining a game in progress
 
 A game stays open when it starts (on the Xbox it closed, since every
