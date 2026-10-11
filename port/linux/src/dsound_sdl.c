@@ -483,6 +483,36 @@ next, so the blend is a multiply and an add a tap */
 static float resampler_phases[RESAMPLER_TABLE_STEPS + 1][RESAMPLER_TAPS] RESAMPLER_ALIGNED;
 static float resampler_deltas[RESAMPLER_TABLE_STEPS][RESAMPLER_TAPS] RESAMPLER_ALIGNED;
 
+/* How source samples are converted to the output sample rate */
+enum resampler_mode
+{
+	/* windowed sinc low pass */
+	RESAMPLER_SINC,
+	/* linear interpolation: it suppresses unwanted spectral images
+	less effectively, but it is a brighter alternative */
+	RESAMPLER_LINEAR,
+};
+/* audio.resampler */
+static enum resampler_mode resampler_mode = RESAMPLER_SINC;
+
+static enum resampler_mode get_resampler_mode_from_config(void)
+{
+	const char *setting = config_string("audio.resampler");
+
+	if (setting)
+	{
+		if (!strcmp(setting, "sinc"))
+		{
+			return RESAMPLER_SINC;
+		}
+		if (!strcmp(setting, "linear"))
+		{
+			return RESAMPLER_LINEAR;
+		}
+	}
+	return RESAMPLER_SINC;
+}
+
 static double bessel_i0(double x)
 {
 	double sum = 1.0, term = 1.0;
@@ -776,6 +806,17 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 		{
 			/* a voice turned all the way down (out of earshot), and not
 			sending to the reverb, only moves on */
+		}
+		else if (resampler_mode == RESAMPLER_LINEAR)
+		{
+			unsigned long first = stream->center % RESAMPLER_HISTORY;
+			unsigned long next = (first + 1) % RESAMPLER_HISTORY;
+			float fraction = (float)stream->phase;
+			const float *left_frames = stream->history[0];
+			const float *right_frames = stream->history[1];
+
+			sample_left = left_frames[first] + (left_frames[next] - left_frames[first]) * fraction;
+			sample_right = right_frames[first] + (right_frames[next] - right_frames[first]) * fraction;
 		}
 		else if (scale == 1.0f)
 		{
@@ -1357,6 +1398,7 @@ static void audio_start(void)
 	audio_started = TRUE;
 	master_volume = (float)config_real("audio.volume");
 	reverb_enabled = config_boolean("audio.reverb");
+	resampler_mode = get_resampler_mode_from_config();
 	resampler_initialize();
 	resampler_phases_initialize();
 	reverb_initialize();
@@ -1696,6 +1738,11 @@ VOID WINAPI DirectSoundDoWork(void)
 		volume_read_at = config_changes();
 		master_volume = (float)config_real("audio.volume");
 		reverb_enabled = config_boolean("audio.reverb");
+		/* TODO: audio.resampler option is not added to UI yet:
+		it can only be changed from config.toml.
+		So currently, get_resampler_mode_from_config call here does nothing.
+		Remove this comment when audio.resampler can be changed through UI */
+		resampler_mode = get_resampler_mode_from_config();
 	}
 	streams_complete_finished();
 }
