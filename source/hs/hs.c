@@ -2805,7 +2805,8 @@ symbols in this file:
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
 #include "networking/network_server_manager.h"
-#include "network_votekick.h" /* port: port/linux/game/network_votekick.c */
+#include "network_votekick.h"
+#include "network_suicide.h" /* port: port/linux/game/network_suicide.c */ /* port: port/linux/game/network_votekick.c */
 #include "objects/damage.h"
 #include "objects/object_lights.h"
 #include "objects/scenery.h"
@@ -13971,6 +13972,9 @@ static void hs_enumerate_function_names(
 {
 	short function_index;
 
+	/* port: console-only self-kill commands, also available to clients. */
+	hs_tokens_enumerate_add_string("kill");
+	hs_tokens_enumerate_add_string("suicide");
 	for (function_index = 0; function_index<hs_function_table_count; function_index++)
 		hs_tokens_enumerate_add_string(hs_function_get(function_index)->name);
 	return;
@@ -15367,6 +15371,9 @@ static boolean hs_compile_and_evaluate_command(
 	if (profile_console_command(expression))
 		return TRUE;
 #endif
+	/* port: a client may request only its own current unit's death. */
+	if (network_suicide_console_command(expression, &success))
+		return success;
 	/* port: the co-op host's bringto, which brings every player to the host
 	(players.c; a client is told it is the host's) */
 	if (hs_host_player_command(expression, "bringto"))

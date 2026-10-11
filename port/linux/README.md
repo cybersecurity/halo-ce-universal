@@ -1124,3 +1124,8 @@ each of the browser's frames, the cache thread starts at a function of
 `CreateThread`'s type, `debug.txt`'s lines go to the page's log) and the
 declarations given their definitions' types, which WebAssembly needs, are
 listed in "Game source changes" in [../web/README.md](../web/README.md).
+
+The console commands `kill` and `suicide` (no arguments) kill your current
+living player in singleplayer or multiplayer. They can free a player stuck
+in co-op without restarting the level. Clients ask the host to perform the
+kill; normal lives, respawning and suicide penalties still apply.

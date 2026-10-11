@@ -637,3 +637,18 @@ The host logs to `debug.txt` when a player on another machine presses the
 action button where the host has nothing for them to pick up, with where it
 has them and the nearest item: a client that sees a pickup the host does
 not.
+
+## Console self-kill
+
+`kill` and `suicide` take no arguments and request the invoking local
+player's death, including in co-op. The host runs the ordinary unit-kill
+path, so respawning, lives and suicide penalties retain the mode's rules.
+This lets a stuck player, or many stuck co-op players, respawn without a
+host restarting the level. It also works in singleplayer.
+
+The client sends distributed message 84 reliably. The host accepts only
+an authenticated stream, the sender's full player handle, its current
+living unit and its unit-to-player backlink. Naming the unit prevents a
+delayed request killing a respawn; requests are limited to one a second
+per player. Neither command is a function exposed to map scripts. Network
+version 27 distinguishes this new request from builds without it.
