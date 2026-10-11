@@ -75,6 +75,7 @@ machine (their datum identifiers need not be).
 #include "network_coop.h"
 #include "network_distributed.h"
 #include "network_voice.h"
+#include "network_suicide.h"
 #include "profile_sections.h"
 
 #include <limits.h>
@@ -3364,6 +3365,7 @@ void network_distributed_new_game(
 	network_damage_new_game();
 	network_actors_new_game();
 	network_coop_new_game();
+	network_suicide_reset();
 	network_votekick_new_game();
 }
 
@@ -3971,6 +3973,11 @@ void network_distributed_handle_message(
 	word entry_size;
 
 	/* (voice chat's, in the lobby too: network_voice.c) */
+	if (network_suicide_handles_message(message, size))
+	{
+		network_suicide_handle_message(machine_index, message, size, distributed_handling_stream_message);
+		return;
+	}
 	if (network_voice_handles_message(message, size))
 	{
 		network_voice_handle_message(machine_index, message, size);

@@ -119,6 +119,9 @@ enum
 	_distributed_message_voice_down = 81,
 	_distributed_message_voice_config = 82,
 
+	/* A client asks the host to kill only its current unit (reliable). */
+	_distributed_message_suicide_request = 84,
+
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
 
