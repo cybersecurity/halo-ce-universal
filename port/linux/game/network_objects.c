@@ -2846,8 +2846,8 @@ void network_objects_client_picked_up_weapon(
 }
 
 /* the weapons its own players picked up readied once they have them, as
-unit_add_weapon_to_inventory readies a pickup where it decides it (not
-while firing): the client chooses its players' weapons in hand
+unit_add_weapon_to_inventory readies a pickup where it decides it (a second
+weapon too, while firing): the client chooses its players' weapons in hand
 (distributed_client_apply_inventory), and the host follows */
 static void distributed_client_ready_picked_up_weapons(
 	void)
@@ -2872,21 +2872,39 @@ static void distributed_client_ready_picked_up_weapons(
 			continue;
 		}
 		unit = unit_get(unit_index);
-		for (weapon_slot = 0; weapon_slot < MAXIMUM_WEAPONS_PER_UNIT; weapon_slot++)
 		{
-			long weapon_index = unit->unit.weapon_object_indices[weapon_slot];
-			struct weapon_datum *weapon = weapon_index != NONE ? weapon_try_and_get(weapon_index) : NULL;
+			short current_slot = unit->unit.current_weapon_index;
+			short matched_slot = NONE;
+			long current_weapon_index = unit_inventory_get_weapon(unit_index, current_slot);
+			struct weapon_datum *current_weapon = current_weapon_index != NONE ?
+				weapon_try_and_get(current_weapon_index) : NULL;
 
-			if (weapon && weapon->definition_index == picked_up->definition_index)
-				break;
+			/* already the one in hand (a swap into that slot): nothing to ready */
+			if (current_weapon && current_weapon->definition_index == picked_up->definition_index)
+			{
+				picked_up->definition_index = NONE;
+				continue;
+			}
+			for (weapon_slot = 0; weapon_slot < MAXIMUM_WEAPONS_PER_UNIT; weapon_slot++)
+			{
+				long weapon_index = unit->unit.weapon_object_indices[weapon_slot];
+				struct weapon_datum *weapon = weapon_index != NONE ? weapon_try_and_get(weapon_index) : NULL;
+
+				if (weapon && weapon_slot != current_slot &&
+					weapon->definition_index == picked_up->definition_index)
+				{
+					matched_slot = weapon_slot;
+				}
+			}
+			if (matched_slot == NONE)
+				continue;
+			weapon_slot = matched_slot;
 		}
-		if (weapon_slot == MAXIMUM_WEAPONS_PER_UNIT)
-			continue;
-		if (!TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit))
-		{
-			player_control_set_desired_weapon(unit_index, weapon_slot);
-			unit->unit.desired_weapon_index = weapon_slot;
-		}
+		/* port: a one-weapon loadout's second weapon is readied when it
+		arrives, including while firing. Dropping the announcement on a
+		held trigger left it holstered until a manual switch. */
+		player_control_set_desired_weapon(unit_index, weapon_slot);
+		unit->unit.desired_weapon_index = weapon_slot;
 		picked_up->definition_index = NONE;
 	}
 }
